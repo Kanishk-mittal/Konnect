@@ -5,10 +5,6 @@ class Config:
     # Load environment variables from .env file
     dotenv.load_dotenv()
 
-    # MongoDB configuration
-    MONGO_URI = os.getenv("MONGO_URI")  # MongoDB connection URI
-    DB_NAME = os.getenv("DB_NAME")  # MongoDB database name
-
     # Email configuration (for password recovery, notifications, etc.)
     MAIL_SERVER = "smtp.mailtrap.io"  # Replace with your email service SMTP server
     MAIL_PORT = 587  # Port for sending emails
@@ -17,4 +13,11 @@ class Config:
     SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")  # Replace with your email password
 
     # Secret key for sessions and CSRF protection (Ensure to change this to a random value in production)
-    SECRET_KEY = "your-secret-key"  # Change to a strong secret key in production
+    SECRET_KEY = os.getenv("SECRET_KEY") # Change to a strong secret key in production
+
+    # JWT related configurations
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")  # JWT secret key
+    JWT_TOKEN_LOCATION = ["cookies"]
+    JWT_COOKIE_SECURE = True  # Use HTTPS in production
+    JWT_COOKIE_HTTPONLY = True
+    JWT_COOKIE_SAMESITE = "Lax"

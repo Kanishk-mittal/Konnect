@@ -1,14 +1,28 @@
 from flask import Flask
+from flask_jwt_extended import JWTManager
+from app.config import Config
+import logging
+from flask_cors import CORS
 
-# Initialize PyMongo inside the create_app function
 def create_app():
     app = Flask(__name__)
+    CORS(app,supports_credentials=True,origins="http://localhost:5173")
+    app.config.from_object(Config)
+    JWTManager(app)
 
-    # Load configuration
-    app.config.from_object("app.config.Config")
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,  # Change to logging.INFO in production
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler("app.log"),  # Logs to a file
+            logging.StreamHandler()  # Logs to console
+        ]
+    )
 
-    # Register Blueprints or routes
+    # Import and register routes
     from app.routes import main_bp
     app.register_blueprint(main_bp)
 
     return app
+

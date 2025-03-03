@@ -1,8 +1,3 @@
-from pymongo import MongoClient
-import os
-from dotenv import load_dotenv
-from werkzeug.security import generate_password_hash, check_password_hash
-
 class User:
     def __init__(self, name: str, roll_number: int, email: str, password: str):
         self.name = name
@@ -29,17 +24,4 @@ class User:
         if user:
             return User(user["name"], user["roll_number"], user["email"], user["password"])
         return None
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Connect to the MongoDB server
-conn = MongoClient(os.getenv("MONGO_URI"))
-db = conn["Konnect"]
-
-# Create a dummy user
-dummy_user = User(name='dummy',roll_number='1234',email='abcd@gmail.com',password=generate_password_hash('1234'))
-
-dummy_user.to_db(db)
-
-print("Dummy user added successfully.")
+        
