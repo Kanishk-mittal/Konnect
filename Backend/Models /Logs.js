@@ -8,4 +8,4 @@ const LogSchema = new mongoose.Schema({
     DeviceType :{type : String , required : false }, 
 });
 
-module.exports = mongoose.exports("logs" , LogSchema);
+module.exports = mongoose.model("logs" , LogSchema);
