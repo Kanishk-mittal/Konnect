@@ -8,4 +8,4 @@ const SessionSchema = new mongoose.Schema({
 
 });
 
-module.exports = mongoose.exports("Session", SessionSchema);
+module.exports = mongoose.model("Session", SessionSchema);
