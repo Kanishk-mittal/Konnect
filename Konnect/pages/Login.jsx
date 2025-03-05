@@ -5,41 +5,92 @@ import JSEncrypt from "jsencrypt";
 
 
 const Login = () => {
-    //State for roll and password
     const [roll, setroll] = useState('')
     const [password, setPassword] = useState('')
+    const instance = axios.create({
+        withCredentials: true,
+        baseURL: "http://localhost:5000",
+        mode: 'cors',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+
+    const logOut = async () => {
+        try {
+            // Extract CSRF token from cookies
+            const csrfToken = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrf_access_token='))
+                ?.split('=')[1];
+
+            if (!csrfToken) {
+                console.error("CSRF token not found");
+                return;
+            }
+
+            // Send request with CSRF token
+            const response = await instance.post('/logout', {}, {
+                withCredentials: true,
+                headers: {
+                    "X-CSRF-TOKEN": csrfToken  // Include CSRF token in the request
+                }
+            });
+
+            console.log(response.data);
+        } catch (error) {
+            console.error("Error:", error.response?.data || error.message);
+        }
+    }
 
     const handleLogin = async () => {
         // getting RSA public key
         const { data } = await axios.post('http://localhost:5000/publicKey')
         const publicKeyPem = data.public_key
         const key = new JSEncrypt();
-        key.setPublicKey(publicKeyPem);
-
-        // Encrypting roll and password
+        key.setPublicKey(publicKeyPem);;
         const encryptedroll = key.encrypt(roll, 'base64');
         const encryptedPassword = key.encrypt(password, 'base64');
-
-        // creating template for axios instance
-        const instance = axios.create({
-            withCredentials: true,
-            baseURL: "http://localhost:5000",
-            mode: 'cors',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        // sending encrypted roll and password to backend
+        console.log("roll:- " + encryptedroll)
+        console.log("Password:- " + encryptedPassword)
         const response = await instance.post('/login', {
             roll: encryptedroll,
             password: encryptedPassword
         })
+        console.log(response.data)
     }
+    const testLogin = async () => {
+        try {
+            // Extract CSRF token from cookies
+            const csrfToken = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrf_access_token='))
+                ?.split('=')[1];
+
+            if (!csrfToken) {
+                console.error("CSRF token not found");
+                return;
+            }
+
+            // Send request with CSRF token
+            const response = await instance.post('/protected', {}, {
+                withCredentials: true,
+                headers: {
+                    "X-CSRF-TOKEN": csrfToken  // Include CSRF token in the request
+                }
+            });
+
+            console.log(response.data);
+        } catch (error) {
+            console.error("Error:", error.response?.data || error.message);
+        }
+    };
+
+
 
     return (
-        // Modify the code below as per the desing
         <>
             <div>
             </div>
@@ -67,7 +118,10 @@ const Login = () => {
                         </label>
                     </div>
                     <button type="submit">Login</button>
+
                 </form>
+                <button onClick={logOut}>Logout</button>
+                <button onClick={testLogin}>Test</button>
             </div>
         </>
     )

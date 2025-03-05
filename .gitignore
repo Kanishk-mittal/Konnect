@@ -76,3 +76,9 @@ coverage.xml
 
 # VS Code
 .vscode/
+
+# temporary testing files
+Backend/testing
+
+#keys
+Backend/keys
