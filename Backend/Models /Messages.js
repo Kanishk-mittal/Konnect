@@ -12,4 +12,4 @@ reply_to : {type : mongoose.Schema.Types.ObjectId , ref :"Message" , required : 
 deleted : {type : Boolean , default : false }
 });
 
-module.exports = mongoose.exports("Messages" , MessageSchema);
+module.exports = mongoose.model("Messages" , MessageSchema);
