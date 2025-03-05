@@ -7,4 +7,4 @@ const clubSchema = new mongoose.Schema({
   Updated_time : {type : Date , default : Date.now },
 })
 
-module.exports = mongoose.exports("Clubs",clubSchema);
+module.exports = mongoose.model("Clubs",clubSchema);
