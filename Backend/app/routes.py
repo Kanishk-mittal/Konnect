@@ -2,73 +2,10 @@ import base64
 from flask import request, jsonify, make_response, Blueprint
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import serialization
-import pymongo
-import os
-from dotenv import load_dotenv
-
-def init_dadabase():
-    """
-    Initializes the database connection using environment variables.
-
-    This function loads environment variables from a .env file, retrieves the MongoDB
-    connection URI and database name, and establishes a connection to the MongoDB
-    server. It returns a reference to the specified database.
-
-    Returns:
-        pymongo.database.Database: A reference to the MongoDB database.
-    """
-    load_dotenv()
-    connection_uri = os.getenv("MONGO_URI")
-    connection_uri = connection_uri.lstrip('\"')
-    conn = pymongo.MongoClient(connection_uri)
-    db_name = os.getenv("DB_NAME")
-    db = conn[db_name]
-    return db
-
-db = init_dadabase()  # Database object for operations
+from app.utils import get_public_key_pem, db, decrypt, handle_options
 
 # Initialize the blueprint
 main_bp = Blueprint("main", __name__)
-
-#TODO: Move the key generation to a separate file and store it persistently but this is also fine for devlopment phase
-private_key = rsa.generate_private_key(
-    public_exponent=65537,
-    key_size=2048
-)
-public_key = private_key.public_key()
-
-def get_public_key_pem():
-    """
-    Retrieve the public key in PEM format.
-
-    This function returns the public key encoded in PEM format as a string.
-    The public key is serialized using the SubjectPublicKeyInfo format.
-
-    Returns:
-        str: The public key in PEM format.
-    """
-    return public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
-    ).decode()
-
-def decrypt(ciphertext):
-    """
-    Decrypts the given ciphertext using the private key and PKCS1v15 padding.
-
-    Args:
-        ciphertext (bytes): The encrypted data to be decrypted.
-
-    Returns:
-        str: The decrypted plaintext as a string.
-    """
-    return private_key.decrypt(
-        ciphertext,
-        padding.PKCS1v15()
-    ).decode()
-
 
 @main_bp.route("/publicKey", methods=["POST"])
 def get_public_key():
@@ -96,15 +33,8 @@ def login():
     Raises:
         401 Unauthorized: If the provided credentials are invalid.
     """
-    if request.method == "OPTIONS":  # to manage CORS preflight requests (please do not touch even a single character of this block)
-        print("Option request received")
-        response = jsonify({"message": "CORS preflight response"})
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "X-Requested-With, Content-Type"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        print(response.headers)
-        return response, 200
+    if request.method == "OPTIONS":  # to manage CORS preflight requests
+        return handle_options()
 
     data = request.get_json()
 
