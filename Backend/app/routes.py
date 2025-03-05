@@ -1,8 +1,8 @@
 import base64
 from flask import request, jsonify, make_response, Blueprint
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_csrf_token
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.utils import get_public_key_pem, db, decrypt, handle_options
+from app.utils import get_public_key_pem, db, decrypt, handle_options, public_key
 
 # Initialize the blueprint
 main_bp = Blueprint("main", __name__)
@@ -18,7 +18,7 @@ def get_public_key():
         Returns:
             JSON: A JSON object with the public key.
     """
-    return jsonify({"public_key": get_public_key_pem()})
+    return jsonify({"public_key": public_key()})
 
 @main_bp.route("/login", methods=["POST","OPTIONS"])
 def login():
@@ -62,19 +62,35 @@ def login():
         secure=True,
         samesite="None"
     )
+    # Create csrf token
+    csrf_token = get_csrf_token(access_token)
+    response.set_cookie(
+        "csrf_access_token",  # CSRF token for frontend
+        csrf_token,
+        httponly=False,  # This must be readable by JavaScript
+        secure=True,
+        samesite="None"
+    )
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
 
-# TODO :Check these routes
-@main_bp.route("/logout", methods=["POST"])
+@main_bp.route("/logout", methods=["POST","OPTIONS"])
+@jwt_required(locations='cookies')
 def logout():
+    if request.method == "OPTIONS":
+        return handle_options()
     response = make_response(jsonify({"msg": "Logout successful"}))
     response.set_cookie("access_token_cookie", "", expires=0)
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
-@main_bp.route("/protected", methods=["GET"])
-@jwt_required()
+@main_bp.route("/protected", methods=["POST","OPTIONS"])
+@jwt_required(locations='cookies')
 def protected():
+    if request.method == "OPTIONS":
+        return handle_options()
     current_user = get_jwt_identity()
-    return jsonify(logged_in_as=current_user)
+    response=make_response(jsonify(logged_in_as=current_user),200)
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response

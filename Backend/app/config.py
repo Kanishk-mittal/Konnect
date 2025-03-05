@@ -18,6 +18,7 @@ class Config:
     # JWT related configurations
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")  # JWT secret key
     JWT_TOKEN_LOCATION = ["cookies"]
+    JWT_ACCESS_TOKEN_NAME = "access_token_cookie"
     JWT_COOKIE_SECURE = True  # Use HTTPS in production
     JWT_COOKIE_HTTPONLY = True
     JWT_COOKIE_SAMESITE = "Lax"

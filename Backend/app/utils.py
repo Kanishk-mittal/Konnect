@@ -99,6 +99,12 @@ def get_public_key_pem():
     with open(PUBLIC_KEY_PATH, "rb") as key_file:
         return serialization.load_pem_public_key(key_file.read())
 
+def public_key():
+    return get_public_key_pem().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode()
+
 # Generate keys if not present
 generate_keys()
 
@@ -115,11 +121,7 @@ def decrypt(ciphertext):
     private_key = get_private_key()
     plaintext = private_key.decrypt(
         ciphertext,
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=padding.Algorithms.SHA256()),
-            algorithm=padding.Algorithms.SHA256(),
-            label=None
-        )
+        padding.PKCS1v15()
     )
     return plaintext.decode("utf-8")
 
@@ -127,6 +129,6 @@ def handle_options():
     response = jsonify({"message": "CORS preflight response"})
     response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
     response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "X-Requested-With, Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = "X-Requested-With, Content-Type, X-CSRF-TOKEN"
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response, 200
