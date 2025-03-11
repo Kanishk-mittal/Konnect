@@ -7,10 +7,8 @@ const UserSchema = new mongoose.Schema({
     role : {type : String , required : true , enum : ["Student" ,"Admin" , "clubAdmin"]}, 
     public_key : {type : String , reuired : false  }, // encryption purpose ;;;
     profile_pic : {type : String , required : false },
-    // status :  {type : String , required : false , default : "Let's Konnect!"}  // if required 
     last_seen : {type : Date , default : Date.now}, // last Active
     is_online : {type : Boolean , default : false}  // Real-Time Tracking
-
 });
 
 module.exports = mongoose.model("User" , UserSchema);

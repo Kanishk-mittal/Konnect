@@ -4,6 +4,10 @@ import pymongo
 import os
 from dotenv import load_dotenv
 from flask import jsonify
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from Crypto.Random import get_random_bytes
+import base64
 
 def init_dadabase():
     """
@@ -108,7 +112,7 @@ def public_key():
 # Generate keys if not present
 generate_keys()
 
-def decrypt(ciphertext):
+def decrypt_RSA(ciphertext:str):
     """
     Decrypts the given ciphertext using the private key and PKCS1v15 padding.
 
@@ -132,3 +136,20 @@ def handle_options():
     response.headers["Access-Control-Allow-Headers"] = "X-Requested-With, Content-Type, X-CSRF-TOKEN"
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response, 200
+
+key_env = os.getenv("AES_KEY_INTERNAL")  
+
+def encrypt_AES_CBC(plain_text,key=key_env):
+    KEY=base64.b64decode(key)
+    iv = get_random_bytes(16)  # Generate random IV
+    cipher = AES.new(KEY, AES.MODE_CBC, iv)
+    encrypted_bytes = cipher.encrypt(pad(plain_text.encode(), AES.block_size))
+    return base64.b64encode(iv + encrypted_bytes).decode()  # Encode IV + ciphertext
+
+def decrypt_AES_CBC(encrypted_text,key=key_env):
+    KEY=base64.b64decode(key)
+    encrypted_data = base64.b64decode(encrypted_text)
+    iv = encrypted_data[:16]  # Extract IV
+    cipher = AES.new(KEY, AES.MODE_CBC, iv)
+    decrypted_bytes = unpad(cipher.decrypt(encrypted_data[16:]), AES.block_size)
+    return decrypted_bytes.decode()

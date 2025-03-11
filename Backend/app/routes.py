@@ -1,8 +1,8 @@
 import base64
 from flask import request, jsonify, make_response, Blueprint
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_csrf_token
-from werkzeug.security import generate_password_hash, check_password_hash
-from app.utils import get_public_key_pem, db, decrypt, handle_options, public_key
+from app.utils import db, handle_options, public_key, decrypt_RSA,key_env
+from app.Models.User import User
 
 # Initialize the blueprint
 main_bp = Blueprint("main", __name__)
@@ -43,14 +43,13 @@ def login():
     encrypted_password = base64.b64decode(data["password"])
     
     # Decrypt the data
-    roll = decrypt(encrypted_roll)
-    password = decrypt(encrypted_password)
+    roll = decrypt_RSA(encrypted_roll)
+    password = decrypt_RSA(encrypted_password)
 
-    # Check if the user exists and the password is correct by matching the hashes
-    user = db.users.find_one({"roll_number": roll})
-    if not user or not check_password_hash(user["password"], password):
-        return jsonify({"msg": "Invalid credentials"}), 401
+    isVerified=User.verify(roll, password, db)
     
+    if not isVerified:
+        return jsonify({"msg": "Invalid credentials"}), 401
 
     # Create an access token and setting it as cookie
     access_token = create_access_token(identity=roll)
@@ -74,6 +73,61 @@ def login():
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
+# TODO: Work on register route
+@main_bp.route("/register", methods=["POST","OPTIONS"])
+def register():
+    if request.method == "OPTIONS":
+        return handle_options()
+    data = request.get_json()
+    encrypted_roll = base64.b64decode(data["roll"])
+    encrypted_password = base64.b64decode(data["password"])
+    encrypted_name = base64.b64decode(data["name"])
+    public_key=base64.b64decode(data["public_key"])
+    email=base64.b64decode(data["email"])
+    roll = decrypt_RSA(encrypted_roll)
+    password = decrypt_RSA(encrypted_password)
+    name = decrypt_RSA(encrypted_name)
+    email=decrypt_RSA(email)
+
+    user = User(
+        ame=name,
+        roll_number=roll,
+        password=password,
+        email=email,
+        role='Student',
+        public_key=public_key,
+        profile_pic=None,
+        is_online=True
+        )
+    if not user.check_unique():
+        response=make_response(jsonify({'msg':'Account already exist'}))
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    user.to_db(db)
+    # Create an access token and setting it as cookie
+    access_token = create_access_token(identity=roll)
+    encrypted_key=user.get_AES_key()
+    response = make_response(jsonify({"msg": "Login successful","key":encrypted_key}))
+    response.set_cookie(
+        "access_token_cookie",
+        access_token,
+        httponly=True,
+        secure=True,
+        samesite="None"
+    )
+    # Create csrf token
+    csrf_token = get_csrf_token(access_token)
+    response.set_cookie(
+        "csrf_access_token",  # CSRF token for frontend
+        csrf_token,
+        httponly=False,  # This must be readable by JavaScript
+        secure=True,
+        samesite="None"
+    )
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+
 
 @main_bp.route("/logout", methods=["POST","OPTIONS"])
 @jwt_required(locations='cookies')
@@ -92,5 +146,17 @@ def protected():
         return handle_options()
     current_user = get_jwt_identity()
     response=make_response(jsonify(logged_in_as=current_user),200)
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+@main_bp.route("/get_AES_key", methods=["POST","OPTIONS"])
+@jwt_required(locations='cookies')
+def get_AES_key():
+    if request.method == "OPTIONS":
+        return handle_options()
+    identity=get_jwt_identity()
+    user=User.from_db(identity,db)
+    encrypted_key=user.get_AES_key()
+    response=make_response(jsonify({'key':encrypted_key},200))
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response

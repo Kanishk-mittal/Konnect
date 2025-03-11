@@ -1,34 +1,7 @@
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
-from werkzeug.security import generate_password_hash, check_password_hash
-
-class User:
-    def __init__(self, name: str, roll_number: int, email: str, password: str):
-        self.name = name
-        self.roll_number = roll_number
-        self.email = email
-        self.password = password
-
-    def to_db(self, db):
-        return db.users.insert_one({
-            "name": self.name,
-            "roll_number": self.roll_number,
-            "email": self.email,
-            "password": self.password
-        })
-    @staticmethod
-    def verify(roll_number:int, hashed_password:str,db):
-        user = db.users.find_one({"roll_number": roll_number})
-        if user and user["password"] == hashed_password:
-            return True
-        return False
-    @staticmethod
-    def from_db(roll_number:int, db):
-        user = db.users.find_one({"roll_number": roll_number})
-        if user:
-            return User(user["name"], user["roll_number"], user["email"], user["password"])
-        return None
+from app.Models.User import User
 
 # Load environment variables from .env file
 load_dotenv()
@@ -38,7 +11,16 @@ conn = MongoClient(os.getenv("MONGO_URI"))
 db = conn["Konnect"]
 
 # Create a dummy user
-dummy_user = User(name='dummy',roll_number='1234',email='abcd@gmail.com',password=generate_password_hash('1234'))
+dummy_user = User(
+    name="Dummy User",
+    roll_number= '1234',
+    password= '1234',
+    email='dummy@gmail.com',
+    role= 'Student',
+    public_key= '1234',
+    profile_pic = '1234',
+    is_online = False
+)
 
 dummy_user.to_db(db)
 
