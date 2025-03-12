@@ -44,7 +44,7 @@ const Login = () => {
             console.error("Error:", error.response?.data || error.message);
         }
     }
-
+    // TODO Generate RSA key pair send public key along with the login request to get AES key and using that decrypt the private key stored in the local storage (remember that the both the {lable:privte_key} are encrypted using the AES key under name private_key)
     const handleLogin = async () => {
         // getting RSA public key
         const { data } = await axios.post('http://localhost:5000/publicKey')
@@ -53,13 +53,10 @@ const Login = () => {
         key.setPublicKey(publicKeyPem);;
         const encryptedroll = key.encrypt(roll, 'base64');
         const encryptedPassword = key.encrypt(password, 'base64');
-        console.log("roll:- " + encryptedroll)
-        console.log("Password:- " + encryptedPassword)
         const response = await instance.post('/login', {
             roll: encryptedroll,
             password: encryptedPassword
         })
-        console.log(response.data)
     }
     const testLogin = async () => {
         try {

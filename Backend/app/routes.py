@@ -20,6 +20,8 @@ def get_public_key():
     """
     return jsonify({"public_key": public_key()})
 
+
+# TODO: user will send a public key encrypt AES Key using that public key and send it to user as he needs it to decrypt his own private key
 @main_bp.route("/login", methods=["POST","OPTIONS"])
 def login():
     """
@@ -90,7 +92,7 @@ def register():
     email=decrypt_RSA(email)
 
     user = User(
-        ame=name,
+        name=name,
         roll_number=roll,
         password=password,
         email=email,
