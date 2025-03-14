@@ -23,8 +23,6 @@ class User:
             "profile_pic": encrypt_AES_CBC(self.profile_pic) ,
             "is_online": self.is_online
         })
-    def get_AES_key():
-        return""
 
     @staticmethod
     def verify(roll: str, password: str, db):

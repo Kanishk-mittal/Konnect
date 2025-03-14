@@ -18,6 +18,8 @@ const Login = () => {
         }
     })
 
+    
+
     const logOut = async () => {
         try {
             // Extract CSRF token from cookies
@@ -53,10 +55,13 @@ const Login = () => {
         key.setPublicKey(publicKeyPem);;
         const encryptedroll = key.encrypt(roll, 'base64');
         const encryptedPassword = key.encrypt(password, 'base64');
+        const{publicKey,privateKey} = generateRSAKeys()
         const response = await instance.post('/login', {
             roll: encryptedroll,
-            password: encryptedPassword
+            password: encryptedPassword,
+            pyblicKey: publicKey
         })
+        console.log(response.data)
     }
     const testLogin = async () => {
         try {

@@ -1,7 +1,7 @@
 import base64
 from flask import request, jsonify, make_response, Blueprint
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_csrf_token
-from app.utils import db, handle_options, public_key, decrypt_RSA,key_env
+from app.utils import db, handle_options, public_key, decrypt_RSA,encryptRSA,extenal_key
 from app.Models.User import User
 
 # Initialize the blueprint
@@ -43,6 +43,7 @@ def login():
     # Decode from Base64 instead of hex
     encrypted_roll = base64.b64decode(data["roll"])
     encrypted_password = base64.b64decode(data["password"])
+    user_public_key=data["pyblicKey"]
     
     # Decrypt the data
     roll = decrypt_RSA(encrypted_roll)
@@ -55,7 +56,7 @@ def login():
 
     # Create an access token and setting it as cookie
     access_token = create_access_token(identity=roll)
-    response = make_response(jsonify({"msg": "Login successful"}))
+    response = make_response(jsonify({"msg": "Login successful","key":encryptRSA(extenal_key,user_public_key)}))
     response.set_cookie(
         "access_token_cookie",
         access_token,

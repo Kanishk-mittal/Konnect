@@ -137,19 +137,40 @@ def handle_options():
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response, 200
 
-key_env = os.getenv("AES_KEY_INTERNAL")  
+internal_key = os.getenv("AES_KEY_INTERNAL")  
+extenal_key = os.getenv("AES_KEY_EXTERNAL")
 
-def encrypt_AES_CBC(plain_text,key=key_env):
+def encrypt_AES_CBC(plain_text,key=internal_key):
     KEY=base64.b64decode(key)
     iv = get_random_bytes(16)  # Generate random IV
     cipher = AES.new(KEY, AES.MODE_CBC, iv)
     encrypted_bytes = cipher.encrypt(pad(plain_text.encode(), AES.block_size))
     return base64.b64encode(iv + encrypted_bytes).decode()  # Encode IV + ciphertext
 
-def decrypt_AES_CBC(encrypted_text,key=key_env):
+def decrypt_AES_CBC(encrypted_text,key=internal_key):
     KEY=base64.b64decode(key)
     encrypted_data = base64.b64decode(encrypted_text)
     iv = encrypted_data[:16]  # Extract IV
     cipher = AES.new(KEY, AES.MODE_CBC, iv)
     decrypted_bytes = unpad(cipher.decrypt(encrypted_data[16:]), AES.block_size)
     return decrypted_bytes.decode()
+
+def encryptRSA(plaintext: str, key: str) -> str:
+    """
+    Encrypts the given plaintext using the public key and PKCS1v15 padding.
+
+    Args:
+        plaintext (str): The plaintext data to be encrypted.
+        key (str): The public key to encrypt the data with.
+
+    Returns:
+        str: The encrypted ciphertext encoded in base64.
+    """
+    public_key = serialization.load_pem_public_key(
+        key.encode()
+    )
+    ciphertext = public_key.encrypt(
+        plaintext.encode(),
+        padding.PKCS1v15()
+    )
+    return base64.b64encode(ciphertext).decode()
