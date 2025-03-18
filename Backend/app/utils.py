@@ -132,26 +132,40 @@ def decrypt_RSA(ciphertext:str):
 def handle_options():
     response = jsonify({"message": "CORS preflight response"})
     response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "X-Requested-With, Content-Type, X-CSRF-TOKEN"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRF-TOKEN, Authorization, X-Requested-With"
+    response.headers["Access-Control-Allow-Credentials"] = "true"  # Explicitly set this for OPTIONS requests
     return response, 200
 
-internal_key = os.getenv("AES_KEY_INTERNAL")  
-extenal_key = os.getenv("AES_KEY_EXTERNAL")
+internal_key = os.getenv("AES_KEY_INTERNAL") 
+external_key = os.getenv("AES_KEY_EXTERNAL")  # Fixed typo from 'extenal_key'
 
-def encrypt_AES_CBC(plain_text,key=internal_key):
-    KEY=base64.b64decode(key)
-    iv = get_random_bytes(16)  # Generate random IV
-    cipher = AES.new(KEY, AES.MODE_CBC, iv)
-    encrypted_bytes = cipher.encrypt(pad(plain_text.encode(), AES.block_size))
-    return base64.b64encode(iv + encrypted_bytes).decode()  # Encode IV + ciphertext
+def encrypt_AES_CBC(plain_text, key_str=internal_key):
+    # Check if plain_text is already bytes, otherwise encode it
+    text_to_encrypt = plain_text if isinstance(plain_text, bytes) else plain_text.encode()
+    
+    # Decode the base64-encoded key to get raw bytes
+    key = base64.b64decode(key_str)
+    
+    # Generate a random 16-byte initialization vector
+    iv = get_random_bytes(16)
+    
+    # Create a new AES cipher object with the key and IV
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    
+    # Encrypt the padded plaintext
+    encrypted_bytes = cipher.encrypt(pad(text_to_encrypt, AES.block_size))
+    
+    # Concatenate the IV and ciphertext and encode as base64
+    encrypted_message = base64.b64encode(iv + encrypted_bytes).decode('utf-8')
+    
+    return encrypted_message
 
-def decrypt_AES_CBC(encrypted_text,key=internal_key):
-    KEY=base64.b64decode(key)
+def decrypt_AES_CBC(encrypted_text, key_str=internal_key):
+    key = base64.b64decode(key_str)
     encrypted_data = base64.b64decode(encrypted_text)
     iv = encrypted_data[:16]  # Extract IV
-    cipher = AES.new(KEY, AES.MODE_CBC, iv)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
     decrypted_bytes = unpad(cipher.decrypt(encrypted_data[16:]), AES.block_size)
     return decrypted_bytes.decode()
 
@@ -174,3 +188,6 @@ def encryptRSA(plaintext: str, key: str) -> str:
         padding.PKCS1v15()
     )
     return base64.b64encode(ciphertext).decode()
+
+def get_external_key():
+    return external_key
