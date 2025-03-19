@@ -20,8 +20,6 @@ def get_public_key():
     """
     return jsonify({"public_key": public_key()})
 
-
-# TODO: user will send a public key encrypt AES Key using that public key and send it to user as he needs it to decrypt his own private key
 @main_bp.route("/login", methods=["POST","OPTIONS"])
 def login():
     """
@@ -76,6 +74,7 @@ def login():
     )
     return response
 
+#TODO: Add otp functionality for registration alone and not for login also add users to some groups based on their role
 @main_bp.route("/register", methods=["POST","OPTIONS"])
 def register():
     """
