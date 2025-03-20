@@ -1,8 +1,11 @@
 import base64
 from flask import request, jsonify, make_response, Blueprint
+import time
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_csrf_token
 from app.utils import db, handle_options, public_key, decrypt_RSA, encryptRSA, external_key, get_external_key
 from app.Models.User import User
+from app.Models.OTP import OTP
+
 
 # Initialize the blueprint
 main_bp = Blueprint("main", __name__)
@@ -41,7 +44,7 @@ def login():
     # Decode from Base64 instead of hex
     encrypted_roll = base64.b64decode(data["roll"])
     encrypted_password = base64.b64decode(data["password"])
-    user_public_key=data["pyblicKey"]
+    user_public_key=data["publicKey"]
     
     # Decrypt the data
     roll = decrypt_RSA(encrypted_roll)
@@ -74,43 +77,41 @@ def login():
     )
     return response
 
-#TODO: Add otp functionality for registration alone and not for login also add users to some groups based on their role
 @main_bp.route("/register", methods=["POST","OPTIONS"])
 def register():
-    """
-    Handle user registration requests.
-    
-    This function processes registration requests by:
-    1. Decrypting the encrypted user information sent from the frontend
-    2. Creating a new user in the database
-    3. Creating a JWT access token for the new user
-    4. Sending back an encrypted AES key that the user can use to encrypt/decrypt data on the client side
-    
-    Returns:
-        Response: A Flask response object with appropriate headers, cookies, and encrypted AES key.
-        
-    Raises:
-        409 Conflict: If a user with the same roll number already exists.
-    """
     if request.method == "OPTIONS":
         return handle_options()
-    
+
     data = request.get_json()
-    
-    # Decode all encrypted data from base64
+
     encrypted_roll = base64.b64decode(data["roll"])
     encrypted_password = base64.b64decode(data["password"])
     encrypted_name = base64.b64decode(data["name"])
     encrypted_email = base64.b64decode(data["email"])
     user_public_key = data["publicKey"]
-    
-    # Decrypt the data using our private key
+    otp_input = data.get("otp")
+
     roll = decrypt_RSA(encrypted_roll)
     password = decrypt_RSA(encrypted_password)
     name = decrypt_RSA(encrypted_name)
     email = decrypt_RSA(encrypted_email)
 
-    # Create a new user instance
+    otp_doc = OTP.get_by_email(email)
+    if not otp_doc:
+        return make_response(jsonify({'msg': 'No OTP found for this email. Please request a new OTP.'}), 400)
+
+    stored_otp = otp_doc['otp']
+    expiration_time = otp_doc['expires_at']
+
+    if time.time() > expiration_time.timestamp():
+        OTP.delete_by_email(email)
+        return make_response(jsonify({'msg': 'OTP expired. Please request a new OTP.'}), 400)
+
+    if otp_input != stored_otp:
+        return make_response(jsonify({'msg': 'Invalid OTP.'}), 400)
+
+    OTP.delete_by_email(email)
+
     user = User(
         name=name,
         roll_number=roll,
@@ -121,23 +122,15 @@ def register():
         profile_pic=None,
         is_online=True
     )
-    
-    # Check if user already exists
+
     if not user.check_unique(db):
-        response = make_response(jsonify({'msg': 'Account already exists'}), 409)
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response
-    
-    # Save to database
+        return make_response(jsonify({'msg': 'Account already exists'}), 409)
+
     user.to_db(db)
-    
-    # Create an access token and set it as cookie
+
     access_token = create_access_token(identity=roll)
-    
-    # Get the external AES key and encrypt it using the user's public key
-    # Make sure we're using the external key for user communication
     encrypted_key = encryptRSA(external_key, user_public_key)
-    
+
     response = make_response(jsonify({"msg": "Registration successful", "key": encrypted_key}))
     response.set_cookie(
         "access_token_cookie",
@@ -146,8 +139,6 @@ def register():
         secure=True,
         samesite="None"
     )
-    
-    # Create csrf token
     csrf_token = get_csrf_token(access_token)
     response.set_cookie(
         "csrf_access_token",
@@ -157,6 +148,9 @@ def register():
         samesite="None"
     )
     return response
+
+
+
 
 @main_bp.route("/logout", methods=["POST","OPTIONS"])
 @jwt_required(locations='cookies')
