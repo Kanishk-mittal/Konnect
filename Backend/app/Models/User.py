@@ -43,6 +43,42 @@ class User:
             return None
         return encryptRSA(external_key, self.public_key.decode())
 
+    def get_user_groups(self, db):
+        """
+        Get all groups that this user is a member of.
+        
+        Args:
+            db: Database connection object
+            
+        Returns:
+            list: A list of dictionaries containing group information
+        """
+        from app.Models.GroupMembership import GroupMembership
+        from app.Models.Group import Group
+        
+        # Get all group memberships for this user
+        memberships = GroupMembership.get_user_memberships(self.roll_number, db)
+        
+        if not memberships:
+            return []
+        
+        # Get detailed information for each group
+        groups = []
+        for membership in memberships:
+            group_id = membership.group_id
+            group = Group.find_by_id(group_id, db)
+            
+            if group:
+                groups.append({
+                    "id": group_id,
+                    "name": group.name,
+                    "description": group.description if hasattr(group, 'description') else None,
+                    "role": membership.role,
+                    "joined_at": membership.joined_at
+                })
+        
+        return groups
+
     @staticmethod
     def verify(roll: str, password: str, db):
         users = db.users.find()

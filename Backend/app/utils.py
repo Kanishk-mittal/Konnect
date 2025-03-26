@@ -3,11 +3,16 @@ from cryptography.hazmat.primitives import serialization
 import pymongo
 import os
 from dotenv import load_dotenv
-from flask import jsonify
+from flask import jsonify, make_response
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 import base64
+from app.Models.Group import Group
+from app.Models.GroupMembership import GroupMembership
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 def init_dadabase():
     """
@@ -130,12 +135,18 @@ def decrypt_RSA(ciphertext:str):
     return plaintext.decode("utf-8")
 
 def handle_options():
-    response = jsonify({"message": "CORS preflight response"})
-    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRF-TOKEN, Authorization, X-Requested-With"
-    response.headers["Access-Control-Allow-Credentials"] = "true"  # Explicitly set this for OPTIONS requests
-    return response, 200
+    """
+    Handle CORS preflight OPTIONS requests by returning appropriate headers.
+    
+    Returns:
+        Response: A Flask response with CORS headers set
+    """
+    response = make_response()
+    response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-TOKEN, X-Requested-With")
+    response.headers.add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+    response.headers.add("Access-Control-Allow-Credentials", "true")
+    return response
 
 internal_key = os.getenv("AES_KEY_INTERNAL") 
 external_key = os.getenv("AES_KEY_EXTERNAL")  # Fixed typo from 'extenal_key'
@@ -191,3 +202,138 @@ def encryptRSA(plaintext: str, key: str) -> str:
 
 def get_external_key():
     return external_key
+
+def assign_user_to_groups(roll_number, db):
+    """
+    Assign a user to appropriate groups based on their roll number.
+    
+    The roll number format is YYYY(BCY/BEC/BCS/BCD)XXXX where:
+    - YYYY: Year of admission
+    - BCY/BEC/BCS/BCD: Branch code
+    - XXXX: 4-digit number (last digit determines batch)
+    
+    Args:
+        roll_number (str): The student's roll number
+        db: MongoDB database connection
+        
+    Returns:
+        list: List of group names the user was added to
+    """
+    if len(roll_number) < 9:
+        print(f"Invalid roll number format: {roll_number}")
+        return []
+    
+    # Extract year, branch information
+    year = roll_number[:4]
+    branch_code = roll_number[4:7]
+    
+    # Calculate batch based on last digit mod 3
+    last_digit = int(roll_number[-1])
+    batch_mapping = {
+        0: '3',
+        1: '1',
+        2: '2'
+    }
+    batch_number = batch_mapping[last_digit % 3]
+    
+    # Map branch codes to department names
+    branch_mapping = {
+        'BCY': 'CSY',
+        'BEC': 'ECE',
+        'BCS': 'CSE',
+        'BCD': 'AI&DS'
+    }
+    
+    # Get the department name from the branch code
+    department = branch_mapping.get(branch_code, 'Unknown')
+    
+    # List of groups to add the user to
+    groups_to_add = [
+        year,                   # Year group
+        f"{year}-Batch-{batch_number}", # Year-Batch group
+        f"{year}-{department}", # Year-Department group
+        "IIIT-Kottayam"        # College-wide group
+    ]
+    
+    added_groups = []
+    
+    # Add the user to each group
+    for group_name in groups_to_add:
+        group = Group.find_by_name(group_name, db)
+        if group:
+            GroupMembership(
+                roll_number=roll_number,
+                group_id=str(group._id),
+                is_admin=False
+            ).save(db)
+            added_groups.append(group_name)
+        else:
+            print(f"Group {group_name} not found")
+    
+    return added_groups
+
+def send_email(recipient_email, otp):
+    """
+    Send an email with the OTP to the specified recipient.
+    
+    Args:
+        recipient_email (str): The email address of the recipient
+        otp (str): The OTP to be sent
+        
+    Returns:
+        bool: True if the email was sent successfully, False otherwise
+        
+    Raises:
+        Exception: If there is an error sending the email
+    """
+    sender_email = os.getenv("SENDER_EMAIL")
+    sender_password = os.getenv("SENDER_PASSWORD")
+    
+    if not sender_email or not sender_password:
+        print("Email credentials not configured in environment variables")
+        return False
+    
+    # Create the email message
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient_email
+    message["Subject"] = "Your OTP for Konnect Registration"
+    
+    # Email body - Updated to reflect 15-minute expiration
+    body = f"""
+    <html>
+    <body>
+        <h2>Your Verification Code</h2>
+        <p>Hello,</p>
+        <p>Your one-time password (OTP) for Konnect registration is:</p>
+        <h1 style="color: #4285f4; font-size: 32px;">{otp}</h1>
+        <p>This code will expire in 15 minutes.</p>
+        <p>If you did not request this code, please ignore this email.</p>
+        <p>Regards,<br>Konnect Team</p>
+    </body>
+    </html>
+    """
+    
+    # Attach the body as HTML
+    message.attach(MIMEText(body, "html"))
+    
+    try:
+        # Connect to the SMTP server
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()  # Secure the connection
+        
+        # Login to the email account
+        server.login(sender_email, sender_password)
+        
+        # Send the email
+        server.send_message(message)
+        
+        # Close the connection
+        server.quit()
+        
+        print(f"OTP email sent successfully to {recipient_email}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        return False

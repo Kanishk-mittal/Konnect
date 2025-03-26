@@ -11,9 +11,14 @@ const Register = () => {
         roll: '',
         email: '',
         password: '',
+        otp: '',
     });
     const [rollAvailable, setRollAvailable] = useState(true);
     const [checkingRoll, setCheckingRoll] = useState(false);
+    const [otpRequested, setOtpRequested] = useState(false);
+    const [otpVerified, setOtpVerified] = useState(false);
+    const [otpExpiry, setOtpExpiry] = useState(null);
+    const [isRequestingOtp, setIsRequestingOtp] = useState(false);
 
     const instance = axios.create({
         withCredentials: true,
@@ -32,6 +37,31 @@ const Register = () => {
             ...formData,
             [name]: value
         });
+    };
+
+    // Function to request OTP
+    const requestOtp = async (e) => {
+        e.preventDefault();
+        if (!formData.email) {
+            alert('Please enter your email address');
+            return;
+        }
+
+        try {
+            setIsRequestingOtp(true);
+            const response = await instance.post('/otp', { email: formData.email });
+            
+            if (response.status === 200) {
+                setOtpRequested(true);
+                setOtpExpiry(new Date(response.data.expires_at));
+                alert('OTP has been sent to your email address');
+            }
+        } catch (error) {
+            console.error('Error requesting OTP:', error);
+            alert(`Failed to request OTP: ${error.response?.data?.msg || error.message}`);
+        } finally {
+            setIsRequestingOtp(false);
+        }
     };
 
     const generateRSAKeys = () => {
@@ -123,12 +153,37 @@ const Register = () => {
         return () => clearTimeout(timer);
     }, [formData.roll]);
 
+    // Timer for OTP expiry
+    React.useEffect(() => {
+        let timer;
+        if (otpExpiry) {
+            timer = setInterval(() => {
+                const now = new Date();
+                if (now >= new Date(otpExpiry)) {
+                    setOtpRequested(false);
+                    setOtpExpiry(null);
+                    clearInterval(timer);
+                }
+            }, 1000);
+        }
+        
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [otpExpiry]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
         // First check if roll is available
         if (!rollAvailable) {
             alert('This roll number is already registered. Please try logging in or use a different roll number.');
+            return;
+        }
+
+        // Check if OTP is provided
+        if (!formData.otp) {
+            alert('Please enter the OTP sent to your email');
             return;
         }
         
@@ -156,6 +211,7 @@ const Register = () => {
                 email: rsaEncrypt.encrypt(formData.email),
                 password: rsaEncrypt.encrypt(formData.password),
                 publicKey: publicKey, // Send user's public key unencrypted
+                otp: formData.otp     // Add OTP to the registration data
             };
             
             // 6. Send registration request with updated axios instance
@@ -193,6 +249,8 @@ const Register = () => {
             console.error('Registration error:', error);
             if (error.response && error.response.status === 409) {
                 alert('This account already exists. Please try logging in instead.');
+            } else if (error.response && error.response.status === 400) {
+                alert(`Registration failed: ${error.response.data.msg || 'Invalid or expired OTP'}`);
             } else if (error.response) {
                 // Other server errors
                 alert(`Registration failed: ${error.response.data.msg || 'Server error'}`);
@@ -204,6 +262,22 @@ const Register = () => {
                 alert(`Registration failed: ${error.message}`);
             }
         }
+    };
+
+    // Calculate time remaining for OTP
+    const getTimeRemaining = () => {
+        if (!otpExpiry) return null;
+        
+        const now = new Date();
+        const expiry = new Date(otpExpiry);
+        const diffMs = expiry - now;
+        
+        if (diffMs <= 0) return null;
+        
+        const minutes = Math.floor(diffMs / (60 * 1000));
+        const seconds = Math.floor((diffMs % (60 * 1000)) / 1000);
+        
+        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     };
 
     return (
@@ -239,15 +313,47 @@ const Register = () => {
                 </div>
                 <div>
                     <label>Email:</label>
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} required />
+                    <input 
+                        type="email" 
+                        name="email" 
+                        value={formData.email} 
+                        onChange={handleChange} 
+                        required 
+                    />
+                    <button 
+                        type="button" 
+                        onClick={requestOtp} 
+                        disabled={isRequestingOtp || !formData.email}
+                        style={{ marginLeft: '10px' }}
+                    >
+                        {isRequestingOtp ? 'Sending...' : otpRequested ? 'Resend OTP' : 'Get OTP'}
+                    </button>
+                    {otpRequested && otpExpiry && (
+                        <div style={{ fontSize: '0.8rem', marginTop: '5px', color: 'blue' }}>
+                            OTP expires in: {getTimeRemaining() || 'Expired'}
+                        </div>
+                    )}
                 </div>
+                {otpRequested && (
+                    <div>
+                        <label>OTP:</label>
+                        <input 
+                            type="text" 
+                            name="otp" 
+                            value={formData.otp} 
+                            onChange={handleChange} 
+                            required 
+                            placeholder="Enter OTP from email"
+                        />
+                    </div>
+                )}
                 <div>
                     <label>Password:</label>
                     <input type="password" name="password" value={formData.password} onChange={handleChange} required />
                 </div>
                 <button 
                     type="submit" 
-                    disabled={!rollAvailable || checkingRoll}
+                    disabled={!rollAvailable || checkingRoll || !otpRequested}
                 >
                     Register
                 </button>

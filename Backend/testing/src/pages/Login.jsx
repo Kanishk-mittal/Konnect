@@ -18,7 +18,7 @@ function Login() {
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
+            'X-Requested-With': 'XMLHttpRequest',
         }
     })
     const generateRSAKeys = () => {
@@ -32,8 +32,35 @@ function Login() {
     };
 
     const logOut = async () => {
-        const response = await instance.post('/logout')
-        console.log(response.data)
+        try {
+            // Extract CSRF token from cookies
+            const csrfToken = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrf_access_token='))
+                ?.split('=')[1];
+
+            if (!csrfToken) {
+                console.error("CSRF token not found");
+                return;
+            }
+
+            // Include CSRF token in the request headers
+            const response = await instance.post('/logout', {}, {
+                headers: {
+                    "X-CSRF-TOKEN": csrfToken
+                }
+            });
+            console.log(response.data);
+            alert("Logged out successfully!");
+            
+            // Optionally, you might want to clear any user-related state or redirect
+            setPrivateKey(null);
+            setDbKey(null);
+            navigate('/'); // Redirect to home or login page
+        } catch (error) {
+            console.error("Logout error:", error.response?.data || error.message);
+            alert("Logout failed. Please try again.");
+        }
     }
 
     const handleLogin = async () => {
@@ -50,7 +77,7 @@ function Login() {
             const response = await instance.post('/login', {
                 roll: encryptedRoll,
                 password: encryptedPassword,
-                pyblicKey: publicKey
+                publicKey: publicKey // Fixed the typo from pyblicKey to publicKey
             })
             
             const crypt = new JSEncrypt();

@@ -1,0 +1,41 @@
+The division in our colleges are as follows and for each we need a group
+
+Based on year of admission one group for each year
+2021
+2022
+2023
+2024
+
+Based on batch
+- Each admission year has 3 batches
+
+Based on department (independent of batch)
+- ECE
+- CSE
+- CSY
+- AI&DS 
+
+so for lets say 2021 admission we will have 8 groups
+- 2021-Batch-1
+- 2021-Batch-2
+- 2021-Batch-3
+- 2021-Batch-4
+- 2021-ECE
+- 2021-CSE
+- 2021-CSY
+- 2021-AI&DS
+
+..... similarly for other years
+
+point to note roll number has following format
+YYYY(BCY/BEC/BCS/BCD)XXXX
+
+here YYYY is year of admission
+BCY/BEC/BCS/BCD is branch code
+XXXX is a 4 digit number padded with 0's in the left
+
+each student will be a part of 3 groups lets us assume that the roll_number of the student is 2023BCY0003
+1. Admission 2023
+2. 2023_Batch_3 
+3. 2023-CSY
+4. IIIT-Kottayam (This will be a gorup for all students)
