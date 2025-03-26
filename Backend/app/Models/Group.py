@@ -81,9 +81,19 @@ class Group:
         """Find a group by ID"""
         from app.utils import encrypt_AES_CBC, decrypt_AES_CBC
         
-        encrypted_id = encrypt_AES_CBC(group_id)
-        group_data = db.groups.find_one({"id": encrypted_id})
-        return Group.from_db(group_data) if group_data else None
+        # Since we can't query directly by encrypted value (due to random IV),
+        # we need to fetch all groups and find the matching one
+        all_groups = db.groups.find()
+        for group_data in all_groups:
+            try:
+                decrypted_id = decrypt_AES_CBC(group_data["id"])
+                if decrypted_id == group_id:
+                    return Group.from_db(group_data)
+            except Exception as e:
+                print(f"Error decrypting group ID: {e}")
+                continue
+                
+        return None
 
     @staticmethod
     def find_by_name(group_name: str, db):

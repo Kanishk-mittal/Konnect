@@ -152,6 +152,11 @@ internal_key = os.getenv("AES_KEY_INTERNAL")
 external_key = os.getenv("AES_KEY_EXTERNAL")  # Fixed typo from 'extenal_key'
 
 def encrypt_AES_CBC(plain_text, key_str=internal_key):
+    # IMPORTANT NOTE: This encryption uses a random IV, which means
+    # encrypting the same text twice will produce different results.
+    # This makes it unsuitable for database lookups by encrypted value.
+    # When querying by encrypted fields, use application-level filtering.
+    
     # Check if plain_text is already bytes, otherwise encode it
     text_to_encrypt = plain_text if isinstance(plain_text, bytes) else plain_text.encode()
     
@@ -263,9 +268,9 @@ def assign_user_to_groups(roll_number, db):
         if group:
             GroupMembership(
                 roll_number=roll_number,
-                group_id=str(group._id),
-                is_admin=False
-            ).save(db)
+                group_id=str(group.id),
+                role="member"  # Changed from is_admin=False to role="member"
+            ).to_db(db)  # Changed from save(db) to to_db(db)
             added_groups.append(group_name)
         else:
             print(f"Group {group_name} not found")

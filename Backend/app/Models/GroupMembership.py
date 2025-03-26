@@ -68,20 +68,30 @@ class GroupMembership:
     @staticmethod
     def get_user_groups(roll_number: str, db):
         """Get all groups that a user is a member of"""
-        from app.utils import encrypt_AES_CBC
+        from app.utils import encrypt_AES_CBC, decrypt_AES_CBC
         
-        encrypted_roll = encrypt_AES_CBC(roll_number)
-        memberships = db.groupMemberships.find({"roll_number": encrypted_roll})
-        return [GroupMembership.from_db(membership) for membership in memberships]
+        # Since we can't directly query by encrypted value (due to random IV),
+        # we need to retrieve all memberships and filter in application code
+        all_memberships = list(db.groupMemberships.find())
+        return [
+            GroupMembership.from_db(membership) 
+            for membership in all_memberships 
+            if decrypt_AES_CBC(membership["roll_number"]) == roll_number
+        ]
 
     @staticmethod
     def get_group_members(group_id: str, db):
         """Get all members of a specific group"""
-        from app.utils import encrypt_AES_CBC
+        from app.utils import encrypt_AES_CBC, decrypt_AES_CBC
         
-        encrypted_group_id = encrypt_AES_CBC(group_id)
-        memberships = db.groupMemberships.find({"group_id": encrypted_group_id})
-        return [GroupMembership.from_db(membership) for membership in memberships]
+        # Since we can't directly query by encrypted value (due to random IV),
+        # we need to retrieve all memberships and filter in application code
+        all_memberships = list(db.groupMemberships.find())
+        return [
+            GroupMembership.from_db(membership) 
+            for membership in all_memberships 
+            if decrypt_AES_CBC(membership["group_id"]) == group_id
+        ]
 
     @staticmethod
     def get_membership(roll_number: str, group_id: str, db):

@@ -396,6 +396,7 @@ def get_user_groups():
     
     # Get the identity of the current user from JWT
     current_user = get_jwt_identity()
+    print(f"Getting groups for user: {current_user}")
     
     # Check if the user exists in the database
     user = User.from_db(current_user, db)
@@ -405,6 +406,7 @@ def get_user_groups():
     
     # Get all groups the user is a member of
     user_groups = user.get_user_groups(db)
+    print(f"User {current_user} has {len(user_groups)} groups")
     
     return jsonify({
         "user": current_user,

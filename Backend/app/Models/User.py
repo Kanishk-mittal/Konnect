@@ -1,4 +1,5 @@
 import hashlib
+import datetime  # Add this import to fix the error
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.utils import encrypt_AES_CBC, decrypt_AES_CBC, encryptRSA, external_key  # Changed from extenal_key
 
@@ -57,15 +58,17 @@ class User:
         from app.Models.Group import Group
         
         # Get all group memberships for this user
-        memberships = GroupMembership.get_user_memberships(self.roll_number, db)
+        memberships = GroupMembership.get_user_groups(self.roll_number, db)
         
         if not memberships:
+            print(f"No memberships found for user {self.roll_number}")
             return []
         
         # Get detailed information for each group
         groups = []
         for membership in memberships:
             group_id = membership.group_id
+            print(f"Looking for group with ID: {group_id}")
             group = Group.find_by_id(group_id, db)
             
             if group:
@@ -74,8 +77,10 @@ class User:
                     "name": group.name,
                     "description": group.description if hasattr(group, 'description') else None,
                     "role": membership.role,
-                    "joined_at": membership.joined_at
+                    "joined_at": membership.joined_at.isoformat() if isinstance(membership.joined_at, datetime.datetime) else membership.joined_at
                 })
+            else:
+                print(f"Group with ID {group_id} not found")
         
         return groups
 
