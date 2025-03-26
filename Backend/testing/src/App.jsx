@@ -6,6 +6,7 @@ import Test from './pages/Test';
 import GetUserKey from './pages/GetUserKey';
 import GetGroupKeys from './pages/GetGroupKeys';
 import Groups from './pages/Groups';
+import Messages from './pages/Messages';
 import { AppContext } from './context/AppContext';
 
 const App = () => {
@@ -30,6 +31,7 @@ const App = () => {
         <Route path="/get-user-key" element={<GetUserKey />} />
         <Route path="/get-group-keys" element={<GetGroupKeys />} />
         <Route path="/groups" element={<Groups />} />
+        <Route path="/messages" element={<Messages />} />
       </Routes>
     </BrowserRouter>
   );

@@ -3,63 +3,78 @@ from bson import ObjectId
 from app.utils import encrypt_AES_CBC, decrypt_AES_CBC
 
 class Messages:
-    def __init__(self, sender_id: str, content: str, message_type: str = "text",
-                 receiver_id: str = None, club_id: str = None, timestamp=None, 
-                 is_read: bool = False, message_id: str = None, reply_to: str = None,
-                 deleted: bool = False):
-        self.sender_id = sender_id
-        self.receiver_id = receiver_id
-        self.club_id = club_id
-        self.message_type = message_type  # text or file
-        self.content = content
+    def __init__(self, sender: str, message: str, receiver: str = None, 
+                 group: str = None, timestamp=None, message_id: str = None,
+                 aes_key: str = None):
+        self.sender = sender
+        self.receiver = receiver
+        self.group = group  # null if it's a DM
+        self.message = message  # Already encrypted
         self.timestamp = timestamp if timestamp else datetime.datetime.now()
-        self.is_read = is_read
         self.message_id = message_id
-        self.reply_to = reply_to
-        self.deleted = deleted
+        self.aes_key = aes_key  # Already encrypted
 
     def to_db(self, db):
-        """Save message to database with encrypted fields"""
+        """Save message to database with encrypted fields - temporarily stored until user logs in"""
         message_data = {
-            "sender_id": encrypt_AES_CBC(self.sender_id),
-            "message_type": encrypt_AES_CBC(self.message_type),
-            "content": encrypt_AES_CBC(self.content),
+            "sender": encrypt_AES_CBC(self.sender),
+            "message": self.message,  # Already encrypted
             "timeStamp": self.timestamp,
-            "is_read": self.is_read,
-            "deleted": self.deleted
+            "aes_key": self.aes_key  # Already encrypted
         }
 
         # Only add these fields if they have values
-        if self.receiver_id:
-            message_data["receiver_id"] = encrypt_AES_CBC(self.receiver_id)
-        if self.club_id:
-            message_data["club_id"] = encrypt_AES_CBC(self.club_id)
-        if self.reply_to:
-            message_data["reply_to"] = encrypt_AES_CBC(self.reply_to)
+        if self.receiver:
+            message_data["receiver"] = encrypt_AES_CBC(self.receiver)
+        if self.group:
+            message_data["group"] = encrypt_AES_CBC(self.group)
         
         if self.message_id:
             message_data["_id"] = ObjectId(self.message_id)
             
-        return db.messages.insert_one(message_data)
+        return db.temp_messages.insert_one(message_data)
 
     def to_dict(self):
         """Convert message object to dictionary for API responses"""
+        # Make sure the sender and receiver are not in encrypted form
+        sender = self.sender
+        receiver = self.receiver
+        
+        # Check if sender looks like an encrypted string (base64 format)
+        if isinstance(sender, str) and sender.endswith('=') and len(sender) > 20:
+            try:
+                sender = decrypt_AES_CBC(sender)
+            except:
+                pass  # If decryption fails, keep the original value
+                
+        # Similarly for receiver
+        if receiver and isinstance(receiver, str) and receiver.endswith('=') and len(receiver) > 20:
+            try:
+                receiver = decrypt_AES_CBC(receiver)
+            except:
+                pass
+                
         result = {
             "message_id": str(self.message_id) if self.message_id else None,
-            "sender_id": self.sender_id,
-            "message_type": self.message_type,
-            "content": self.content,
+            "sender": sender,
+            "message": self.message,
             "timestamp": self.timestamp.isoformat() if isinstance(self.timestamp, datetime.datetime) else self.timestamp,
-            "is_read": self.is_read,
-            "deleted": self.deleted
         }
         
-        if self.receiver_id:
-            result["receiver_id"] = self.receiver_id
-        if self.club_id:
-            result["club_id"] = self.club_id
-        if self.reply_to:
-            result["reply_to"] = self.reply_to
+        if receiver:
+            result["receiver"] = receiver
+        if self.group:
+            # Check if group needs decryption too
+            group = self.group
+            if isinstance(group, str) and group.endswith('=') and len(group) > 20:
+                try:
+                    group = decrypt_AES_CBC(group)
+                except:
+                    pass
+            result["group"] = group
+            
+        if self.aes_key:
+            result["aes_key"] = self.aes_key
             
         return result
 
@@ -70,32 +85,27 @@ class Messages:
             return None
             
         return Messages(
-            sender_id=decrypt_AES_CBC(message_data["sender_id"]),
-            content=decrypt_AES_CBC(message_data["content"]),
-            message_type=decrypt_AES_CBC(message_data["message_type"]),
-            receiver_id=decrypt_AES_CBC(message_data.get("receiver_id")) if message_data.get("receiver_id") else None,
-            club_id=decrypt_AES_CBC(message_data.get("club_id")) if message_data.get("club_id") else None,
+            sender=decrypt_AES_CBC(message_data["sender"]),
+            message=message_data["message"],  # Keep encrypted
+            receiver=decrypt_AES_CBC(message_data.get("receiver")) if message_data.get("receiver") else None,
+            group=decrypt_AES_CBC(message_data.get("group")) if message_data.get("group") else None,
             timestamp=message_data.get("timeStamp"),
-            is_read=message_data.get("is_read", False),
             message_id=str(message_data["_id"]) if "_id" in message_data else None,
-            reply_to=decrypt_AES_CBC(message_data.get("reply_to")) if message_data.get("reply_to") else None,
-            deleted=message_data.get("deleted", False)
+            aes_key=message_data.get("aes_key")  # Keep encrypted
         )
 
     @staticmethod
-    def get_conversation(user1_id: str, user2_id: str, db, limit: int = 50):
+    def get_conversation(user1: str, user2: str, db, limit: int = 50):
         """Retrieve direct conversation between two users"""
-        messages = db.messages.find({
+        messages = db.temp_messages.find({
             "$or": [
                 {"$and": [
-                    {"sender_id": encrypt_AES_CBC(user1_id)}, 
-                    {"receiver_id": encrypt_AES_CBC(user2_id)},
-                    {"deleted": False}
+                    {"sender": encrypt_AES_CBC(user1)}, 
+                    {"receiver": encrypt_AES_CBC(user2)}
                 ]},
                 {"$and": [
-                    {"sender_id": encrypt_AES_CBC(user2_id)}, 
-                    {"receiver_id": encrypt_AES_CBC(user1_id)},
-                    {"deleted": False}
+                    {"sender": encrypt_AES_CBC(user2)}, 
+                    {"receiver": encrypt_AES_CBC(user1)}
                 ]}
             ]
         }).sort("timeStamp", -1).limit(limit)
@@ -103,36 +113,22 @@ class Messages:
         return [Messages.from_db(message) for message in messages]
 
     @staticmethod
-    def get_club_messages(club_id: str, db, limit: int = 50):
-        """Retrieve messages for a specific club"""
-        encrypted_club_id = encrypt_AES_CBC(club_id)
-        messages = db.messages.find({
-            "club_id": encrypted_club_id,
-            "deleted": False
+    def get_group_messages(group: str, db, limit: int = 50):
+        """Retrieve messages for a specific group"""
+        encrypted_group = encrypt_AES_CBC(group)
+        messages = db.temp_messages.find({
+            "group": encrypted_group
         }).sort("timeStamp", -1).limit(limit)
         
         return [Messages.from_db(message) for message in messages]
 
     @staticmethod
-    def mark_as_read(message_id: str, db):
-        """Mark a message as read"""
+    def cleanup_messages(user_id: str, db):
+        """Remove messages that have been delivered to the user"""
         try:
-            db.messages.update_one(
-                {"_id": ObjectId(message_id)},
-                {"$set": {"is_read": True}}
-            )
-            return True
-        except:
-            return False
-
-    @staticmethod
-    def soft_delete(message_id: str, db):
-        """Soft delete a message (mark as deleted without removing from database)"""
-        try:
-            db.messages.update_one(
-                {"_id": ObjectId(message_id)},
-                {"$set": {"deleted": True}}
-            )
+            db.temp_messages.delete_many({
+                "receiver": encrypt_AES_CBC(user_id)
+            })
             return True
         except:
             return False

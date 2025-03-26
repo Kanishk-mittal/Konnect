@@ -40,5 +40,9 @@ def create_app():
     from app.routes import main_bp
     app.register_blueprint(main_bp)
     
+    # Re-enable Socket.IO initialization
+    from app.socket import socketio
+    socketio.init_app(app)
+    
     return app
 

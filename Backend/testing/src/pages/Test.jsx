@@ -69,6 +69,18 @@ const Test = () => {
         }
     };
 
+    // Add navigation to messages page
+    const navigateToMessages = () => {
+        if (!privateKey || !dbKey) {
+            console.error("Missing authentication keys. Can't navigate to Messages.");
+            alert("You need to be logged in to access messages. Please log in again.");
+            navigate('/login');
+        } else {
+            console.log("Auth keys present, navigating to Messages...");
+            navigate('/messages');
+        }
+    };
+
     return (
         <div>
             <h2>{data}</h2>
@@ -82,7 +94,8 @@ const Test = () => {
                 </div>
             )}
             <button onClick={testLogin}>test</button>
-            <button onClick={navigateToGroups}>View My Groups</button> {/* Use the new function */}
+            <button onClick={navigateToGroups}>View My Groups</button>
+            <button onClick={navigateToMessages}>Messages</button>
             
             {/* Add debug info */}
             <div style={{marginTop: "20px", padding: "10px", border: "1px solid #ccc"}}>

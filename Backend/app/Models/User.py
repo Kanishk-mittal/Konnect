@@ -30,6 +30,20 @@ class User:
             "is_online": self.is_online
         })
 
+    def update_db(self, db):
+        """Update user data in the database"""
+        return db.users.update_one(
+            {"roll_number": encrypt_AES_CBC(self.roll_number)},
+            {"$set": {
+                "name": encrypt_AES_CBC(self.name),
+                "email": encrypt_AES_CBC(self.email),
+                "role": encrypt_AES_CBC(self.role),
+                "public_key": encrypt_AES_CBC(self.public_key) if self.public_key else None,
+                "profile_pic": encrypt_AES_CBC(self.profile_pic) if self.profile_pic else None,
+                "is_online": self.is_online
+            }}
+        )
+
     def check_unique(self, db):
         """Check if a user with this roll number already exists"""
         users = db.users.find()
@@ -96,19 +110,61 @@ class User:
             return False
         return True
 
+    def to_dict(self):
+        """Convert user object to dictionary for API responses"""
+        return {
+            "roll_number": self.roll_number,
+            "name": self.name,
+            "email": self.email,
+            "is_online": self.is_online
+        }
+
     @staticmethod
-    def from_db(roll_number: str, db):
-        users = db.users.find()
-        for user in users:
-            if decrypt_AES_CBC(user["roll_number"]) == roll_number:
-                return User(
-                    decrypt_AES_CBC(user["name"]),
-                    roll_number,
-                    user["password"],
-                    decrypt_AES_CBC(user["email"]),
-                    decrypt_AES_CBC(user["role"]),
-                    decrypt_AES_CBC(user["public_key"]) if user["public_key"] else None,
-                    decrypt_AES_CBC(user["profile_pic"]) if user["profile_pic"] else None,
-                    user["is_online"]
-                )
+    def from_db(roll_number=None, db=None, user_doc=None):
+        """Create a User object from database either by roll number or from a document"""
+        # If user document is provided directly
+        if user_doc:
+            decrypted_roll = decrypt_AES_CBC(user_doc.get("roll_number"))
+            return User(
+                decrypt_AES_CBC(user_doc["name"]),
+                decrypted_roll,
+                user_doc["password"],
+                decrypt_AES_CBC(user_doc["email"]),
+                decrypt_AES_CBC(user_doc["role"]),
+                decrypt_AES_CBC(user_doc["public_key"]) if user_doc.get("public_key") else None,
+                decrypt_AES_CBC(user_doc["profile_pic"]) if user_doc.get("profile_pic") else None,
+                user_doc.get("is_online", False)
+            )
+        
+        # If searching by roll number - Fix the boolean evaluation of db
+        if roll_number is not None and db is not None:
+            users = db.users.find()
+            for user in users:
+                if decrypt_AES_CBC(user["roll_number"]) == roll_number:
+                    return User.from_db(user_doc=user)
+        
         return None
+
+    @staticmethod
+    def get_all_users(db):
+        """
+        Get all users from the database
+        
+        Args:
+            db: Database connection object
+            
+        Returns:
+            list: A list of dictionaries with basic user information
+        """
+        users = []
+        user_docs = db.users.find()
+        
+        for user_doc in user_docs:
+            # Only decrypt and extract the needed fields
+            users.append({
+                "roll_number": decrypt_AES_CBC(user_doc.get("roll_number")),
+                "name": decrypt_AES_CBC(user_doc.get("name")),
+                "is_online": user_doc.get("is_online", False)
+            })
+        
+        return users
