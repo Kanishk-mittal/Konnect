@@ -4,6 +4,8 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from app.utils import db, handle_options, public_key, decrypt_RSA, encryptRSA, external_key, get_external_key, assign_user_to_groups, send_email, decrypt_AES_CBC
 from app.Models.User import User
 from app.Models.OTP import OTP
+from . import socketio
+from flask_socketio import emit, join_room
 
 main_bp = Blueprint("main", __name__)
 
@@ -402,8 +404,7 @@ def request_otp():
 def get_messages():
     """
     Retrieve messages for the authenticated user.
-    This endpoint fetches all messages where the current user is either 
-    the sender or receiver.
+    This endpoint fetches all messages where the current user is either the sender or receiver.
     Returns:
         JSON: An object containing the user's messages
     """
@@ -468,13 +469,6 @@ def set_offline():
     user.is_online = False
     user.update_db(db)
     
-    # Re-enable socket broadcast
-    from app.socket import socketio
-    socketio.emit('user_status', {
-        'roll_number': current_user,
-        'status': 'offline'
-    })
-    
     return jsonify({
         "message": "Status set to offline"
     }), 200
@@ -504,51 +498,71 @@ def get_users():
         "users": users
     }), 200
 
-@main_bp.route("/send_message", methods=["POST", "OPTIONS"])
-@jwt_required(locations='cookies')
-def send_message():
+
+@socketio.on('send_message')
+def receive_message(data):
     """
-    Send a message to another user.
-    This endpoint allows the authenticated user to send a message
-    to another user or a group.
-    Request body:
-        receiver (str): The roll number of the message recipient
-        message (str): The encrypted message content
-    Returns:
-        JSON: A message indicating the status of the operation
+    Handle incoming messages via WebSocket.
+    This function processes messages using the following algorithm:
+    1. Get the receiver roll number
+    2. Decode the receiver roll_number
+    3. Check if the receiver is online
+    4. If receiver is not online, save message to database and return
+    5. Else set the room as receiver roll number
+    6. Emit message with attributes: sender, message, key, timestamp, group
+    
+    Args:
+        data (dict): Contains sender, receiver, group, message, aes_key and timestamp
     """
-    if request.method == "OPTIONS":
-        return handle_options()
-    
-    current_user = get_jwt_identity()
-    user = User.from_db(current_user, db)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    data = request.get_json()
-    receiver = data.get("receiver")
-    message_content = data.get("message")
-    
-    if not receiver or not message_content:
-        return jsonify({"error": "Receiver and message are required"}), 400
-    
-    # Create and store the message
-    from app.Models.Messages import Messages
-    
-    message = Messages(
-        sender=current_user,
-        message=message_content,  # Already encrypted
-        receiver=receiver,
-        group=None
-    )
-    
-    result = message.to_db(db)
-    
-    # Re-enable socket event emission
-    from app.socket import socketio
-    socketio.emit('message', message.to_dict(), room=receiver)
-    
-    return jsonify({
-        "message": "Message sent successfully",
-        "message_id": str(result.inserted_id) if result else None
-    }), 201
+    try:
+        # 1 & 2. Get and decrypt receiver roll number
+        receiver = decrypt_AES_CBC(data.get('receiver'))
+        sender = decrypt_AES_CBC(data.get('sender'))
+        
+        # 3. Check if receiver is online
+        from app.Models.User import User
+        receiver_online = User.is_online(receiver, db)
+        
+        # 4. If receiver is offline, save to database and return
+        if not receiver_online:
+            # Save message to database
+            from app.Models.Messages import Messages
+            new_message = Messages(
+                sender=sender,
+                receiver=receiver,
+                message=data.get('message'),
+                aes_key=data.get('aes_key'),
+                timestamp=data.get('timestamp')
+            )
+            new_message.save(db)
+            
+            # Emit confirmation back to sender
+            emit('message_stored', {
+                'status': 'stored',
+                'receiver': data.get('receiver'),
+                'timestamp': data.get('timestamp')
+            })
+            
+            print(f"Message from {sender} to {receiver} stored in database (receiver offline)")
+            return
+        
+        # 5. Set the room as receiver roll number
+        room = receiver
+        join_room(room)
+        
+        # 6. Emit message with required attributes
+        emit('new_message', {
+            'sender': data.get('sender'),
+            'message': data.get('message'),
+            'key': data.get('aes_key'),
+            'timestamp': data.get('timestamp'),
+            'group': data.get('group')  # Will be None for DMs
+        }, room=room)
+        
+        print(f"Message from {sender} sent to room: {room}")
+        
+    except Exception as e:
+        print(f"Error processing message: {str(e)}")
+        # Emit error to sender only
+        emit('message_error', {'error': 'Failed to process message'})
+

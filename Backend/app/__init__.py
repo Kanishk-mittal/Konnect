@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from datetime import timedelta
 import logging
+from flask_socketio import SocketIO
 
 # Configure logging
 logging.basicConfig(
@@ -12,6 +13,8 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
+
+socketio = SocketIO(cors_allowed_origins="*")
 
 def create_app():
     app = Flask(__name__)
@@ -39,9 +42,6 @@ def create_app():
     # Import and register blueprints
     from app.routes import main_bp
     app.register_blueprint(main_bp)
-    
-    # Re-enable Socket.IO initialization
-    from app.socket import socketio
     socketio.init_app(app)
     
     return app

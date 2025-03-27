@@ -4,14 +4,12 @@ from app.utils import encrypt_AES_CBC, decrypt_AES_CBC
 
 class Messages:
     def __init__(self, sender: str, message: str, receiver: str = None, 
-                 group: str = None, timestamp=None, message_id: str = None,
-                 aes_key: str = None):
+                 group: str = None, timestamp=None, aes_key: str = None):
         self.sender = sender
         self.receiver = receiver
         self.group = group  # null if it's a DM
         self.message = message  # Already encrypted
         self.timestamp = timestamp if timestamp else datetime.datetime.now()
-        self.message_id = message_id
         self.aes_key = aes_key  # Already encrypted
 
     def to_db(self, db):
@@ -29,9 +27,6 @@ class Messages:
         if self.group:
             message_data["group"] = encrypt_AES_CBC(self.group)
         
-        if self.message_id:
-            message_data["_id"] = ObjectId(self.message_id)
-            
         return db.temp_messages.insert_one(message_data)
 
     def to_dict(self):
@@ -55,7 +50,6 @@ class Messages:
                 pass
                 
         result = {
-            "message_id": str(self.message_id) if self.message_id else None,
             "sender": sender,
             "message": self.message,
             "timestamp": self.timestamp.isoformat() if isinstance(self.timestamp, datetime.datetime) else self.timestamp,
@@ -90,7 +84,6 @@ class Messages:
             receiver=decrypt_AES_CBC(message_data.get("receiver")) if message_data.get("receiver") else None,
             group=decrypt_AES_CBC(message_data.get("group")) if message_data.get("group") else None,
             timestamp=message_data.get("timeStamp"),
-            message_id=str(message_data["_id"]) if "_id" in message_data else None,
             aes_key=message_data.get("aes_key")  # Keep encrypted
         )
 

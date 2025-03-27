@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import CryptoJS from 'crypto-js';
-import io from 'socket.io-client';
+import { io } from 'socket.io-client'; // Add socket.io-client import
 
 const Messages = () => {
     const [users, setUsers] = useState([]);
@@ -14,10 +14,11 @@ const Messages = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const messagesEndRef = useRef(null);
-    const socketRef = useRef(null);
     const navigate = useNavigate();
     const { privateKey, dbKey } = useContext(AppContext);
     const messagesDb = useRef(null);
+    const pollIntervalRef = useRef(null);
+    const socketRef = useRef(null); // Add socket reference
 
     // Create axios instance with credentials
     const instance = axios.create({
@@ -60,7 +61,90 @@ const Messages = () => {
         };
     }, [dbKey]);
 
-    // Check authentication and connect to socket
+    // Initialize WebSocket connection
+    useEffect(() => {
+        // Connect to the WebSocket server
+        socketRef.current = io('http://localhost:5000', {
+            withCredentials: true
+        });
+
+        // Set up event listeners
+        socketRef.current.on('connect', () => {
+            console.log('Connected to WebSocket server');
+        });
+
+        socketRef.current.on('disconnect', () => {
+            console.log('Disconnected from WebSocket server');
+        });
+
+        socketRef.current.on('new_message', (data) => {
+            console.log('Received new message:', data);
+            handleNewMessage(data);
+        });
+
+        socketRef.current.on('message_stored', (data) => {
+            console.log('Message stored in database:', data);
+        });
+
+        socketRef.current.on('message_error', (data) => {
+            console.error('Message error:', data.error);
+            setError(`Message error: ${data.error}`);
+        });
+
+        // Clean up on component unmount
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+            }
+        };
+    }, []);
+
+    // Handle incoming messages from socket
+    const handleNewMessage = (data) => {
+        try {
+            // Decrypt the message
+            const senderRoll = decrypt_AES_CBC(data.sender, dbKey);
+            let decryptedContent = null;
+            
+            // Decrypt the message content using the AES key
+            if (data.key) {
+                decryptedContent = decryptWithAES(data.message, dbKey);
+            } else {
+                decryptedContent = decryptWithAES(data.message, dbKey);
+            }
+            
+            if (!decryptedContent) {
+                console.error('Failed to decrypt message content');
+                return;
+            }
+            
+            // Create message object
+            const newMsg = {
+                message_id: Date.now().toString(), // Generate a temporary ID
+                sender: senderRoll,
+                receiver: userInfo?.logged_in_as,
+                message: decryptedContent,
+                timestamp: new Date(data.timestamp)
+            };
+            
+            // Add to messages state
+            setMessages(prevMessages => [...prevMessages, newMsg]);
+            
+            // Store in IndexedDB
+            if (messagesDb.current) {
+                const transaction = messagesDb.current.transaction(['messages'], 'readwrite');
+                const store = transaction.objectStore('messages');
+                store.add({...newMsg, id: newMsg.message_id});
+            }
+            
+            // Scroll to bottom
+            scrollToBottom();
+        } catch (error) {
+            console.error('Error handling new message:', error);
+        }
+    };
+
+    // Check authentication and setup message polling
     useEffect(() => {
         if (!privateKey || !dbKey) {
             console.error("Authentication keys missing");
@@ -88,23 +172,14 @@ const Messages = () => {
                 });
                 setUserInfo(response.data);
                 
-                // Connect to socket with authentication
-                console.log(`Attempting to connect to socket server at: http://localhost:5000`);
-                socketRef.current = io('http://localhost:5000', {
-                    withCredentials: true,
-                    query: { token: csrfToken },
-                    autoConnect: true,
-                    reconnection: true,
-                    reconnectionAttempts: 5,
-                    reconnectionDelay: 1000
-                });
-                
-                // Set up socket event listeners
-                setupSocketListeners();
-                
                 // Fetch messages and users
                 fetchMessages(csrfToken);
                 fetchUsers(csrfToken);
+                
+                // We don't need to poll as frequently with WebSockets
+                pollIntervalRef.current = setInterval(() => {
+                    fetchUsers(csrfToken); // Just update user statuses
+                }, 10000); // Every 10 seconds
             } catch (error) {
                 console.error("Error fetching user info:", error);
                 setError("Could not authenticate. Please log in again.");
@@ -114,8 +189,14 @@ const Messages = () => {
 
         fetchUserInfo();
 
-        // Cleanup function to set user offline and disconnect socket
+        // Clean up polling on unmount
         return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+            
+            // Set user offline when leaving the page
             if (csrfToken && userInfo) {
                 instance.post('/set_offline', {}, {
                     headers: { "X-CSRF-TOKEN": csrfToken }
@@ -123,90 +204,8 @@ const Messages = () => {
                     console.error("Error setting user offline:", err);
                 });
             }
-            
-            if (socketRef.current) {
-                socketRef.current.disconnect();
-            }
         };
     }, [privateKey, dbKey, navigate]);
-
-    // Setup socket event listeners
-    const setupSocketListeners = () => {
-        if (!socketRef.current) return;
-
-        socketRef.current.on('connect', () => {
-            const timestamp = new Date().toISOString();
-            console.log(`%c[${timestamp}] SOCKET CONNECTED`, 'color: green; font-weight: bold');
-            console.log(`Socket ID: ${socketRef.current.id}`);
-            console.log(`Connected to: ${socketRef.current.io.uri}`);
-            console.log(`User: ${userInfo?.logged_in_as}`);
-        });
-
-        socketRef.current.on('disconnect', (reason) => {
-            const timestamp = new Date().toISOString();
-            console.log(`%c[${timestamp}] SOCKET DISCONNECTED`, 'color: red; font-weight: bold');
-            console.log(`Reason: ${reason}`);
-            console.log(`Will reconnect automatically: ${socketRef.current.io.reconnection}`);
-        });
-
-        socketRef.current.on('connect_error', (error) => {
-            console.error('Connection error:', error.message);
-        });
-
-        socketRef.current.on('message', (encryptedMessage) => {
-            console.log("Received message:", encryptedMessage);
-            
-            // Check if message has recipient metadata (from broadcast)
-            if (encryptedMessage._recipients) {
-                // Only process if current user is in the recipients list
-                if (!encryptedMessage._recipients.includes(userInfo?.logged_in_as)) {
-                    console.log("Message not for this user, ignoring");
-                    return;
-                }
-                // Remove metadata before processing
-                delete encryptedMessage._recipients;
-            }
-            
-            // Only process messages to/from the current user
-            if (encryptedMessage.sender === userInfo?.logged_in_as || 
-                encryptedMessage.receiver === userInfo?.logged_in_as) {
-                handleIncomingMessage(encryptedMessage);
-            } else {
-                console.log("Message not relevant to current user, ignoring");
-            }
-        });
-
-        socketRef.current.on('user_status', (data) => {
-            console.log("User status update:", data);
-            // Update user status in the users list
-            setUsers(prevUsers => prevUsers.map(user => 
-                user.roll_number === data.roll_number 
-                    ? { ...user, is_online: data.status === 'online' } 
-                    : user
-            ));
-        });
-        
-        // Add an error handler
-        socketRef.current.on('error', (error) => {
-            console.error("Socket error:", error);
-            setError(`Socket error: ${error.message || 'Unknown error'}`);
-        });
-        
-        // Add a reconnect handler
-        socketRef.current.on('reconnect', (attempt) => {
-            console.log(`Socket reconnected after ${attempt} attempts`);
-            // Re-fetch messages and users upon reconnection
-            const csrfToken = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('csrf_access_token='))
-                ?.split('=')[1];
-                
-            if (csrfToken) {
-                fetchMessages(csrfToken);
-                fetchUsers(csrfToken);
-            }
-        });
-    };
 
     // Fetch users list
     const fetchUsers = async (csrfToken) => {
@@ -225,7 +224,10 @@ const Messages = () => {
     // Fetch messages
     const fetchMessages = async (csrfToken) => {
         try {
-            setLoading(true);
+            if (loading) {
+                setLoading(true);
+            }
+            
             const response = await instance.get('/get_messages', {
                 headers: { "X-CSRF-TOKEN": csrfToken }
             });
@@ -235,7 +237,19 @@ const Messages = () => {
                 response.data.messages.map(msg => decryptAndStoreMessage(msg))
             );
             
-            setMessages(decryptedMessages.filter(Boolean));
+            setMessages(prevMessages => {
+                // Filter out null messages and duplicates
+                const newMessages = decryptedMessages.filter(Boolean);
+                const messageIds = new Set(prevMessages.map(msg => msg.message_id));
+                const uniqueNewMessages = newMessages.filter(msg => !messageIds.has(msg.message_id));
+                
+                if (uniqueNewMessages.length === 0) {
+                    return prevMessages;
+                }
+                
+                return [...prevMessages, ...uniqueNewMessages];
+            });
+            
             setLoading(false);
         } catch (error) {
             console.error("Error fetching messages:", error);
@@ -244,64 +258,22 @@ const Messages = () => {
         }
     };
 
-    // Handle incoming message from socket
-    const handleIncomingMessage = async (encryptedMessage) => {
-        try {
-            console.log("Processing incoming message:", encryptedMessage);
-            
-            // Skip messages not relevant to the current user
-            if (userInfo?.logged_in_as !== encryptedMessage.sender && 
-                userInfo?.logged_in_as !== encryptedMessage.receiver) {
-                console.log("Message not relevant to current user, skipping");
-                return;
-            }
-            
-            // If it's a message the user sent (from another device), skip if already in state
-            if (encryptedMessage.sender === userInfo?.logged_in_as) {
-                const isDuplicate = messages.some(msg => 
-                    msg.message_id === encryptedMessage.message_id
-                );
-                
-                if (isDuplicate) {
-                    console.log("Duplicate message, skipping");
-                    return;
-                }
-            }
-            
-            const decryptedMessage = await decryptAndStoreMessage(encryptedMessage);
-            if (decryptedMessage) {
-                setMessages(prevMessages => {
-                    // Check if message already exists to avoid duplicates
-                    const exists = prevMessages.some(msg => 
-                        msg.message_id === decryptedMessage.message_id
-                    );
-                    
-                    if (exists) {
-                        console.log("Message already in state, not adding again");
-                        return prevMessages;
-                    }
-                    
-                    return [...prevMessages, decryptedMessage];
-                });
-                scrollToBottom();
-            }
-        } catch (error) {
-            console.error("Error processing incoming message:", error);
-        }
-    };
-
     // Decrypt message and store in IndexedDB
     const decryptAndStoreMessage = async (message) => {
         if (!dbKey || !messagesDb.current) return null;
         
         try {
+            // Skip if message already exists in state
+            if (messages.some(msg => msg.message_id === message.message_id)) {
+                return null;
+            }
+            
             // Decrypt the message content with AES key
             let decryptedContent;
             if (message.aes_key) {
                 // If message has an AES key, decrypt the key first using private key
                 // This would be for group messages or advanced encryption
                 // Implementation depends on actual encryption scheme
-                // For this example, we'll use a simplified approach
                 decryptedContent = decryptWithAES(message.message, dbKey);
             } else {
                 // Direct decrypt for simple messages
@@ -323,7 +295,14 @@ const Messages = () => {
                 decryptedMessage.id = message.message_id;
             }
             
-            store.add(decryptedMessage);
+            // Check if message already exists in store
+            const request = store.get(decryptedMessage.id);
+            request.onsuccess = (event) => {
+                if (!event.target.result) {
+                    // Message doesn't exist, add it
+                    store.add(decryptedMessage);
+                }
+            };
             
             return decryptedMessage;
         } catch (error) {
@@ -332,38 +311,101 @@ const Messages = () => {
         }
     };
 
-    // Encrypt and send message
-    const sendMessage = async (e) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !selectedUser || !dbKey) return;
-        
+    // Helper function to encrypt receiver roll number with AES
+    const encrypt_AES_CBC = (text, key) => {
+        if (!text || !key) return null;
         try {
-            // Get user's public key for encryption
-            const response = await instance.post('/get_user_key', 
-                { roll: selectedUser.roll_number }, 
-                {
-                    headers: {
-                        "X-CSRF-TOKEN": document.cookie
-                            .split('; ')
-                            .find(row => row.startsWith('csrf_access_token='))
-                            ?.split('=')[1]
-                    }
-                }
+            // Generate a random IV
+            const iv = CryptoJS.lib.WordArray.random(16); // 16 bytes for AES
+            
+            // Create encryption parameters
+            const encryptParams = {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            };
+            
+            // Encrypt the data
+            const encrypted = CryptoJS.AES.encrypt(
+                text,
+                CryptoJS.enc.Utf8.parse(key),
+                encryptParams
             );
             
-            const recipientPublicKey = response.data.key;
+            // Combine IV and ciphertext and convert to base64
+            const ivAndCiphertext = iv.concat(encrypted.ciphertext);
+            return CryptoJS.enc.Base64.stringify(ivAndCiphertext);
+        } catch (error) {
+            console.error('Encryption failed:', error);
+            return null;
+        }
+    };
+
+    // Helper function to decrypt AES encrypted data
+    const decrypt_AES_CBC = (encryptedData, key) => {
+        if (!encryptedData || !key) return null;
+        try {
+            // Convert the base64 encoded encrypted data to bytes
+            const encryptedBytes = CryptoJS.enc.Base64.parse(encryptedData);
             
-            // Encrypt message content with dbKey
+            // Split the encrypted data into the IV and the ciphertext
+            const iv = encryptedBytes.clone();
+            iv.sigBytes = 16; // AES block size is 16 bytes for IV
+            iv.clamp();
+            
+            const ciphertext = encryptedBytes.clone();
+            ciphertext.words.splice(0, 4); // Remove the first 4 words (16 bytes) which is the IV
+            ciphertext.sigBytes -= 16;
+            
+            // Create decryption parameters
+            const decryptParams = {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            };
+            
+            // Decrypt the data
+            const decryptedData = CryptoJS.AES.decrypt(
+                { ciphertext: ciphertext },
+                CryptoJS.enc.Utf8.parse(key),
+                decryptParams
+            );
+            
+            return decryptedData.toString(CryptoJS.enc.Utf8);
+        } catch (error) {
+            console.error('Decryption failed:', error);
+            return null;
+        }
+    };
+
+    // Encrypt and send message using WebSocket
+    const sendMessage = async (e) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !selectedUser || !dbKey || !socketRef.current) return;
+        
+        try {
+            // Encrypt message content with AES
             const encryptedContent = encryptWithAES(newMessage, dbKey);
             
-            // Send message through socket
+            // Encrypt sender roll number (current user)
+            const encryptedSender = encrypt_AES_CBC(userInfo.logged_in_as, dbKey);
+            
+            // Encrypt receiver roll number (selected user)
+            const encryptedReceiver = encrypt_AES_CBC(selectedUser.roll_number, dbKey);
+            
+            // Send message via WebSocket
             socketRef.current.emit('send_message', {
-                receiver: selectedUser.roll_number,
-                message: encryptedContent
+                sender: encryptedSender,
+                receiver: encryptedReceiver,
+                message: encryptedContent,
+                aes_key: dbKey,
+                timestamp: new Date().toISOString(),
+                group: null // This is a DM
             });
             
             // Add message to local state (optimistic UI update)
             const newMsg = {
+                message_id: Date.now().toString(), // Generate a temporary ID
                 sender: userInfo.logged_in_as,
                 receiver: selectedUser.roll_number,
                 message: newMessage,
@@ -378,11 +420,41 @@ const Messages = () => {
             if (messagesDb.current) {
                 const transaction = messagesDb.current.transaction(['messages'], 'readwrite');
                 const store = transaction.objectStore('messages');
-                store.add(newMsg);
+                store.add({...newMsg, id: newMsg.message_id});
             }
         } catch (error) {
             console.error("Error sending message:", error);
             alert("Failed to send message. Please try again.");
+        }
+    };
+
+    // Helper function to encrypt message with AES
+    const encryptWithAES = (data, key) => {
+        if (!data) return null;
+        try {
+            // Generate a random IV
+            const iv = CryptoJS.lib.WordArray.random(16); // 16 bytes for AES
+            
+            // Create encryption parameters
+            const encryptParams = {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            };
+            
+            // Encrypt the data
+            const encrypted = CryptoJS.AES.encrypt(
+                data,
+                CryptoJS.enc.Utf8.parse(key),
+                encryptParams
+            );
+            
+            // Combine IV and ciphertext and convert to base64
+            const ivAndCiphertext = iv.concat(encrypted.ciphertext);
+            return CryptoJS.enc.Base64.stringify(ivAndCiphertext);
+        } catch (error) {
+            console.error('Encryption failed:', error);
+            return null;
         }
     };
 
@@ -419,36 +491,6 @@ const Messages = () => {
             return decryptedData.toString(CryptoJS.enc.Utf8);
         } catch (error) {
             console.error('Decryption failed:', error);
-            return null;
-        }
-    };
-
-    // Helper function to encrypt message with AES
-    const encryptWithAES = (data, key) => {
-        if (!data) return null;
-        try {
-            // Generate a random IV
-            const iv = CryptoJS.lib.WordArray.random(16); // 16 bytes for AES
-            
-            // Create encryption parameters
-            const encryptParams = {
-                iv: iv,
-                mode: CryptoJS.mode.CBC,
-                padding: CryptoJS.pad.Pkcs7
-            };
-            
-            // Encrypt the data
-            const encrypted = CryptoJS.AES.encrypt(
-                data,
-                CryptoJS.enc.Utf8.parse(key),
-                encryptParams
-            );
-            
-            // Combine IV and ciphertext and convert to base64
-            const ivAndCiphertext = iv.concat(encrypted.ciphertext);
-            return CryptoJS.enc.Base64.stringify(ivAndCiphertext);
-        } catch (error) {
-            console.error('Encryption failed:', error);
             return null;
         }
     };

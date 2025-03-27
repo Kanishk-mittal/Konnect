@@ -168,3 +168,21 @@ class User:
             })
         
         return users
+        
+    @staticmethod
+    def is_online(roll_number, db):
+        """
+        Check if a user is currently online
+        
+        Args:
+            roll_number: The roll number of the user to check
+            db: Database connection object
+            
+        Returns:
+            bool: True if the user is online, False otherwise
+        """
+        users = db.users.find()
+        for user in users:
+            if decrypt_AES_CBC(user.get("roll_number")) == roll_number:
+                return user.get("is_online", False)
+        return False

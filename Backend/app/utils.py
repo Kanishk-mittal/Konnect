@@ -342,3 +342,15 @@ def send_email(recipient_email, otp):
     except Exception as e:
         print(f"Failed to send email: {str(e)}")
         return False
+
+def save_message(sender, receiver, message, group, timestamp, aes_key):
+    from app.Models.Messages import Messages
+    msg=Messages(
+        sender=sender,
+        receiver=receiver,
+        message=message,
+        group=group,
+        timestamp=timestamp,
+        aes_key=aes_key,
+    )
+    msg.to_db(db)
