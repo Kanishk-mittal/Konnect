@@ -1,7 +1,7 @@
 import base64
 from flask import request, jsonify, make_response, Blueprint
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_csrf_token
-from app.utils import db, handle_options, public_key, decrypt_RSA, encryptRSA, external_key, get_external_key, assign_user_to_groups, send_email, decrypt_AES_CBC
+from app.utils import db, handle_options, public_key, decrypt_RSA, encryptRSA, external_key, assign_user_to_groups, send_email, decrypt_AES_CBC
 from app.Models.User import User
 from app.Models.OTP import OTP
 from . import socketio
@@ -11,28 +11,10 @@ main_bp = Blueprint("main", __name__)
 
 @main_bp.route("/publicKey", methods=["POST"])
 def get_public_key():
-    """
-        Endpoint to get the public key for sharing login details.
-        This endpoint is used by the frontend to retrieve the public key in PEM format.
-        It responds to POST requests with a JSON object containing the public key.
-        Returns:
-            JSON: A JSON object with the public key.
-    """
     return jsonify({"public_key": public_key()})
 
 @main_bp.route("/login", methods=["POST","OPTIONS"])
 def login():
-    """
-    Handle user login requests.
-    This function manages both CORS preflight requests and actual login attempts.
-    For CORS preflight requests, it returns appropriate headers to allow cross-origin requests.
-    For login attempts, it decodes and decrypts the provided credentials, verifies them against the database,
-    and if valid, creates an access token and sets it as a cookie in the response.
-    Returns:
-        Response: A Flask response object with appropriate headers and cookies set.
-    Raises:
-        401 Unauthorized: If the provided credentials are invalid.
-    """
     if request.method == "OPTIONS":  
         return handle_options()
     data = request.get_json()
@@ -67,19 +49,6 @@ def login():
 
 @main_bp.route("/register", methods=["POST","OPTIONS"])
 def register():
-    """
-    Handle user registration requests.
-    This function processes registration requests by:
-    1. Decrypting the encrypted user information sent from the frontend
-    2. Creating a new user in the database
-    3. Creating a JWT access token for the new user
-    4. Sending back an encrypted AES key that the user can use to encrypt/decrypt data on the client side
-    5. Assigning the user to appropriate groups based on their roll number
-    Returns:
-        Response: A Flask response object with appropriate headers, cookies, and encrypted AES key.
-    Raises:
-        409 Conflict: If a user with the same roll number already exists.
-    """
     if request.method == "OPTIONS":
         return handle_options()
     data = request.get_json()
@@ -172,13 +141,6 @@ def get_AES_key():
 
 @main_bp.route("/check_roll", methods=["POST","OPTIONS"])
 def check_roll():
-    """
-    Check if a roll number already exists in the database.
-    This endpoint allows the frontend to check if a roll number is available
-    before attempting full registration.
-    Returns:
-        JSON: A response indicating whether the roll number exists
-    """
     if request.method == "OPTIONS":
         return handle_options()
     data = request.get_json()
@@ -197,17 +159,6 @@ def check_roll():
 @main_bp.route("/get_user_key", methods=["POST","OPTIONS"])
 @jwt_required(locations='cookies')
 def get_user_key():
-    """
-    Retrieve a user's public key by their roll number.
-    This endpoint allows authenticated users to retrieve the public key of another user
-    by providing the target user's roll number. This is useful for end-to-end encryption
-    between users when they need to encrypt messages for secure communication.
-    Request body:
-        roll (str): The roll number of the user whose public key is being requested
-    Returns:
-        JSON: An object containing the requested user's public key
-              or an appropriate error message if the user is not found
-    """
     if request.method == "OPTIONS":
         return handle_options()
     data = request.get_json()
@@ -237,17 +188,6 @@ def get_user_key():
 @main_bp.route("/get_group_keys", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_group_keys():
-    """
-    Retrieve public keys of all members in a specific group.
-    This endpoint allows authenticated users to retrieve the public keys of all users
-    who are members of a specified group. This is useful for group encryption where
-    messages need to be encrypted for multiple recipients.
-    Request body:
-        group_id (str): The unique ID of the group
-    Returns:
-        JSON: An array of objects containing roll numbers and public keys of group members
-              or an appropriate error message if the group is not found
-    """
     if request.method == "OPTIONS":
         return handle_options()
     data = request.get_json()
@@ -289,13 +229,6 @@ def get_group_keys():
 @main_bp.route("/get_user_groups", methods=["GET", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_user_groups():
-    """
-    Retrieve all groups that the authenticated user is a member of.
-    This endpoint uses the JWT token to identify the user and returns
-    a list of all groups the user belongs to.
-    Returns:
-        JSON: An object containing an array of groups the user is a member of
-    """
     if request.method == "OPTIONS":
         return handle_options()
     current_user = get_jwt_identity()
@@ -313,15 +246,6 @@ def get_user_groups():
 @main_bp.route("/get_user_groups_with_keys", methods=["GET", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_user_groups_with_keys():
-    """
-    Retrieve all groups that the authenticated user is a member of,
-    along with the public keys of all members in each group.
-    This endpoint simplifies the process of retrieving group information
-    and member keys in a single request, which is useful for the frontend
-    to display groups and prepare for encrypted messaging.
-    Returns:
-        JSON: An object containing an array of groups with member keys
-    """
     if request.method == "OPTIONS":
         return handle_options()
     current_user = get_jwt_identity()
@@ -370,17 +294,6 @@ def get_user_groups_with_keys():
 
 @main_bp.route("/otp", methods=["POST", "OPTIONS"])
 def request_otp():
-    """
-    Handle requests for OTP generation and sending.
-    This endpoint receives an email address, generates a 6-digit OTP,
-    saves it to the database with an expiration time, and sends the
-    OTP to the provided email address.
-    Request body:
-        email (str): The email address to send the OTP to
-    Returns:
-        JSON: A response indicating whether the OTP was sent successfully
-              and when it expires
-    """
     if request.method == "OPTIONS":
         return handle_options()
     data = request.get_json()
@@ -402,12 +315,6 @@ def request_otp():
 @main_bp.route("/get_messages", methods=["GET", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_messages():
-    """
-    Retrieve messages for the authenticated user.
-    This endpoint fetches all messages where the current user is either the sender or receiver.
-    Returns:
-        JSON: An object containing the user's messages
-    """
     if request.method == "OPTIONS":
         return handle_options()
     
@@ -451,12 +358,6 @@ def get_messages():
 @main_bp.route("/set_offline", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
 def set_offline():
-    """
-    Set the authenticated user's status to offline.
-    This endpoint is called when the user leaves the messaging page or logs out.
-    Returns:
-        JSON: A message indicating the status was updated
-    """
     if request.method == "OPTIONS":
         return handle_options()
     
@@ -476,13 +377,6 @@ def set_offline():
 @main_bp.route("/get_users", methods=["GET", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_users():
-    """
-    Retrieve list of all users for messaging.
-    This endpoint returns a list of all users in the system that 
-    the current user can message.
-    Returns:
-        JSON: An object containing an array of users
-    """
     if request.method == "OPTIONS":
         return handle_options()
     
@@ -501,19 +395,6 @@ def get_users():
 
 @socketio.on('send_message')
 def receive_message(data):
-    """
-    Handle incoming messages via WebSocket.
-    This function processes messages using the following algorithm:
-    1. Get the receiver roll number
-    2. Decode the receiver roll_number
-    3. Check if the receiver is online
-    4. If receiver is not online, save message to database and return
-    5. Else set the room as receiver roll number
-    6. Emit message with attributes: sender, message, key, timestamp, group
-    
-    Args:
-        data (dict): Contains sender, receiver, group, message, aes_key and timestamp
-    """
     try:
         # 1 & 2. Get and decrypt receiver roll number
         receiver = decrypt_AES_CBC(data.get('receiver'))
