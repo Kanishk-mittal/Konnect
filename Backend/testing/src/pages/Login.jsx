@@ -9,7 +9,7 @@ function Login() {
     const [roll, setroll] = useState('')
     const [password, setPassword] = useState('')
     const navigate = useNavigate();
-    const { setPrivateKey, setDbKey } = useContext(AppContext);
+    const { setPrivateKey, setDbKey, setServerKey } = useContext(AppContext); // Added setServerKey
 
     const instance = axios.create({
         withCredentials: true,
@@ -85,6 +85,9 @@ function Login() {
             const serverAESKey = crypt.decrypt(response.data.key);
             
             console.log('Received AES key from server:', serverAESKey);
+            
+            // Set the server key in the context for use in other components
+            setServerKey(serverAESKey);
             
             // Look for user-specific keys using roll number
             console.log("Searching for stored keys for roll:", roll);

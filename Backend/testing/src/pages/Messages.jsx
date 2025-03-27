@@ -3,6 +3,8 @@ import axios from 'axios';
 import './Messages.css';
 import { AppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import CryptoJS from 'crypto-js';
+import JSEncrypt from 'jsencrypt';
 
 const Messages = () => {
     const [users, setUsers] = useState([]);
@@ -26,8 +28,11 @@ const Messages = () => {
     const [loadingGroupKeys, setLoadingGroupKeys] = useState(false);
     const [groupKeysError, setGroupKeysError] = useState(null);
     
+    // Add state for current user information
+    const [currentUser, setCurrentUser] = useState(null);
+    
     // Get context values
-    const { privateKey, dbKey } = useContext(AppContext);
+    const { privateKey, dbKey, serverKey } = useContext(AppContext);
     const navigate = useNavigate();
 
     // Create axios instance with credentials
@@ -154,6 +159,33 @@ const Messages = () => {
         }
     };
 
+    // Fetch current user info on component mount
+    const fetchCurrentUserInfo = async () => {
+        try {
+            // Extract CSRF token from cookies
+            const csrfToken = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrf_access_token='))
+                ?.split('=')[1];
+
+            if (!csrfToken) {
+                setError("Authentication token not found. Please log in again.");
+                return;
+            }
+
+            const response = await instance.post('/protected', {}, {
+                headers: { "X-CSRF-TOKEN": csrfToken }
+            });
+            
+            setCurrentUser(response.data);
+            console.log("Current user info:", response.data);
+        } catch (err) {
+            console.error("Error fetching current user info:", err);
+            setError("Failed to authenticate. Please log in again.");
+            navigate('/login');
+        }
+    };
+
     // Fetch data when component mounts
     useEffect(() => {
         // Check if user is authenticated
@@ -165,10 +197,15 @@ const Messages = () => {
 
         console.log("Messages component mounted with dbKey:", dbKey);
         console.log("Private key available:", privateKey ? "Yes" : "No");
+        console.log("Server key available:", serverKey ? "Yes" : "No");
 
         const fetchData = async () => {
             setLoading(true);
             try {
+                // Fetch current user info first
+                await fetchCurrentUserInfo();
+                
+                // Then fetch other data in parallel
                 await Promise.all([fetchUsers(), fetchGroups()]);
                 setError(null);
             } catch (err) {
@@ -179,7 +216,7 @@ const Messages = () => {
         };
         
         fetchData();
-    }, [privateKey, dbKey, navigate]);
+    }, [privateKey, dbKey, serverKey, navigate]);
 
     // Handle selecting a chat (user or group)
     const handleSelectChat = (id, type) => {
@@ -203,23 +240,138 @@ const Messages = () => {
         }
     };
 
+    // Generate a random AES key for message encryption
+    const generateRandomAESKey = () => {
+        // Generate a random 16-byte (128-bit) key
+        const randomBytes = CryptoJS.lib.WordArray.random(16);
+        return CryptoJS.enc.Base64.stringify(randomBytes);
+    };
+
+    // Encrypt data with AES using CBC mode
+    const encryptWithAES = (data, key) => {
+        if (!data) return null;
+        try {
+            // Generate a random IV
+            const iv = CryptoJS.lib.WordArray.random(16); // 16 bytes for AES
+            
+            // Create encryption parameters
+            const encryptParams = {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            };
+            
+            // Encrypt the data
+            const encrypted = CryptoJS.AES.encrypt(
+                typeof data === 'string' ? data : JSON.stringify(data),
+                CryptoJS.enc.Utf8.parse(key),
+                encryptParams
+            );
+            
+            // Combine IV and ciphertext and convert to base64
+            const ivAndCiphertext = iv.concat(encrypted.ciphertext);
+            return CryptoJS.enc.Base64.stringify(ivAndCiphertext);
+        } catch (error) {
+            console.error('Encryption failed:', error);
+            return null;
+        }
+    };
+
+    // Encrypt data with RSA using the receiver's public key
+    const encryptWithRSA = (data, publicKey) => {
+        if (!data || !publicKey) return null;
+        try {
+            // Use JSEncrypt for RSA encryption, which is compatible with the backend
+            const encrypt = new JSEncrypt();
+            encrypt.setPublicKey(publicKey);
+            
+            // JSEncrypt's encrypt method returns base64 encoded string
+            const encryptedData = encrypt.encrypt(data);
+            if (!encryptedData) {
+                throw new Error("RSA encryption failed");
+            }
+            
+            return encryptedData;
+        } catch (error) {
+            console.error('RSA encryption failed:', error);
+            return null;
+        }
+    };
+
     // Handle sending a message
     const handleSendMessage = (e) => {
         e.preventDefault();
-        if (!messageText.trim() || !selectedChat) return;
+        if (!messageText.trim() || !selectedChat || !currentUser) return;
 
         // Add message to the local state for immediate display
         const newMessage = {
             id: Date.now(), // temporary id
             text: messageText,
-            sender: 'me', // In a real app, this would be the current user's ID
+            sender: currentUser.logged_in_as, // Use actual user roll number
             timestamp: new Date().toISOString(),
         };
         setMessages([...messages, newMessage]);
 
-        // Here you would send the message to the backend
-        // using socket.io or an API call
-
+        // For DM messages, create an encrypted message object for development
+        if (chatType === 'user' && selectedUserPublicKey && serverKey) {
+            try {
+                // Create timestamp
+                const timestamp = new Date().toISOString();
+                
+                // Generate a random AES key for this message
+                const messageAESKey = generateRandomAESKey();
+                console.log('Random AES key generated for message:', messageAESKey);
+                
+                // 1. Encrypt sender, timestamp, and receiver using server AES key
+                const encryptedSender = encryptWithAES(currentUser.logged_in_as, serverKey);
+                const encryptedReceiver = encryptWithAES(selectedChat, serverKey);
+                const encryptedTimestamp = encryptWithAES(timestamp, serverKey);
+                
+                // 2. Encrypt message using the randomly generated AES key
+                const encryptedMessage = encryptWithAES(messageText, messageAESKey);
+                
+                // 3. Encrypt the random AES key with receiver's public key using JSEncrypt
+                const encryptedAESKey = encryptWithRSA(messageAESKey, selectedUserPublicKey);
+                
+                // Verify the encryption worked
+                if (!encryptedAESKey) {
+                    console.error("RSA encryption of AES key failed!");
+                }
+                
+                // Create the complete encrypted message object
+                const encryptedMessageObj = {
+                    sender: encryptedSender,
+                    receiver: encryptedReceiver,
+                    timestamp: encryptedTimestamp,
+                    message: encryptedMessage,
+                    encrypted_key: encryptedAESKey,
+                    group: null // This is a DM, not a group message
+                };
+                
+                // Log the original and encrypted objects for development
+                console.log('------ ENCRYPTION DETAILS ------');
+                console.log('Original message:', {
+                    sender: currentUser.logged_in_as,
+                    receiver: selectedChat,
+                    timestamp: timestamp,
+                    message: messageText,
+                    key: messageAESKey
+                });
+                console.log('Encrypted with server key:', {
+                    sender: encryptedSender,
+                    receiver: encryptedReceiver,
+                    timestamp: encryptedTimestamp
+                });
+                console.log('Message encrypted with random AES key:', encryptedMessage);
+                console.log('Random AES key encrypted with receiver public key using JSEncrypt:', encryptedAESKey);
+                console.log('Complete encrypted message object:', encryptedMessageObj);
+                console.log('------ END ENCRYPTION DETAILS ------');
+                
+            } catch (error) {
+                console.error('Error encrypting message:', error);
+            }
+        }
+        
         // Clear the input field
         setMessageText('');
     };
@@ -238,8 +390,10 @@ const Messages = () => {
                 boxShadow: '0 0 5px rgba(0,0,0,0.2)',
                 zIndex: 1000
             }}>
+                <p><strong>User:</strong> {currentUser?.logged_in_as || 'Unknown'}</p>
                 <p><strong>Authentication:</strong> {dbKey ? 'Authenticated' : 'Not authenticated'}</p>
                 <p><strong>DB Key:</strong> {dbKey ? `${dbKey.substring(0, 10)}...` : 'None'}</p>
+                <p><strong>Server Key:</strong> {serverKey ? `${serverKey.substring(0, 10)}...` : 'None'}</p>
                 <p><strong>Private Key:</strong> {privateKey ? 'Available' : 'None'}</p>
             </div>
 
@@ -385,7 +539,7 @@ const Messages = () => {
                                 messages.map(message => (
                                     <div 
                                         key={message.id} 
-                                        className={`message ${message.sender === 'me' ? 'sent' : 'received'}`}
+                                        className={`message ${message.sender === currentUser?.logged_in_as ? 'sent' : 'received'}`}
                                     >
                                         <div className="message-content">{message.text}</div>
                                         <div className="message-time">
