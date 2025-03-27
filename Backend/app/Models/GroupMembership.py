@@ -96,13 +96,24 @@ class GroupMembership:
     @staticmethod
     def get_membership(roll_number: str, group_id: str, db):
         """Get a specific membership"""
-        from app.utils import encrypt_AES_CBC
+        from app.utils import decrypt_AES_CBC
         
-        membership = db.groupMemberships.find_one({
-            "roll_number": encrypt_AES_CBC(roll_number),
-            "group_id": encrypt_AES_CBC(group_id)
-        })
-        return GroupMembership.from_db(membership) if membership else None
+        # We can't directly query by encrypted value (due to random IV),
+        # so we need to iterate through all memberships and check by decrypting each one
+        all_memberships = list(db.groupMemberships.find())
+        
+        for membership in all_memberships:
+            try:
+                decrypted_roll = decrypt_AES_CBC(membership["roll_number"])
+                decrypted_group = decrypt_AES_CBC(membership["group_id"])
+                
+                if decrypted_roll == roll_number and decrypted_group == group_id:
+                    return GroupMembership.from_db(membership)
+            except Exception as e:
+                print(f"Error decrypting membership: {e}")
+                continue
+                
+        return None
 
     @staticmethod
     def update_role(roll_number: str, group_id: str, new_role: str, db):
@@ -130,15 +141,12 @@ class GroupMembership:
     @staticmethod
     def is_member(roll_number: str, group_id: str, db):
         """Check if a user is a member of a group"""
-        from app.utils import encrypt_AES_CBC
-        
+        # Simply use the get_membership method which already handles the proper decryption
         membership = GroupMembership.get_membership(roll_number, group_id, db)
         return membership is not None
 
     @staticmethod
     def is_admin(roll_number: str, group_id: str, db):
         """Check if a user is an admin of a group"""
-        from app.utils import encrypt_AES_CBC
-        
         membership = GroupMembership.get_membership(roll_number, group_id, db)
         return membership is not None and membership.role == "admin"

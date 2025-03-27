@@ -395,10 +395,28 @@ def get_users():
 
 @socketio.on('send_message')
 def receive_message(data):
+    """
+    Handle incoming messages via WebSocket.
+    This function processes messages using the following algorithm:
+    1. Get the receiver roll number
+    2. Decode the receiver roll_number
+    3. Check if the receiver is online
+    4. If receiver is not online, save message to database and return
+    5. Else set the room as receiver roll number
+    6. Emit message with attributes: sender, message, encrypted_key, timestamp, group
+    
+    Args:
+        data (dict): Contains sender, receiver, group, message, encrypted_key and timestamp
+    """
     try:
         # 1 & 2. Get and decrypt receiver roll number
-        receiver = decrypt_AES_CBC(data.get('receiver'))
-        sender = decrypt_AES_CBC(data.get('sender'))
+        try:
+            receiver = decrypt_AES_CBC(data.get('receiver'))
+            sender = decrypt_AES_CBC(data.get('sender'))
+        except Exception as decrypt_error:
+            print(f"Decryption error: {str(decrypt_error)}")
+            emit('message_error', {'error': 'Encryption format error'})
+            return
         
         # 3. Check if receiver is online
         from app.Models.User import User
@@ -408,11 +426,14 @@ def receive_message(data):
         if not receiver_online:
             # Save message to database
             from app.Models.Messages import Messages
+            message_data = data.get('message')
+            encrypted_key = data.get('encrypted_key')  # This is the RSA-encrypted AES key
+            
             new_message = Messages(
                 sender=sender,
                 receiver=receiver,
-                message=data.get('message'),
-                aes_key=data.get('aes_key'),
+                message=message_data,
+                aes_key=encrypted_key,  # Store the encrypted key, not the raw key
                 timestamp=data.get('timestamp')
             )
             new_message.save(db)
@@ -435,7 +456,7 @@ def receive_message(data):
         emit('new_message', {
             'sender': data.get('sender'),
             'message': data.get('message'),
-            'key': data.get('aes_key'),
+            'encrypted_key': data.get('encrypted_key'),  # Forward the encrypted key
             'timestamp': data.get('timestamp'),
             'group': data.get('group')  # Will be None for DMs
         }, room=room)

@@ -1,12 +1,14 @@
-import React from 'react'
+import React, { useContext } from 'react'
 import { useState } from 'react'
 import axios from 'axios'
 import JSEncrypt from "jsencrypt";
-
+import { AppContext } from '../src/context/AppContext';
 
 const Login = () => {
     const [roll, setroll] = useState('')
     const [password, setPassword] = useState('')
+    const { setPrivateKey, setServerKey } = useContext(AppContext);
+
     const instance = axios.create({
         withCredentials: true,
         baseURL: "http://localhost:5000",
@@ -18,7 +20,15 @@ const Login = () => {
         }
     })
 
-    
+    // Generate RSA key pair for this session
+    const generateRSAKeys = () => {
+        const encryptor = new JSEncrypt();
+        encryptor.getKey(); // Generates a new 1024-bit RSA key pair
+        return {
+            publicKey: encryptor.getPublicKey(),
+            privateKey: encryptor.getPrivateKey()
+        };
+    };
 
     const logOut = async () => {
         try {
@@ -47,20 +57,42 @@ const Login = () => {
         }
     }
     const handleLogin = async () => {
-        // getting RSA public key
-        const { data } = await axios.post('http://localhost:5000/publicKey')
-        const publicKeyPem = data.public_key
-        const key = new JSEncrypt();
-        key.setPublicKey(publicKeyPem);;
-        const encryptedroll = key.encrypt(roll, 'base64');
-        const encryptedPassword = key.encrypt(password, 'base64');
-        const{publicKey,privateKey} = generateRSAKeys()
-        const response = await instance.post('/login', {
-            roll: encryptedroll,
-            password: encryptedPassword,
-            pyblicKey: publicKey
-        })
-        console.log(response.data)
+        try {
+            // Getting RSA public key from server
+            const { data } = await axios.post('http://localhost:5000/publicKey')
+            const publicKeyPem = data.public_key
+            const key = new JSEncrypt();
+            key.setPublicKey(publicKeyPem);
+            
+            // Encrypt credentials with server's public key
+            const encryptedRoll = key.encrypt(roll, 'base64');
+            const encryptedPassword = key.encrypt(password, 'base64');
+            
+            // Generate client-side keys
+            const {publicKey, privateKey} = generateRSAKeys();
+            
+            // Store private key in context
+            setPrivateKey(privateKey);
+            
+            // Send login request
+            const response = await instance.post('/login', {
+                roll: encryptedRoll,
+                password: encryptedPassword,
+                publicKey: publicKey
+            });
+            
+            // Decrypt the server AES key with our private key
+            const encryptor = new JSEncrypt();
+            encryptor.setPrivateKey(privateKey);
+            const serverKey = encryptor.decrypt(response.data.key);
+            
+            // Store server key in context
+            setServerKey(serverKey);
+            
+            console.log('Login successful');
+        } catch (error) {
+            console.error("Login error:", error);
+        }
     }
     const testLogin = async () => {
         try {
