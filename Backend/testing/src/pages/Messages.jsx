@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from 'axios';
 import './Messages.css';
 import { AppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import JSEncrypt from 'jsencrypt';
 import CryptoJS from 'crypto-js';
+import { io } from 'socket.io-client';
 
 const Messages = () => {
     const [users, setUsers] = useState([]);
@@ -36,6 +37,9 @@ const Messages = () => {
             'X-Requested-With': 'XMLHttpRequest',
         }
     });
+
+    // Socket reference to maintain connection
+    const socketRef = useRef(null);
 
     // Function to fetch users from backend
     const fetchUsers = async () => {
@@ -166,7 +170,6 @@ const Messages = () => {
             group: group,
             key: aesKey,
             receiverPublicKey: publicKey,
-            serverKey: serverKey
         };
         return newMessage;
     }
@@ -215,13 +218,110 @@ const Messages = () => {
         return response.data.keys;
     }
 
+    const encryptWithAES = (message, key) => {
+        console.log(message,key);
+
+        // Decode base64 AES key
+        const keyBytes = CryptoJS.enc.Base64.parse(key);
+
+        // Generate a random IV (Initialization Vector)
+        const iv = CryptoJS.lib.WordArray.random(16);
+
+        // Encrypt message using AES-CBC
+        const encrypted = CryptoJS.AES.encrypt(message, keyBytes, {
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7,
+            iv: iv
+        });
+
+        // Combine IV and ciphertext, then encode as base64
+        return CryptoJS.enc.Base64.stringify(iv.concat(encrypted.ciphertext));
+    };
+
     const createPacket = (message) => {
-        
+        // Encrypt the message using AES
+        const aesKey = message.key;
+        const publicKey = message.receiverPublicKey;
+        const encryptedMessage = encryptWithAES(message.text, aesKey);
+        // Encrypt the AES key using RSA
+        const rsaEncoder = new JSEncrypt();
+        rsaEncoder.setPublicKey(publicKey);
+        const encryptedKey = rsaEncoder.encrypt(aesKey);
+        // encrypting sender,group (if it exist) and receiver with server aes key
+        const encryptedSender = encryptWithAES(message.sender, serverKey);
+        const encryptedReceiver = encryptWithAES(message.receiver, serverKey);
+        if (!(message.group === null)) {
+            message.group= encryptWithAES(message.group, serverKey);
+        }
+        // Creating the packet
+        const packet = {
+            message: encryptedMessage,
+            key: encryptedKey,
+            sender: encryptedSender,
+            receiver: encryptedReceiver,
+            group: message.group,
+            timestamp: message.timestamp
+        };
+        return packet;
     }
 
+    // Remove socket initialization from sendMessage function
     const sendMessage = (message) => {
-        console.log("Sending message:", message);
+        const packet = createPacket(message);
+        // Using the persistent socket connection established in useEffect
+        if (socketRef.current) {
+            socketRef.current.emit('send_message', packet);
+        } else {
+            console.error('Socket connection not established');
+            // Try to re-establish connection if missing
+            setupSocketConnection();
+        }
     }
+
+    // Create a separate function to set up socket connection
+    const setupSocketConnection = () => {
+        if (!currentUser) return false;
+        
+        // Close existing connection if it exists
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+        }
+        
+        try {
+            console.log('Establishing socket connection');
+            socketRef.current = io('http://localhost:5000', {
+                withCredentials: true,
+            });
+            
+            // Join room with user's roll number to receive messages
+            socketRef.current.emit('join', { room: currentUser.logged_in_as });
+            
+            // Listen for incoming messages
+            socketRef.current.on('receive_message', handleReceivedMessage);
+            
+            // Listen for message delivery confirmation
+            socketRef.current.on('message_sent', (data) => {
+                console.log('Message delivery confirmed:', data);
+            });
+            
+            socketRef.current.on('message_error', (error) => {
+                console.error('Message delivery error:', error);
+            });
+            
+            socketRef.current.on('connect', () => {
+                console.log('Socket connected');
+            });
+            
+            socketRef.current.on('connect_error', (error) => {
+                console.error('Socket connection error:', error);
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Failed to establish socket connection:', error);
+            return false;
+        }
+    };
 
     const handleSendMessage = async(e) => {
         e.preventDefault();
@@ -256,6 +356,156 @@ const Messages = () => {
         // Clear the message input after sending
         setMessageText('');
     };
+
+    // Function to decrypt AES encrypted message
+    const decryptWithAES = (encryptedData, key) => {
+        try {
+            // Decode the base64 string to get encrypted data
+            const ciphertext = CryptoJS.enc.Base64.parse(encryptedData);
+            
+            // Extract IV (first 16 bytes)
+            const iv = CryptoJS.lib.WordArray.create(
+                ciphertext.words.slice(0, 4),
+                16
+            );
+            
+            // Extract actual ciphertext (everything after IV)
+            const encryptedMessage = CryptoJS.lib.WordArray.create(
+                ciphertext.words.slice(4),
+                ciphertext.sigBytes - 16
+            );
+            
+            // Decrypt using AES
+            const decrypted = CryptoJS.AES.decrypt(
+                { ciphertext: encryptedMessage },
+                CryptoJS.enc.Base64.parse(key),
+                { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+            );
+            
+            return decrypted.toString(CryptoJS.enc.Utf8);
+        } catch (error) {
+            console.error('Error decrypting message:', error);
+            return 'Error decrypting message';
+        }
+    };
+    
+    // Function to decrypt RSA encrypted AES key
+    const decryptRSAKey = (encryptedKey) => {
+        try {
+            const decrypt = new JSEncrypt();
+            decrypt.setPrivateKey(privateKey);
+            const decryptedKey = decrypt.decrypt(encryptedKey);
+            return decryptedKey;
+        } catch (error) {
+            console.error('Error decrypting RSA key:', error);
+            return null;
+        }
+    };
+    
+    // Handle received messages from socket
+    const handleReceivedMessage = (data) => {
+        console.log('Received message data:', data);
+        
+        try {
+            // Decrypt sender
+            const sender = decryptWithAES(data.sender, serverKey);
+            
+            // Decrypt receiver (should be current user)
+            const receiver = decryptWithAES(data.receiver, serverKey);
+            
+            // Check if this is a group message
+            let group = null;
+            if (data.group) {
+                group = decryptWithAES(data.group, serverKey);
+            }
+            
+            // Decrypt the AES key using user's private RSA key
+            const decryptedAESKey = decryptRSAKey(data.key);
+            if (!decryptedAESKey) {
+                console.error('Failed to decrypt message key');
+                return;
+            }
+            
+            // Decrypt the message using the decrypted AES key
+            const decryptedMessage = decryptWithAES(data.message, decryptedAESKey);
+            
+            // Create a message object to add to state
+            const newMessage = {
+                id: CryptoJS.SHA256(sender + receiver + data.timestamp).toString(),
+                text: decryptedMessage,
+                sender: sender,
+                receiver: receiver,
+                timestamp: data.timestamp,
+                group: group
+            };
+            
+            console.log('Decrypted message:', newMessage);
+            
+            // Update message list in UI
+            setMessages(prevMessages => [...prevMessages, newMessage]);
+            
+            // If this chat isn't currently selected, could add notification logic here
+            if ((chatType === 'user' && selectedChat !== sender) || 
+                (chatType === 'group' && selectedChat !== group)) {
+                // Could implement notification logic
+                console.log('Message received in background chat');
+            }
+        } catch (error) {
+            console.error('Error processing received message:', error);
+        }
+    };
+
+    // Setup socket connection and listeners
+    useEffect(() => {
+        if (!currentUser) return;
+        
+        // Create socket connection if not already created
+        if (!socketRef.current) {
+            console.log('Establishing socket connection');
+            socketRef.current = io('http://localhost:5000', {
+                withCredentials: true,
+            });
+            
+            // Join room with user's roll number to receive messages
+            socketRef.current.emit('join', { room: currentUser.logged_in_as });
+            
+            // Listen for incoming messages
+            socketRef.current.on('receive_message', handleReceivedMessage);
+            
+            // Additional socket event handlers could be added here
+            socketRef.current.on('connect', () => {
+                console.log('Socket connected');
+            });
+            
+            socketRef.current.on('connect_error', (error) => {
+                console.error('Socket connection error:', error);
+            });
+        }
+        
+        // Cleanup on component unmount
+        return () => {
+            if (socketRef.current) {
+                console.log('Disconnecting socket');
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, [currentUser]);
+
+    // Setup socket as soon as user info is available, separate from other data loading
+    useEffect(() => {
+        if (currentUser && currentUser.logged_in_as) {
+            setupSocketConnection();
+        }
+        
+        return () => {
+            if (socketRef.current) {
+                console.log('Disconnecting socket');
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, [currentUser]); // Only depend on currentUser, not all the other states
 
     return (
         <div className="messages-container">

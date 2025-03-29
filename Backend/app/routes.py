@@ -409,122 +409,34 @@ def on_join(data):
 
 @socketio.on('send_message')
 def receive_message(data):
-    """
-    Handle incoming messages via WebSocket.
-    This function processes messages using the following algorithm:
-    1. Get the receiver roll number
-    2. Decode the receiver roll_number
-    3. Check if the receiver is online
-    4. If receiver is not online, save message to database and return
-    5. Else set the room as receiver roll number
-    6. Emit message with attributes: sender, message, encrypted_key, timestamp, group
-    
-    Args:
-        data (dict): Contains sender, receiver, group, message, encrypted_key and timestamp
-    """
     try:
-        # Debug print: Show received message structure
-        print("\n=== RECEIVED MESSAGE DATA ===")
-        print(f"Keys in message: {list(data.keys())}")
-        print(f"Timestamp type: {type(data.get('timestamp'))}")
-        print(f"Timestamp value: {data.get('timestamp')}")
-        
-        # 1 & 2. Get and decrypt receiver roll number
-        print(f"Attempting to decrypt sender: {data.get('sender')[:20]}... (length: {len(data.get('sender', ''))})")
-        print(f"Attempting to decrypt receiver: {data.get('receiver')[:20]}... (length: {len(data.get('receiver', ''))})")
-        
-        try:
-            receiver = decrypt_AES_CBC(data.get('receiver'))
-            print(f"✅ Successfully decrypted receiver: {receiver}")
-            
-            sender = decrypt_AES_CBC(data.get('sender'))
-            print(f"✅ Successfully decrypted sender: {sender}")
-            
-        except Exception as decrypt_error:
-            print(f"❌ Decryption error: {str(decrypt_error)}")
-            print(f"Decryption failed on one of the fields. Error type: {type(decrypt_error).__name__}")
-            
-            # Check each field individually to narrow down the problem
-            try:
-                receiver_test = decrypt_AES_CBC(data.get('receiver'))
-                print(f"✅ Receiver decryption works individually: {receiver_test}")
-            except Exception as e:
-                print(f"❌ Receiver decryption fails individually: {str(e)}")
-                
-            try:
-                sender_test = decrypt_AES_CBC(data.get('sender'))
-                print(f"✅ Sender decryption works individually: {sender_test}")
-            except Exception as e:
-                print(f"❌ Sender decryption fails individually: {str(e)}")
-                
-            emit('message_error', {'error': 'Encryption format error'})
+        # Decrypt receiver info since it's the only one needed for routing
+        receiver = data.get('receiver')
+        if not receiver:
+            emit('message_error', {'error': 'No receiver specified'})
             return
-        
-        # 3. Check if receiver is online
-        from app.Models.User import User
-        receiver_online = User.is_online(receiver, db)
-        print(f"Receiver {receiver} online status: {receiver_online}")
-        
-        # Also check if it's a group message
-        if data.get('group'):
-            try:
-                group_id = decrypt_AES_CBC(data.get('group'))
-                print(f"✅ This is a group message for group: {group_id}")
-            except Exception as e:
-                print(f"❌ Failed to decrypt group field: {str(e)}")
-        
-        # 4. If receiver is offline, save to database and return
-        if not receiver_online:
-            # Save message to database
-            from app.Models.Messages import Messages
-            message_data = data.get('message')
-            encrypted_key = data.get('encrypted_key')  # This is the RSA-encrypted AES key
             
-            print(f"Receiver offline, storing message:")
-            print(f"  Message length: {len(message_data) if message_data else 'None'}")
-            print(f"  Encrypted key length: {len(encrypted_key) if encrypted_key else 'None'}")
-            
-            new_message = Messages(
-                sender=sender,
-                receiver=receiver,
-                message=message_data,
-                aes_key=encrypted_key,  # Store the encrypted key, not the raw key
-                timestamp=data.get('timestamp')
-            )
-            new_message.save(db)
-            
-            # Emit confirmation back to sender
-            emit('message_stored', {
-                'status': 'stored',
-                'receiver': data.get('receiver'),
-                'timestamp': data.get('timestamp')
-            })
-            
-            print(f"Message from {sender} to {receiver} stored in database (receiver offline)")
-            return
+        # Decrypt the receiver using the external key
+        decrypted_receiver = decrypt_AES_CBC(receiver, key_str=external_key)
+        print(f"Message for receiver: {decrypted_receiver}")
         
-        # 5. Set the room as receiver roll number
-        room = receiver
-        join_room(room)
+        # Store message in database for offline delivery
+        from app.utils import save_message
+        save_message(
+            sender=data.get('sender'),
+            receiver=receiver,  # Keep encrypted for storage
+            message=data.get('message'),
+            group=data.get('group'),
+            timestamp=data.get('timestamp'),
+            aes_key=data.get('key')
+        )
         
-        # 6. Emit message with required attributes
-        print(f"Message from {sender} to {receiver} in room: {room}")
-        emit('new_message', {
-            'sender': data.get('sender'),
-            'message': data.get('message'),
-            'encrypted_key': data.get('encrypted_key'),  # Forward the encrypted key
-            'timestamp': data.get('timestamp'),
-            'group': data.get('group')  # Will be None for DMs
-        }, room=room)
+        # Emit to the specific room (user)
+        emit('receive_message', data, room=decrypted_receiver)
+        print(f"Message emitted to room: {decrypted_receiver}")
         
-        print(f"Message from {sender} sent to room: {room}")
-        
+        # Also emit confirmation to sender
+        emit('message_sent', {'status': 'delivered', 'timestamp': data.get('timestamp')})
     except Exception as e:
-        print(f"❌ Error processing message: {str(e)}")
-        print(f"Error type: {type(e).__name__}")
-        print(f"Error occurred at: ", end="")
-        import traceback
-        traceback.print_exc()
-        # Emit error to sender only
-        emit('message_error', {'error': 'Failed to process message'})
-
+        print(f"Error in socket message handling: {str(e)}")
+        emit('message_error', {'error': str(e)})
