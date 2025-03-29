@@ -322,6 +322,11 @@ def get_messages():
     if not user:
         return jsonify({"error": "User not found"}), 404
     
+    # Set user as online when they fetch messages
+    user.is_online = True
+    user.update_db(db)
+    print(f"User {current_user} is now online")
+    
     from app.Models.Messages import Messages
     
     # Get direct messages
@@ -371,6 +376,25 @@ def set_offline():
     
     return jsonify({
         "message": "Status set to offline"
+    }), 200
+
+@main_bp.route("/set_online", methods=["POST", "OPTIONS"])
+@jwt_required(locations='cookies')
+def set_online():
+    if request.method == "OPTIONS":
+        return handle_options()
+    
+    current_user = get_jwt_identity()
+    user = User.from_db(current_user, db)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Update user's online status
+    user.is_online = True
+    user.update_db(db)
+    
+    return jsonify({
+        "message": "Status set to online"
     }), 200
 
 @main_bp.route("/get_users", methods=["GET", "OPTIONS"])
@@ -431,12 +455,21 @@ def receive_message(data):
             aes_key=data.get('key')
         )
         
-        # Emit to the specific room (user)
-        emit('receive_message', data, room=decrypted_receiver)
-        print(f"Message emitted to room: {decrypted_receiver}")
+        # Check if the receiver is online before emitting
+        is_receiver_online = User.is_online(decrypted_receiver, db)
         
-        # Also emit confirmation to sender
-        emit('message_sent', {'status': 'delivered', 'timestamp': data.get('timestamp')})
+        if is_receiver_online:
+            # Emit to the specific room (user) if they're online
+            emit('receive_message', data, room=decrypted_receiver)
+            print(f"Message emitted to online user: {decrypted_receiver}")
+        else:
+            print(f"Receiver {decrypted_receiver} is offline. Message stored for later retrieval.")
+        
+        # Always emit confirmation to sender
+        emit('message_sent', {
+            'status': 'delivered' if is_receiver_online else 'stored',
+            'timestamp': data.get('timestamp')
+        })
     except Exception as e:
         print(f"Error in socket message handling: {str(e)}")
         emit('message_error', {'error': str(e)})

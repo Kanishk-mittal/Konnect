@@ -156,7 +156,7 @@ This document provides detailed information about all backend endpoints in the K
 ### Get Messages
 - **URL**: `/get_messages`
 - **Method**: `GET`
-- **Description**: Retrieves messages for the authenticated user.
+- **Description**: Retrieves messages for the authenticated user and sets their status to online.
 - **Input**: No body required, but requires valid JWT token in cookies
 - **Output**:
   - Success: `200 OK` with `{"user": "<roll>", "messages": [{"sender": "...", "receiver": "...", "message": "...", ...}, ...]}`
@@ -175,8 +175,8 @@ This document provides detailed information about all backend endpoints in the K
   - `timestamp`: Message timestamp
   - `group`: Optional group identifier (null for direct messages)
 - **Output Events**:
-  - Success (receiver online): Emits `new_message` event to receiver with message details
-  - Success (receiver offline): Emits `message_stored` event to sender
+  - Success (receiver online): Emits `receive_message` event to receiver with message details
+  - Success (receiver offline): Message stored in database for later retrieval, emits `message_sent` with status "stored" to sender
   - Error: Emits `message_error` event to sender
 
 ## Notes
