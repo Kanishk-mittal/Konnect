@@ -1,0 +1,126 @@
+.landcontainer{
+    background-image: url("../src/assets/LandBg.png");
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+.Topnav{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 80px;
+    background-color:white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.logo {
+    width: 200px;
+    height: 60px;
+    margin-top: 10px;
+    background-color:white;
+    color: white;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+.title {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #92400e;
+    margin-bottom: 16px;
+}
+.card {
+    background: white;
+    border-radius: 27.6px;
+    width: 600px;
+    margin-left: 400px;
+    margin-bottom: 100px;
+    height: 100px;
+    padding: 33px 61px 33px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0px 8.4px 9px 0px rgba(255, 174, 0, 0.01), 0px 16.2px 49.2px 0px rgba(255, 174, 0, 0.28);
+
+}
+/* Description Styling */
+.description {
+    color: #FFAE01;
+    text-align: center;
+    font-family: Outfit;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+}
+.card1{
+    background: white;
+    border-radius: 27.6px;
+    width: 400px;
+    margin-left: 500px;
+    margin-bottom: 100px;
+    height: 100px;
+    padding: 33px 61px 33px 60px;
+    display: flex;
+    margin-top: 20px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0px 8.4px 9px 0px rgba(255, 174, 0, 0.01), 0px 16.2px 49.2px 0px rgba(255, 174, 0, 0.28);
+
+}
+/* Button Container */
+.button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 250px;
+}
+
+/* Login Button */
+.loginbuttonhome {
+    width: 100%;
+    color: #F59500;
+    text-align: center;
+    font-family: "Source Sans Pro";
+    font-size: 27.255px;
+    margin-right: 20px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 100%;
+    padding: 12px;
+    border-radius: 12.113px;
+    background: #FFF;
+    box-shadow: 0px 7.571px 15.142px 0px rgba(255, 174, 0, 0.26), 0px 30.283px 60.566px 0px rgba(255, 174, 0, 0.29);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.loginbuttonhome:hover {
+    background-color: #fef3c7;
+}
+
+/* Register Button */
+.regbuttonhome {
+    width: 100%;
+    color: #F59500;
+    text-align: center;
+    font-family: "Source Sans Pro";
+    font-size: 27.255px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 100%;
+    padding: 12px;
+    border-radius: 12.113px;
+    background: #FFF;
+    box-shadow: 0px 7.571px 15.142px 0px rgba(255, 174, 0, 0.26), 0px 30.283px 60.566px 0px rgba(255, 174, 0, 0.29);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.regbuttonhome:hover {
+    background-color: #fef3c7;
+}
