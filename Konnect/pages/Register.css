@@ -1,0 +1,183 @@
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: url("../src/assets/BackG.png");
+    background-repeat: no-repeat;
+    background-size: cover;
+    align-items: center;
+    font-family: 'Outfit', sans-serif;
+    overflow-y: auto;
+}
+.Top-nav{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 80px;
+    background-color:white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.logo {
+    width: 200px;
+    height: 60px;
+    background-color:white;
+    color: white;
+    margin-top: 10px;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+.container1 {
+    position: relative;
+    z-index: 2;
+    background: #FFF;
+    width: 100%;
+    max-width: 900px;
+    margin-top: 100px;
+    margin-left: 300px;
+    margin-bottom: 50px;
+    padding: 30px;
+    border-radius: 9.364px;
+    box-shadow: 0px 5.852px 11.705px 0px rgba(255, 174, 0, 0.26), 0px 23.409px 46.818px 0px rgba(255, 174, 0, 0.29);
+    overflow-y: auto;
+}
+.buttons1 {
+    display: flex;
+    gap: 50px;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+.login-button1 {
+    width: 20%;
+    color: #F59500;
+    text-align: center;
+    font-family: "Source Sans Pro";
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 100%;
+    padding: 12px;
+    border-radius: 12.113px;
+    background: white;
+    box-shadow: 0px 7.571px 15.142px 0px rgba(255, 174, 0, 0.26), 0px 30.283px 60.566px 0px rgba(255, 174, 0, 0.29);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.login-button1:hover {
+    background-color: #fef3c7;
+}
+
+.reg-button1 {
+    width: 20%;
+    color: #FFF;
+    text-align: center;
+    font-family: "Source Sans Pro";
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 100%;
+    padding: 12px;
+    border-radius: 12.113px;
+    background: #F59500;
+    box-shadow: 0px 7.571px 15.142px 0px rgba(255, 174, 0, 0.26), 0px 30.283px 60.566px 0px rgba(255, 174, 0, 0.29);
+    cursor: pointer;
+    margin-right: 50px;
+    transition: all 0.3s ease;
+}
+
+.reg-button1:hover {
+    background-color: #fef3c7;
+}
+.Flex{
+    display: flex;
+    flex-direction: row;
+    gap:100px;
+}
+.form-group {
+    margin-bottom: 48px;
+}
+
+.form-label {
+    display: block;
+    font-weight: 1000;
+    font-size: 15.55px;
+    margin-bottom: 10px;
+}
+
+.form-input1 {
+    width: 400px;
+    padding: 19px;
+    background: #ffcf67;
+    border: 0.85px solid white;
+    border-radius: 6px;
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    font-size: 15.55px;
+    box-sizing: border-box;
+}
+
+.form-input::placeholder {
+    color: white;
+}
+.otp-btn{
+    width: 20%;
+    height: 10%;
+    padding: 13px;
+    background: #ff9b00;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    margin-top:30px;
+    margin-bottom: 20px;
+}
+.proceed-btn1{
+    width: 20%;
+    padding: 13px;
+    background: #ff9b00;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    margin-left: 350px;
+    margin-bottom: 20px;
+}
+
+.login-link {
+    text-align: center;
+    font-weight: 600;
+    font-size: 12px;
+    color: #ff9b00;
+}
+
+.login-link a {
+    color: black;
+    font-weight: 1000;
+    text-decoration: none;
+}
+  @media (max-width: 768px) {
+    .auth-buttons {
+      flex-direction: row;
+    }
+  
+    .register-container {
+      padding: 10px;
+      margin-top: 60px;
+    }
+  }
+  
+  
+  
+  
+  
+  

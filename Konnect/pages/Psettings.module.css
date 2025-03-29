@@ -1,0 +1,96 @@
+.fullpage{
+  background: linear-gradient(to bottom, #fff8e1, #ffe0b2);
+}
+.settingsPage { 
+  background-color: white;
+  min-height: 100vh;
+  width: 1400px;
+  padding: 20px;
+  margin-right: 43px;
+  margin-left: 35px;
+}
+
+.header {
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  background: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profileSettings {
+  color: #000;
+  font-family: Montserrat;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 66.6px;
+  letter-spacing: -1.235px;
+  margin-bottom: 30px;
+  margin-top: 50px;
+  margin-left: 70px;
+  
+}
+
+.name {
+  color: #FF6636;
+  font-family: Montserrat;
+  font-size: 25px;
+  font-weight: 600;
+  line-height: normal;
+  margin-left: 70px;
+}
+
+.userform {
+  margin-left: 70px;    
+  margin-bottom: 20px;
+}
+
+input[id="username"] {
+  width: 900px;
+  padding: 12px 20px;
+  margin: 8px 0;
+  box-sizing: border-box;
+  border: 2px solid  #FF6636;
+  border-radius: 17.7px;
+  background-color: white;
+  color: black;
+}
+
+.text1 {
+  font-size: 20px;
+  color: #FF6636;
+  margin-left: 70px;   
+  margin-top: 20px;
+}
+
+.text2 {
+  margin-left: 70px;     
+  color: black;
+  background-color: white;
+  width: 900px;
+  height: 125px;
+  padding-left: 10px;
+  border: 2px solid #FF6636;
+  border-radius: 17.7px;
+  box-sizing: border-box;
+}
+
+.btn {
+  background-color: black;
+  color: white;
+  width: 125px;
+  height: 45px;
+  border-radius: 10px;
+
+  margin-left: 70px;      /* Align Save button with other elements */
+  margin-top: 30px;
+}
+.btn1
+{
+    background-color:  #FF6636;
+    margin-left: 70px;
+    margin-bottom: 10px;
+    margin-top: 30px;
+}
