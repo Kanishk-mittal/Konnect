@@ -178,12 +178,32 @@ def encrypt_AES_CBC(plain_text, key_str=internal_key):
     return encrypted_message
 
 def decrypt_AES_CBC(encrypted_text, key_str=internal_key):
-    key = base64.b64decode(key_str)
-    encrypted_data = base64.b64decode(encrypted_text)
-    iv = encrypted_data[:16]  # Extract IV
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    decrypted_bytes = unpad(cipher.decrypt(encrypted_data[16:]), AES.block_size)
-    return decrypted_bytes.decode()
+    try:
+        key = base64.b64decode(key_str)
+        encrypted_data = base64.b64decode(encrypted_text)
+        
+        # Extract IV (first 16 bytes)
+        iv = encrypted_data[:16]
+        
+        # Get the ciphertext (everything after the IV)
+        ciphertext = encrypted_data[16:]
+        
+        # Create cipher and decrypt
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        
+        # Add more robust error handling for padding issues
+        try:
+            decrypted_bytes = unpad(cipher.decrypt(ciphertext), AES.block_size)
+            return decrypted_bytes.decode('utf-8')
+        except ValueError as e:
+            # Log more detailed information about the padding error
+            print(f"Padding error details: IV length={len(iv)}, ciphertext length={len(ciphertext)}")
+            print(f"First few bytes of IV: {iv[:4].hex()}")
+            print(f"First few bytes of ciphertext: {ciphertext[:4].hex()}")
+            raise
+    except Exception as e:
+        print(f"Decryption error in decrypt_AES_CBC: {str(e)}")
+        raise
 
 def encryptRSA(plaintext: str, key: str) -> str:
     """

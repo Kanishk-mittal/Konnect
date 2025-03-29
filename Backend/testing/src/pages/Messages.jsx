@@ -3,8 +3,8 @@ import axios from 'axios';
 import './Messages.css';
 import { AppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import CryptoJS from 'crypto-js';
 import JSEncrypt from 'jsencrypt';
+import CryptoJS from 'crypto-js';
 
 const Messages = () => {
     const [users, setUsers] = useState([]);
@@ -12,23 +12,13 @@ const Messages = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // New state variables for messaging UI
+    // State variables for messaging UI
     const [selectedChat, setSelectedChat] = useState(null);
     const [messageText, setMessageText] = useState('');
     const [messages, setMessages] = useState([]);
     const [chatType, setChatType] = useState(null); // 'user' or 'group'
     
-    // New state variables for user public key
-    const [selectedUserPublicKey, setSelectedUserPublicKey] = useState(null);
-    const [loadingPublicKey, setLoadingPublicKey] = useState(false);
-    const [publicKeyError, setPublicKeyError] = useState(null);
-    
-    // Add state for group members' keys
-    const [groupMembersKeys, setGroupMembersKeys] = useState([]);
-    const [loadingGroupKeys, setLoadingGroupKeys] = useState(false);
-    const [groupKeysError, setGroupKeysError] = useState(null);
-    
-    // Add state for current user information
+    // State for current user information
     const [currentUser, setCurrentUser] = useState(null);
     
     // Get context values
@@ -69,96 +59,6 @@ const Messages = () => {
         }
     };
 
-    // Function to fetch user's public key
-    const fetchUserPublicKey = async (rollNumber) => {
-        if (!rollNumber) return;
-        
-        setLoadingPublicKey(true);
-        setPublicKeyError(null);
-        setSelectedUserPublicKey(null);
-        
-        try {
-            // Extract CSRF token from cookies
-            const csrfToken = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('csrf_access_token='))
-                ?.split('=')[1];
-
-            if (!csrfToken) {
-                setPublicKeyError("CSRF token not found. Please login again.");
-                setLoadingPublicKey(false);
-                return;
-            }
-
-            // Send request to get user's public key
-            const response = await instance.post('/get_user_key', 
-                { roll: rollNumber }, 
-                {
-                    headers: {
-                        "X-CSRF-TOKEN": csrfToken
-                    }
-                }
-            );
-
-            // Set the public key
-            setSelectedUserPublicKey(response.data.key);
-            console.log(`Fetched public key for user ${rollNumber}`);
-        } catch (err) {
-            console.error('Error fetching user public key:', err);
-            setPublicKeyError(
-                err.response?.data?.error || 
-                'Failed to fetch user public key. Please try again.'
-            );
-        } finally {
-            setLoadingPublicKey(false);
-        }
-    };
-
-    // Function to fetch group members' public keys
-    const fetchGroupMembersKeys = async (groupId) => {
-        if (!groupId) return;
-        
-        setLoadingGroupKeys(true);
-        setGroupKeysError(null);
-        setGroupMembersKeys([]);
-        
-        try {
-            // Extract CSRF token from cookies
-            const csrfToken = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('csrf_access_token='))
-                ?.split('=')[1];
-
-            if (!csrfToken) {
-                setGroupKeysError("CSRF token not found. Please login again.");
-                setLoadingGroupKeys(false);
-                return;
-            }
-
-            // Send request to get group members' public keys
-            const response = await instance.post('/get_group_keys', 
-                { group_id: groupId }, 
-                {
-                    headers: {
-                        "X-CSRF-TOKEN": csrfToken
-                    }
-                }
-            );
-
-            // Set the group members' keys
-            setGroupMembersKeys(response.data.keys);
-            console.log(`Fetched public keys for group ${groupId} members:`, response.data.keys.length);
-        } catch (err) {
-            console.error('Error fetching group members public keys:', err);
-            setGroupKeysError(
-                err.response?.data?.error || 
-                'Failed to fetch group members public keys. Please try again.'
-            );
-        } finally {
-            setLoadingGroupKeys(false);
-        }
-    };
-
     // Fetch current user info on component mount
     const fetchCurrentUserInfo = async () => {
         try {
@@ -195,10 +95,6 @@ const Messages = () => {
             return;
         }
 
-        console.log("Messages component mounted with dbKey:", dbKey);
-        console.log("Private key available:", privateKey ? "Yes" : "No");
-        console.log("Server key available:", serverKey ? "Yes" : "No");
-
         const fetchData = async () => {
             setLoading(true);
             try {
@@ -216,7 +112,7 @@ const Messages = () => {
         };
         
         fetchData();
-    }, [privateKey, dbKey, serverKey, navigate]);
+    }, [privateKey, dbKey, navigate]);
 
     // Handle selecting a chat (user or group)
     const handleSelectChat = (id, type) => {
@@ -224,155 +120,140 @@ const Messages = () => {
         setChatType(type);
         setMessages([]);
         
-        // Clear previous key data
-        setSelectedUserPublicKey(null);
-        setPublicKeyError(null);
-        setGroupMembersKeys([]);
-        setGroupKeysError(null);
-        
-        // If selecting a user (DM), fetch their public key
-        if (type === 'user') {
-            fetchUserPublicKey(id);
-        } 
-        // If selecting a group, fetch members' public keys
-        else if (type === 'group') {
-            fetchGroupMembersKeys(id);
-        }
-    };
-
-    // Generate a random AES key for message encryption
-    const generateRandomAESKey = () => {
-        // Generate a random 16-byte (128-bit) key
-        const randomBytes = CryptoJS.lib.WordArray.random(16);
-        return CryptoJS.enc.Base64.stringify(randomBytes);
-    };
-
-    // Encrypt data with AES using CBC mode
-    const encryptWithAES = (data, key) => {
-        if (!data) return null;
-        try {
-            // Generate a random IV
-            const iv = CryptoJS.lib.WordArray.random(16); // 16 bytes for AES
-            
-            // Create encryption parameters
-            const encryptParams = {
-                iv: iv,
-                mode: CryptoJS.mode.CBC,
-                padding: CryptoJS.pad.Pkcs7
-            };
-            
-            // Encrypt the data
-            const encrypted = CryptoJS.AES.encrypt(
-                typeof data === 'string' ? data : JSON.stringify(data),
-                CryptoJS.enc.Utf8.parse(key),
-                encryptParams
-            );
-            
-            // Combine IV and ciphertext and convert to base64
-            const ivAndCiphertext = iv.concat(encrypted.ciphertext);
-            return CryptoJS.enc.Base64.stringify(ivAndCiphertext);
-        } catch (error) {
-            console.error('Encryption failed:', error);
-            return null;
-        }
-    };
-
-    // Encrypt data with RSA using the receiver's public key
-    const encryptWithRSA = (data, publicKey) => {
-        if (!data || !publicKey) return null;
-        try {
-            // Use JSEncrypt for RSA encryption, which is compatible with the backend
-            const encrypt = new JSEncrypt();
-            encrypt.setPublicKey(publicKey);
-            
-            // JSEncrypt's encrypt method returns base64 encoded string
-            const encryptedData = encrypt.encrypt(data);
-            if (!encryptedData) {
-                throw new Error("RSA encryption failed");
+        // For demo purposes, add some placeholder messages
+        // TODO : Replace with actual message fetching logic which will be in index db
+        const placeholderMessages = [
+            {
+                id: 1,
+                text: `This is a placeholder message in ${type === 'user' ? 'direct message' : 'group'} chat`,
+                sender: currentUser?.logged_in_as,
+                timestamp: new Date().toISOString()
+            },
+            {
+                id: 2,
+                text: `Hello from ${id}!`,
+                sender: id,
+                timestamp: new Date().toISOString()
             }
-            
-            return encryptedData;
-        } catch (error) {
-            console.error('RSA encryption failed:', error);
-            return null;
-        }
+        ];
+        
+        setMessages(placeholderMessages);
     };
+
+    const generateAESKey = () => {
+            // Generate a random 16-byte (128-bit) key
+            const randomBytes = CryptoJS.lib.WordArray.random(16);
+            return CryptoJS.enc.Base64.stringify(randomBytes);
+        };
 
     // Handle sending a message
-    const handleSendMessage = (e) => {
+    
+    const createMessage = (receiver, message,publicKey,group = null) => {
+        // Create a unique message ID using CryptoJS
+        const messageId = CryptoJS.SHA256(
+            currentUser.logged_in_as +
+            receiver +
+            message +
+            new Date().getTime().toString()
+        ).toString();
+        const aesKey = generateAESKey();
+        const newMessage = {
+            id: messageId,
+            sender: currentUser.logged_in_as,
+            receiver: receiver,
+            text: message,
+            timestamp: new Date().toISOString(),
+            group: group,
+            key: aesKey,
+            receiverPublicKey: publicKey,
+            serverKey: serverKey
+        };
+        return newMessage;
+    }
+
+    const getUserKey = async (userId) => { 
+        // getting the csrf token from the cookie
+        const csrfToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrf_access_token='))
+            ?.split('=')[1];
+        if (!csrfToken) {
+            console.error("CSRF token not found");
+            return;
+        }
+        // Send request with CSRF token
+        const response = await instance.post('/get_user_key', {
+            roll: userId
+        }, {
+            withCredentials: true,
+            headers: {
+                "X-CSRF-TOKEN": csrfToken  // Include CSRF token in the request
+            }
+        });
+        const userKey = response.data.key;
+        return userKey;
+    }
+
+    const getGroupKeys = async (groupId) => {
+        const csrfToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrf_access_token='))
+            ?.split('=')[1];
+        if (!csrfToken) {
+            console.error("CSRF token not found");
+            return;
+        }
+        // Send request with CSRF token
+        const response = await instance.post('/get_group_keys', {
+            group_id: selectedChat
+        }, {
+            withCredentials: true,
+            headers: {
+                "X-CSRF-TOKEN": csrfToken  // Include CSRF token in the request
+            }
+        });
+        return response.data.keys;
+    }
+
+    const createPacket = (message) => {
+        
+    }
+
+    const sendMessage = (message) => {
+        console.log("Sending message:", message);
+    }
+
+    const handleSendMessage = async(e) => {
         e.preventDefault();
         if (!messageText.trim() || !selectedChat || !currentUser) return;
-
-        // Add message to the local state for immediate display
-        const newMessage = {
-            id: Date.now(), // temporary id
-            text: messageText,
-            sender: currentUser.logged_in_as, // Use actual user roll number
-            timestamp: new Date().toISOString(),
-        };
-        setMessages([...messages, newMessage]);
-
-        // For DM messages, create an encrypted message object for development
-        if (chatType === 'user' && selectedUserPublicKey && serverKey) {
-            try {
-                // Create timestamp
-                const timestamp = new Date().toISOString();
-                
-                // Generate a random AES key for this message
-                const messageAESKey = generateRandomAESKey();
-                console.log('Random AES key generated for message:', messageAESKey);
-                
-                // 1. Encrypt sender, timestamp, and receiver using server AES key
-                const encryptedSender = encryptWithAES(currentUser.logged_in_as, serverKey);
-                const encryptedReceiver = encryptWithAES(selectedChat, serverKey);
-                const encryptedTimestamp = encryptWithAES(timestamp, serverKey);
-                
-                // 2. Encrypt message using the randomly generated AES key
-                const encryptedMessage = encryptWithAES(messageText, messageAESKey);
-                
-                // 3. Encrypt the random AES key with receiver's public key using JSEncrypt
-                const encryptedAESKey = encryptWithRSA(messageAESKey, selectedUserPublicKey);
-                
-                // Verify the encryption worked
-                if (!encryptedAESKey) {
-                    console.error("RSA encryption of AES key failed!");
-                }
-                
-                // Create the complete encrypted message object
-                const encryptedMessageObj = {
-                    sender: encryptedSender,
-                    receiver: encryptedReceiver,
-                    timestamp: encryptedTimestamp,
-                    message: encryptedMessage,
-                    encrypted_key: encryptedAESKey,
-                    group: null // This is a DM, not a group message
-                };
-                
-                // Log the original and encrypted objects for development
-                console.log('------ ENCRYPTION DETAILS ------');
-                console.log('Original message:', {
-                    sender: currentUser.logged_in_as,
-                    receiver: selectedChat,
-                    timestamp: timestamp,
-                    message: messageText,
-                    key: messageAESKey
-                });
-                console.log('Encrypted with server key:', {
-                    sender: encryptedSender,
-                    receiver: encryptedReceiver,
-                    timestamp: encryptedTimestamp
-                });
-                console.log('Message encrypted with random AES key:', encryptedMessage);
-                console.log('Random AES key encrypted with receiver public key using JSEncrypt:', encryptedAESKey);
-                console.log('Complete encrypted message object:', encryptedMessageObj);
-                console.log('------ END ENCRYPTION DETAILS ------');
-                
-            } catch (error) {
-                console.error('Error encrypting message:', error);
+        // identifying the type of chat
+        var messageArray= [];
+        if (chatType=='user') {
+            console.log("Sending message to user: ", selectedChat);
+            // creting message object and displaying to console
+            const PublicKey = await getUserKey(selectedChat);
+            const messageObject = createMessage(selectedChat, messageText,PublicKey);
+            messageArray.push(messageObject);
+        }
+        else {
+            console.log("Sending message to group: ", selectedChat);
+            // creating message objct and displaying to console
+            const keys = await getGroupKeys(selectedChat);
+            for (let i = 0; i < keys.length; i++) {
+                const publickey = keys[i].publicKey;
+                const receiver = keys[i].roll_number;
+                const messageObject = createMessage(receiver, messageText, publickey, selectedChat);
+                messageArray.push(messageObject);
             }
         }
-        
-        // Clear the input field
+        // adding the first message to the messages array
+        setMessages(prevMessages => [...prevMessages, messageArray[0]]);
+        // sending message
+        for (let i = 0; i < messageArray.length; i++) {
+            const element = messageArray[i];
+            sendMessage(element);
+        }
+        // Clear the message input after sending
         setMessageText('');
     };
 
@@ -392,9 +273,6 @@ const Messages = () => {
             }}>
                 <p><strong>User:</strong> {currentUser?.logged_in_as || 'Unknown'}</p>
                 <p><strong>Authentication:</strong> {dbKey ? 'Authenticated' : 'Not authenticated'}</p>
-                <p><strong>DB Key:</strong> {dbKey ? `${dbKey.substring(0, 10)}...` : 'None'}</p>
-                <p><strong>Server Key:</strong> {serverKey ? `${serverKey.substring(0, 10)}...` : 'None'}</p>
-                <p><strong>Private Key:</strong> {privateKey ? 'Available' : 'None'}</p>
             </div>
 
             <div className="chat-sidebar">
@@ -474,64 +352,6 @@ const Messages = () => {
                             </span>
                         </div>
                         
-                        {/* Display public key info for direct messages */}
-                        {chatType === 'user' && (
-                            <div className="public-key-info">
-                                {loadingPublicKey && <p className="loading-key">Loading public key...</p>}
-                                
-                                {publicKeyError && (
-                                    <div className="key-error">
-                                        <p>Error: {publicKeyError}</p>
-                                    </div>
-                                )}
-                                
-                                {selectedUserPublicKey && (
-                                    <div className="key-display">
-                                        <details>
-                                            <summary>View {users.find(u => u.roll_number === selectedChat)?.name}'s Public Key</summary>
-                                            <div className="key-content">
-                                                <pre>{selectedUserPublicKey}</pre>
-                                            </div>
-                                        </details>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        
-                        {/* Display group members' public keys for groups */}
-                        {chatType === 'group' && (
-                            <div className="group-keys-info">
-                                {loadingGroupKeys && <p className="loading-key">Loading group members' keys...</p>}
-                                
-                                {groupKeysError && (
-                                    <div className="key-error">
-                                        <p>Error: {groupKeysError}</p>
-                                    </div>
-                                )}
-                                
-                                {groupMembersKeys.length > 0 && (
-                                    <div className="group-members-keys">
-                                        <details>
-                                            <summary>View Group Members' Public Keys ({groupMembersKeys.length})</summary>
-                                            <div className="members-list">
-                                                {groupMembersKeys.map((member, index) => (
-                                                    <div key={index} className="member-key-item">
-                                                        <h4>Member: {member.roll_number}</h4>
-                                                        <details>
-                                                            <summary>View Public Key</summary>
-                                                            <div className="key-content">
-                                                                <pre>{member.public_key}</pre>
-                                                            </div>
-                                                        </details>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </details>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        
                         <div className="message-list">
                             {messages.length === 0 ? (
                                 <p className="no-messages">No messages yet. Start a conversation!</p>
@@ -542,6 +362,9 @@ const Messages = () => {
                                         className={`message ${message.sender === currentUser?.logged_in_as ? 'sent' : 'received'}`}
                                     >
                                         <div className="message-content">{message.text}</div>
+                                        {message.groupInfo && (
+                                            <div className="message-group-info">{message.groupInfo}</div>
+                                        )}
                                         <div className="message-time">
                                             {new Date(message.timestamp).toLocaleTimeString()}
                                         </div>
