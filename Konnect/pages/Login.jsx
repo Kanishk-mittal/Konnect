@@ -1,12 +1,12 @@
-import React, { useContext } from 'react'
-import { useState } from 'react'
-import axios from 'axios'
+import React, { useContext } from 'react';
+import { useState } from 'react';
+import axios from 'axios';
 import JSEncrypt from "jsencrypt";
 import { AppContext } from '../src/context/AppContext';
 
 const Login = () => {
-    const [roll, setroll] = useState('')
-    const [password, setPassword] = useState('')
+    const [roll, setroll] = useState('');
+    const [password, setPassword] = useState('');
     const { setPrivateKey, setServerKey } = useContext(AppContext);
 
     const instance = axios.create({
@@ -18,7 +18,7 @@ const Login = () => {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
         }
-    })
+    });
 
     // Generate RSA key pair for this session
     const generateRSAKeys = () => {
@@ -55,12 +55,13 @@ const Login = () => {
         } catch (error) {
             console.error("Error:", error.response?.data || error.message);
         }
-    }
+    };
+
     const handleLogin = async () => {
         try {
             // Getting RSA public key from server
-            const { data } = await axios.post('http://localhost:5000/publicKey')
-            const publicKeyPem = data.public_key
+            const { data } = await axios.post('http://localhost:5000/publicKey');
+            const publicKeyPem = data.public_key;
             const key = new JSEncrypt();
             key.setPublicKey(publicKeyPem);
             
@@ -69,7 +70,7 @@ const Login = () => {
             const encryptedPassword = key.encrypt(password, 'base64');
             
             // Generate client-side keys
-            const {publicKey, privateKey} = generateRSAKeys();
+            const { publicKey, privateKey } = generateRSAKeys();
             
             // Store private key in context
             setPrivateKey(privateKey);
@@ -93,7 +94,8 @@ const Login = () => {
         } catch (error) {
             console.error("Login error:", error);
         }
-    }
+    };
+
     const testLogin = async () => {
         try {
             // Extract CSRF token from cookies
@@ -121,8 +123,6 @@ const Login = () => {
         }
     };
 
-
-
     return (
         <>
             <div>
@@ -132,7 +132,7 @@ const Login = () => {
                 <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
                     <div>
                         <label>
-                            roll:
+                            Roll:
                             <input
                                 type="text"
                                 value={roll}
@@ -151,13 +151,12 @@ const Login = () => {
                         </label>
                     </div>
                     <button type="submit">Login</button>
-
                 </form>
                 <button onClick={logOut}>Logout</button>
                 <button onClick={testLogin}>Test</button>
             </div>
         </>
-    )
-}
+    );
+};
 
-export default Login
+export default Login;
