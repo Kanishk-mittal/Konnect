@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { motion } from "framer-motion";
 import { FaUser } from "react-icons/fa";
 import { useNavigate } from 'react-router-dom';
 import Logo from "../src/assets/Logo.png";
 import './Register.css';
 import JSEncrypt from "jsencrypt";
-import { postData } from '../../../integration/apiService';
+import CryptoJS from 'crypto-js';
+import { AppContext } from '../src/context/AppContext';
+import { postData } from '../Integration/apiService';
 
 const Register = ({ style = {} }) => {
   const navigate = useNavigate();
@@ -17,6 +19,12 @@ const Register = ({ style = {} }) => {
     password: '',
     confirmPassword: ''
   });
+  const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [error, setError] = useState('');
+  
+  // Get context for storing encryption keys
+  const { setPrivateKey, setDbKey, setServerKey } = useContext(AppContext);
 
   const handleChange = (e) => {
     setFormData({
@@ -25,48 +33,142 @@ const Register = ({ style = {} }) => {
     });
   };
 
+  // Generate random AES key for local storage encryption
+  const generateAESKey = () => {
+    const randomBytes = CryptoJS.lib.WordArray.random(16);
+    return CryptoJS.enc.Base64.stringify(randomBytes);
+  };
+
+  // Generate RSA key pair
+  const generateRSAKeys = () => {
+    const crypt = new JSEncrypt({ default_key_size: 2048 });
+    crypt.getKey();
+    return {
+      publicKey: crypt.getPublicKey(),
+      privateKey: crypt.getPrivateKey()
+    };
+  };
+
+  // Encrypt data with AES
+  const encryptWithAES = (data, key) => {
+    if (!data) return null;
+    try {
+      // Generate a random IV
+      const iv = CryptoJS.lib.WordArray.random(16);
+      
+      // Create encryption parameters
+      const encryptParams = {
+        iv: iv,
+        mode: CryptoJS.mode.CBC,
+        padding: CryptoJS.pad.Pkcs7
+      };
+      
+      // Encrypt the data
+      const encrypted = CryptoJS.AES.encrypt(
+        data,
+        CryptoJS.enc.Utf8.parse(key),
+        encryptParams
+      );
+      
+      // Combine IV and ciphertext and convert to base64
+      const ivAndCiphertext = iv.concat(encrypted.ciphertext);
+      return CryptoJS.enc.Base64.stringify(ivAndCiphertext);
+    } catch (error) {
+      return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
+    
     if (formData.password !== formData.confirmPassword) {
-      console.error("Passwords do not match");
+      setError("Passwords do not match");
+      setLoading(false);
       return;
     }
+    
     try {
+      // 1. Get server's public RSA key
       const { public_key: publicKeyPem } = await postData('publicKey');
+      
+      // 2. Generate client-side RSA key pair
+      const { publicKey, privateKey } = generateRSAKeys();
+      
+      // 3. Generate user's AES key for local storage encryption
+      const userAESKey = generateAESKey();
+      
+      // 4. Set up encryption with server's public key
       const key = new JSEncrypt();
       key.setPublicKey(publicKeyPem);
 
+      // 5. Encrypt all user data with server's RSA key
       const encryptedData = {
-        name: key.encrypt(formData.name, 'base64'),
-        roll: key.encrypt(formData.rollNumber, 'base64'),
-        email: key.encrypt(formData.email, 'base64'),
+        name: key.encrypt(formData.name),
+        roll: key.encrypt(formData.rollNumber),
+        email: key.encrypt(formData.email),
         otp: formData.otp,
-        password: key.encrypt(formData.password, 'base64'),
-        publicKey: publicKeyPem
+        password: key.encrypt(formData.password),
+        publicKey: publicKey
       };
 
-      const response = await postData('register', encryptedData);
-      console.log('Registration successful:', response);
-      navigate('/login'); // Redirect to login page after successful registration
+      // 6. Send registration request
+      const response = await postData('register', encryptedData, { credentials: 'include' });
+      
+      // 7. Decrypt the returned server AES key using user's private key
+      const decrypt = new JSEncrypt();
+      decrypt.setPrivateKey(privateKey);
+      const serverAESKey = decrypt.decrypt(response.key);
+      
+      if (!serverAESKey) {
+        throw new Error("Failed to decrypt server AES key");
+      }
+      
+      // 8. Encrypt private key and user AES key for storage
+      const encryptedPrivateKey = encryptWithAES(privateKey, serverAESKey);
+      const encryptedUserAESKey = encryptWithAES(userAESKey, serverAESKey);
+      
+      // 9. Store encrypted keys with user-specific names using roll number
+      localStorage.setItem(`encryptedPrivateKey_${formData.rollNumber}`, encryptedPrivateKey);
+      localStorage.setItem(`encryptedAESKey_${formData.rollNumber}`, encryptedUserAESKey);
+      
+      // 10. Set keys in context
+      setServerKey(serverAESKey);
+      setPrivateKey(privateKey);
+      setDbKey(userAESKey);
+      
+      navigate('/chat'); // Redirect to chat page after successful registration
     } catch (error) {
-      console.error("Registration error:", error);
+      setError(error.response?.data?.msg || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGetOTP = async () => {
+    if (!formData.email) {
+      setError("Please enter your email address");
+      return;
+    }
+    
+    setLoading(true);
     try {
       const response = await postData('otp', { email: formData.email });
-      console.log('OTP sent successfully:', response);
+      setOtpSent(true);
+      setError('');
     } catch (error) {
-      console.error("Error sending OTP:", error);
+      setError(error.response?.data?.msg || "Failed to send OTP. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLogin = () => {
-    console.log("Login button clicked");
     navigate('/login'); // Redirect to login page
   };
 
+  // ...existing UI code...
   return (
     <div className="register-container">
       <motion.div className="Top-nav" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
@@ -78,6 +180,7 @@ const Register = ({ style = {} }) => {
           <button className="reg-button1" onClick={() => navigate('/register')}><FaUser /> Register</button>
         </motion.div>
         <form onSubmit={handleSubmit}>
+          {error && <div className="error-message">{error}</div>}
           <div className="Flex">
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.7 }}>
               <label className="form-label">Name</label>
@@ -100,7 +203,17 @@ const Register = ({ style = {} }) => {
                 <input type="text" name="otp" className="form-input1" value={formData.otp} onChange={handleChange} placeholder="OTP" />
               </div>
             </motion.div>
-            <motion.button type="button" className="otp-btn" onClick={handleGetOTP} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.1 }}>Get OTP</motion.button>
+            <motion.button 
+              type="button" 
+              className="otp-btn" 
+              onClick={handleGetOTP} 
+              disabled={loading}
+              initial={{ y: 20, opacity: 0 }} 
+              animate={{ y: 0, opacity: 1 }} 
+              transition={{ delay: 1.1 }}
+            >
+              {loading && !otpSent ? 'Sending...' : otpSent ? 'Resend OTP' : 'Get OTP'}
+            </motion.button>
           </div>
           <div className="Flex">
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.2 }}>
@@ -112,7 +225,16 @@ const Register = ({ style = {} }) => {
               <input type="password" name="confirmPassword" className="form-input1" value={formData.confirmPassword} onChange={handleChange} placeholder="Confirm Password" />
             </motion.div>
           </div>
-          <motion.button type="submit" className="proceed-btn1" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.4 }}>Proceed</motion.button>
+          <motion.button 
+            type="submit" 
+            className="proceed-btn1" 
+            disabled={loading}
+            initial={{ y: 20, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            transition={{ delay: 1.4 }}
+          >
+            {loading ? 'Processing...' : 'Proceed'}
+          </motion.button>
           <motion.div className="login-link" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.5 }}>
             Have an account? <a href="#" onClick={handleLogin}> -Login</a>
           </motion.div>

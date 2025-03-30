@@ -9,20 +9,22 @@ import Header from '../pages/Header.jsx'
 import Landing from '../pages/landing.jsx';
 import Loginnew from '../pages/Loginnew.jsx';
 import Register from '../pages/Register.jsx';
+import { AppProvider } from './context/AppContext';
 import './App.css'
 
 function App() {
-
   return (
     <>
-    <BrowserRouter>
-    <Routes>
-    <Route path="/" element={<Landing/>} />
-    <Route path="/login" element={<Loginnew/>} />
-    <Route path="/register" element={<Register/>} />
-    <Route path="/chat" element={<Chat1/>} />
-    </Routes>
-     </BrowserRouter>
+    <AppProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Landing/>} />
+          <Route path="/login" element={<Loginnew/>} />
+          <Route path="/register" element={<Register/>} />
+          <Route path="/chat" element={<Chat1/>} />
+        </Routes>
+      </BrowserRouter>
+    </AppProvider>
     </>
   )
 }

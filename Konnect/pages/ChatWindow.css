@@ -45,6 +45,24 @@
   padding: 20px;
 }
 
+/* Empty states, loading and error states */
+.messages-container.loading,
+.messages-container.empty-state,
+.messages-container.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #666;
+  font-style: italic;
+}
+
+.messages-container .error-message {
+  color: #f44336;
+  background-color: #ffebee;
+  padding: 10px 15px;
+  border-radius: 4px;
+}
+
 /* Message container */
 .message-container {
   display: flex;
@@ -98,6 +116,9 @@
   color: #999;
   font-size: 14px;
   margin: 10px 0;
+  padding: 5px;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
 }
 
 /* Message input styling */
@@ -131,6 +152,7 @@
 .message-input button:hover {
   background: #ff5722;
 }
+
 .Message-bar{
   position: fixed;
   bottom: 0;
