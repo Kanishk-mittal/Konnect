@@ -104,10 +104,65 @@
   width: 100%;
 }
 
+/* Chat name container with unread badge */
+.chat-name-container {
+  display: flex;
+  align-items: center;
+}
+
 .chat-details h4 {
   margin: 0;
   font-size: 16px;
   color: #333;
+}
+
+/* Unread message badge */
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  background-color: #ff7300;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 10px;
+  margin-left: 8px;
+  padding: 0 6px;
+}
+
+/* Online indicator */
+.online-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background-color: #4caf50;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+/* Unread message indicator */
+.online-indicator.unread {
+  background-color: #ff7300;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 115, 0, 0.7);
+  }
+  
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 5px rgba(255, 115, 0, 0);
+  }
+  
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 115, 0, 0);
+  }
 }
 
 .chat-details p {

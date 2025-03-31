@@ -22,6 +22,7 @@ function App() {
           <Route path="/login" element={<Loginnew/>} />
           <Route path="/register" element={<Register/>} />
           <Route path="/chat" element={<Chat1/>} />
+          <Route path="/notification" element={<Notifications/>} />
         </Routes>
       </BrowserRouter>
     </AppProvider>
