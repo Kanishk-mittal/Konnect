@@ -404,51 +404,51 @@ const ChatWindow = ({ selectedChat, chatType }) => {
     
     // Close existing connection
     if (socketRef.current) {
-      socketRef.current.disconnect();
+        socketRef.current.disconnect();
     }
     
     try {
-      socketRef.current = io(API_BASE_URL, {
-        withCredentials: true,
-      });
-      
-      // Join room with user's roll number
-      socketRef.current.emit('join', { room: currentUser.logged_in_as });
-      
-      // Listen for incoming messages
-      socketRef.current.on('receive_message', handleReceivedMessage);
-      
-      // Listen for message delivery confirmation
-      socketRef.current.on('message_sent', (data) => {
-        // Message delivery confirmed
-      });
-      
-      socketRef.current.on('message_error', (error) => {
-        setError("Failed to send message");
-      });
-      
-      return true;
+        // Create socket with minimal options (matching the working Messages.jsx)
+        socketRef.current = io('http://localhost:5000', {
+            withCredentials: true
+        });
+        
+        // Join room IMMEDIATELY after creating the socket (don't wait for connect event)
+        socketRef.current.emit('join', { room: currentUser.logged_in_as });
+        
+        // Set up event handlers
+        socketRef.current.on('receive_message', handleReceivedMessage);
+        socketRef.current.on('message_sent', data => console.log("Message delivered:", data));
+        socketRef.current.on('message_error', error => setError("Failed to send message"));
+        socketRef.current.on('connect', () => console.log("Socket connected successfully"));
+        socketRef.current.on('connect_error', error => console.error("Socket connection error:", error));
+        socketRef.current.on('disconnect', reason => console.log("Socket disconnected:", reason));
+        
+        return true;
     } catch (error) {
-      setError("Failed to connect to messaging server");
-      return false;
+        console.error("Socket connection error:", error);
+        setError("Failed to connect to messaging server");
+        return false;
     }
-  };
+};
 
   // Send message via socket
   const sendMessage = (message) => {
     const packet = createPacket(message);
     
-    if (socketRef.current) {
-      socketRef.current.emit('send_message', packet);
+    if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('send_message', packet);
     } else {
-      setupSocketConnection();
-      setTimeout(() => {
-        if (socketRef.current) {
-          socketRef.current.emit('send_message', packet);
-        }
-      }, 500);
+        setupSocketConnection();
+        setTimeout(() => {
+            if (socketRef.current && socketRef.current.connected) {
+                socketRef.current.emit('send_message', packet);
+            } else {
+                setError("Could not connect to messaging server");
+            }
+        }, 500);
     }
-  };
+};
 
   // Decrypt RSA encrypted key
   const decryptRSAKey = (encryptedKey) => {
@@ -462,137 +462,171 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   };
 
   // Handle received messages from socket
-  const handleReceivedMessage = (data) => {
+const handleReceivedMessage = (data) => {
     try {
-      // Decrypt sender
-      const sender = decryptWithAES(data.sender, serverKey);
-      
-      // Decrypt receiver
-      const receiver = decryptWithAES(data.receiver, serverKey);
-      
-      // Check if group message
-      let group = null;
-      if (data.group) {
-        group = decryptWithAES(data.group, serverKey);
-      }
-      
-      // Decrypt the AES key using private RSA key
-      const decryptedAESKey = decryptRSAKey(data.key);
-      if (!decryptedAESKey) {
-        return;
-      }
-      
-      // Decrypt the message
-      const decryptedMessage = decryptWithAES(data.message, decryptedAESKey);
-      
-      // Create message object
-      const newMessage = {
-        id: CryptoJS.SHA256(sender + receiver + data.timestamp).toString(),
-        text: decryptedMessage,
-        sender: sender,
-        receiver: receiver,
-        timestamp: data.timestamp,
-        group: group
-      };
-      
-      // Save message to IndexedDB
-      saveMessageToDB(newMessage)
-        .then(() => {
-          // Check if this message belongs to current chat
-          const isActiveChat = (chatType === 'user' && 
-                               ((selectedChat === sender && currentUser.logged_in_as === receiver) || 
-                                (selectedChat === receiver && currentUser.logged_in_as === sender))) || 
-                              (chatType === 'group' && selectedChat === group);
-          
-          if (isActiveChat) {
-            // Update UI with new message
-            setMessages(prevMessages => [
-              ...prevMessages, 
-              {
-                ...newMessage,
-                sender: sender === currentUser.logged_in_as ? "user" : "friend"
-              }
-            ]);
-            
-            // Scroll to bottom
-            if (messagesContainerRef.current) {
-              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-            }
-          }
-        })
-        .catch(error => {
-          setError("Failed to save received message");
-        });
+        // Decrypt sender
+        const sender = decryptWithAES(data.sender, serverKey);
+        
+        // Decrypt receiver
+        const receiver = decryptWithAES(data.receiver, serverKey);
+        
+        // Check if group message
+        let group = null;
+        if (data.group) {
+            group = decryptWithAES(data.group, serverKey);
+        }
+        
+        // Decrypt the AES key using private RSA key
+        const decryptedAESKey = decryptRSAKey(data.key);
+        if (!decryptedAESKey) {
+            return;
+        }
+        
+        // Decrypt the message
+        const decryptedMessage = decryptWithAES(data.message, decryptedAESKey);
+        
+        // Create message object
+        const newMessage = {
+            id: CryptoJS.SHA256(sender + receiver + data.timestamp).toString(),
+            text: decryptedMessage,
+            sender: sender,
+            receiver: receiver,
+            timestamp: data.timestamp,
+            group: group
+        };
+        
+        // Save message to IndexedDB with better error handling
+        saveMessageToDB(newMessage)
+            .then(() => {
+                // Check if this message belongs to the currently active chat
+                let shouldDisplayMessage = false;
+                
+                if (chatType === 'user') {
+                    // For direct messages:
+                    // 1. If selectedChat is the sender, the message is from them to us
+                    // 2. If selectedChat is the receiver and we're the sender, message is from us to them
+                    const isFromSelectedChatToMe = selectedChat === sender && currentUser.logged_in_as === receiver;
+                    const isFromMeToSelectedChat = selectedChat === receiver && currentUser.logged_in_as === sender;
+                    shouldDisplayMessage = isFromSelectedChatToMe || isFromMeToSelectedChat;
+                } else if (chatType === 'group') {
+                    // For group messages, just check if the group ID matches
+                    shouldDisplayMessage = selectedChat === group;
+                }
+                
+                if (shouldDisplayMessage) {
+                    // Update UI with new message
+                    setMessages(prevMessages => [
+                        ...prevMessages, 
+                        {
+                            ...newMessage,
+                            sender: sender === currentUser.logged_in_as ? "user" : "friend"
+                        }
+                    ]);
+                    
+                    // Scroll to bottom
+                    if (messagesContainerRef.current) {
+                        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Database save error:", error);
+                setError("Failed to save message: " + (error.message || error));
+            });
     } catch (error) {
-      setError("Failed to process received message");
+        console.error("Message processing error:", error);
+        setError("Failed to process message: " + (error.message || error));
     }
-  };
+};
 
   // Fetch stored messages from server
-  const fetchStoredMessages = async () => {
+const fetchStoredMessages = async () => {
     try {
-      const response = await instance.get('/get_messages');
-      // This call also marks the user as online
-      if (response.data.messages && response.data.messages.length > 0) {
-        // Process each message as needed
-      }
+        const response = await instance.get('/get_messages');
+        // This call also marks the user as online
+        if (response.data.messages && response.data.messages.length > 0) {
+            // Process each message as needed
+        }
     } catch (err) {
-      // Silently fail - we'll still have messages from IndexedDB
+        // Silently fail - we'll still have messages from IndexedDB
     }
-  };
+};
 
   // Initialize DB and fetch user info when component mounts
-  useEffect(() => {
+useEffect(() => {
     initializeDB()
-      .then(() => fetchCurrentUserInfo())
-      .then(user => {
-        if (user) {
-          // Fetch stored messages and set up socket
-          fetchStoredMessages();
-        }
-      })
-      .catch(err => {
-        setError("Failed to initialize: " + err);
-      });
-      
+        .then(() => fetchCurrentUserInfo())
+        .then(user => {
+            if (user) {
+                // Fetch stored messages and set up socket
+                fetchStoredMessages();
+            }
+        })
+        .catch(err => {
+            setError("Failed to initialize: " + err);
+        });
+    
     return () => {
-      // Clean up socket connection on unmount
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-      
-      // Set user offline
-      if (currentUser) {
-        const csrfToken = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('csrf_access_token='))
-          ?.split('=')[1];
-          
-        if (csrfToken) {
-          instance.post('/set_offline', {}, {
-            headers: { "X-CSRF-TOKEN": csrfToken }
-          });
+        // Clean up socket connection on unmount
+        if (socketRef.current) {
+            socketRef.current.disconnect();
         }
-      }
+        
+        // Set user offline
+        if (currentUser) {
+            const csrfToken = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrf_access_token='))
+                ?.split('=')[1];
+                
+            if (csrfToken) {
+                instance.post('/set_offline', {}, {
+                    headers: { "X-CSRF-TOKEN": csrfToken }
+                });
+            }
+        }
     };
-  }, []);
+}, []);
 
+  // Load messages when chat selection changes
   // Set up socket connection when user info is available
   useEffect(() => {
     if (currentUser && currentUser.logged_in_as) {
-      setupSocketConnection();
+        setupSocketConnection();
     }
-  }, [currentUser]);
+}, [currentUser]);
+
+  // Add an additional socket setup in useEffect to match Messages.jsx's redundancy
+useEffect(() => {
+    if (currentUser && currentUser.logged_in_as) {
+        // If socket doesn't exist, create one (similar to Messages.jsx)
+        if (!socketRef.current) {
+            socketRef.current = io('http://localhost:5000', {
+                withCredentials: true
+            });
+            
+            // Join room immediately
+            socketRef.current.emit('join', { room: currentUser.logged_in_as });
+            
+            // Add event listeners
+            socketRef.current.on('receive_message', handleReceivedMessage);
+        }
+    }
+    
+    return () => {
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+        }
+    };
+}, [currentUser]);
 
   // Load messages when chat selection changes
   useEffect(() => {
     if (selectedChat && chatType && currentUser) {
       setIsLoading(true);
-      
       // Fetch chat name
       getChatName(selectedChat, chatType).then(name => {
         setChatName(name);
-        
         // Fetch messages for this chat
         fetchMessagesFromDB(selectedChat, chatType);
       });
@@ -702,7 +736,6 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   // Group messages by date
   const groupMessagesByDate = () => {
     const groups = {};
-    
     messages.forEach(message => {
       const date = formatMessageDate(message.timestamp);
       if (!groups[date]) {
@@ -714,20 +747,19 @@ const ChatWindow = ({ selectedChat, chatType }) => {
         date
       });
     });
-    
     return groups;
   };
 
   // Get grouped messages
   const messageGroups = groupMessagesByDate();
-  
+
   // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages]);
-  
+
   return (
     <div className="chat-window">
       <div className="chat-header">

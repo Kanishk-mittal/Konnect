@@ -67,6 +67,7 @@
 .message-container {
   display: flex;
   margin: 10px 0;
+  padding-bottom: 5vh;
 }
 
 /* Align sent and received messages */

@@ -425,6 +425,8 @@ def on_join(data):
     """
     try:
         room = data.get('room')
+        sid = request.sid
+        
         if room:
             join_room(room)
             print(f"User joined room: {room}")
@@ -473,3 +475,14 @@ def receive_message(data):
     except Exception as e:
         print(f"Error in socket message handling: {str(e)}")
         emit('message_error', {'error': str(e)})
+
+# Simplified connection event handlers
+@socketio.on('connect')
+def handle_connect():
+    sid = request.sid
+    print(f"Client connected: {sid}")
+    
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    print(f"Client disconnected: {sid}")
