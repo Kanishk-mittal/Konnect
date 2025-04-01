@@ -261,3 +261,72 @@ export const getAllUnreadCounts = (db, currentUserId) => {
     };
   });
 };
+
+// Mark all messages as read for a specific chat
+export const markMessagesAsRead = (db, currentUserId, chatId, type) => {
+  return new Promise((resolve, reject) => {
+    if (!db) {
+      reject('Database not initialized');
+      return;
+    }
+    
+    const transaction = db.transaction(['messages'], 'readwrite');
+    const store = transaction.objectStore('messages');
+    let request;
+    
+    if (type === 'user') {
+      // For user chats, we only want direct messages where receiver is current user
+      const receiverIndex = store.index('receiver');
+      request = receiverIndex.getAll(currentUserId);
+    } else if (type === 'group') {
+      // For group chats, we filter by group ID
+      const groupIndex = store.index('group');
+      request = groupIndex.getAll(chatId);
+    } else {
+      reject('Invalid chat type');
+      return;
+    }
+    
+    request.onsuccess = () => {
+      const messages = request.result;
+      let updatedCount = 0;
+      
+      // Filter and update unread messages
+      const updatePromises = messages.filter(msg => {
+        if (type === 'user') {
+          return msg.receiver === currentUserId && 
+                 msg.sender === chatId && 
+                 !msg.is_seen && 
+                 msg.group === null;
+        } else if (type === 'group') {
+          return msg.receiver === currentUserId && 
+                 !msg.is_seen && 
+                 msg.group === chatId;
+        }
+        return false;
+      }).map(msg => {
+        return new Promise((resolveUpdate) => {
+          msg.is_seen = true;
+          const updateRequest = store.put(msg);
+          
+          updateRequest.onsuccess = () => {
+            updatedCount++;
+            resolveUpdate();
+          };
+          
+          updateRequest.onerror = () => {
+            resolveUpdate(); // Continue even if one update fails
+          };
+        });
+      });
+      
+      Promise.all(updatePromises).then(() => {
+        resolve(updatedCount);
+      });
+    };
+    
+    request.onerror = (error) => {
+      reject('Error getting messages to mark as read: ' + error);
+    };
+  });
+};

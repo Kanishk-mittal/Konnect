@@ -290,6 +290,9 @@ const ChatWindow = ({ selectedChat, chatType }) => {
             window.dispatchEvent(new CustomEvent('messagesRead', {
               detail: { chatId, type }
             }));
+            
+            // Also dispatch a general update event for Header notifications
+            window.dispatchEvent(new CustomEvent('messagesUpdate'));
           }
           
           // Sort by timestamp
@@ -341,6 +344,9 @@ const ChatWindow = ({ selectedChat, chatType }) => {
           window.dispatchEvent(new CustomEvent('messagesRead', {
             detail: { chatId, type }
           }));
+          
+          // Also dispatch a general update event for Header notifications
+          window.dispatchEvent(new CustomEvent('messagesUpdate'));
         }
         
         // Sort by timestamp

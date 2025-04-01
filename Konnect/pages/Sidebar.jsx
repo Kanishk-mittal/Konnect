@@ -352,8 +352,12 @@ const Sidebar = ({ onSelectChat }) => {
       delete newUnreadCounts[id];
       setUnreadCounts(newUnreadCounts);
       
-      // Wait a moment for IndexedDB to update, then refresh counts
-      setTimeout(() => fetchUnreadCounts(currentUser), 500);
+      // Fetch current user then refresh counts instead of using undefined currentUser
+      fetchCurrentUserInfo().then(userInfo => {
+        if (userInfo) {
+          setTimeout(() => fetchUnreadCounts(userInfo), 500);
+        }
+      });
     }
     
     // If parent component provided a selection handler, call it

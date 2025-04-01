@@ -102,6 +102,35 @@
   border-bottom-left-radius: 0;
 }
 
+/* Unread message indicator */
+.message-bubble.unread {
+  position: relative;
+}
+
+.message-bubble.unread::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  background-color: #ff7043;
+  border-radius: 50%;
+  animation: pulse-dot 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+}
+
+@keyframes pulse-dot {
+  0% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0.8);
+  }
+}
+
 /* Timestamp */
 .message-time {
   font-size: 12px;

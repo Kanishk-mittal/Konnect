@@ -1,73 +1,195 @@
-.notificationpage
-{
-    background-color:#FEEFD0;
-    height: 100%;
+.notificationpage {
+    background-color: #FEEFD0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
-.header{
+
+.header {
     width: 100%;
     position: fixed;
     top: 0;
     left: 0;
     z-index: 1;
 }
-.theme{
+
+.theme {
     background-color: white;
-    margin: 70px 50px 10px 50px;
-}
-.heading
-{
-    color: #000000e0;
-font-family: Poppins;
-font-size: 30px;
-font-style: normal;
-margin-left: 50px;
-font-weight: 700;
-line-height: 66.6px; 
-letter-spacing: -1.235px;
+    margin: 90px auto 30px;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    padding: 25px;
+    overflow: hidden;
 }
 
-.image
-{
+.heading {
+    margin: 20px 0 15px 0;
+    color: #555;
+    font-weight: 600;
+    border-bottom: 2px solid #ff7300;
+    padding-bottom: 10px;
+    text-align: center;
+    font-size: 1.5rem;
+    width: 100%;
+    clear: both;
+    display: block;
+}
+
+.image {
     border-radius: 50%;
-    margin-left: 10px;
-    margin-top: 10px;
+    margin-right: 20px;
+    position: relative;
+    flex-shrink: 0;
 }
 
-
-.bigtext
-{
-    color: #000;
-    font-family: Poppins;
-    font-size: 30px;
-    font-style: normal;
-    font-weight: 700;
-    line-height: normal;
-    text-transform: capitalize;
-    padding-right: 100px;
-    padding-left: 30px;
-    padding-top: 10px;
+.image img {
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 115, 0, 0.3);
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
 }
 
-.smalltext
-{
-    color: #000;
-    font-family: Poppins;
-    font-size: 18.37px;
-    font-style: normal;
+.notification:hover .image img {
+    border-color: #ff7300;
+    transform: scale(1.05);
+}
+
+.bigtext {
+    color: #333;
+    font-family: Poppins, sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 8px 0;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.smalltext {
+    color: #666;
+    font-family: Poppins, sans-serif;
+    font-size: 14px;
     font-weight: 400;
-    line-height: 32.658px;
-    padding-right: 100px;
-    padding-left: 30px;
-
+    line-height: 1.4;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
-.notification
-{
-display: flex;
-gap: 0.7rem;
-width: 1350px;
-border-radius: 30px;
-background: #FEEFD0;
-box-shadow: 0px 4px 10px 0px #000;
-margin: 30px 30px 0 30px;
+.notification {
+    display: flex;
+    width: 80vw;
+    margin: 15px auto;
+    padding: 18px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(255, 115, 0, 0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    align-items: center;
+    border-left: 4px solid #ff7300;
+    position: relative;
+    overflow: hidden;
+}
+
+.notification:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(255, 115, 0, 0.2);
+    background-color: #fffaf3;
+}
+
+.notification::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(to bottom, #ff7300, #FFB30E);
+    opacity: 0.9;
+}
+
+.content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.timestamp {
+    font-size: 12px;
+    color: #999;
+    margin-top: 8px;
+    text-align: right;
+    font-weight: 400;
+}
+
+.loadingContainer,
+.errorContainer,
+.emptyContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 150px;
+    background-color: white;
+    border-radius: 12px;
+    margin: 20px 0;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.errorText {
+    color: #f44336;
+}
+
+.notificationsList {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 30px;
+}
+
+.dateGroup {
+    width: 100%;
+    margin-bottom: 25px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .theme {
+        width: 90%;
+        margin: 80px auto 20px;
+        padding: 15px;
+    }
+    
+    .bigtext {
+        font-size: 16px;
+    }
+    
+    .smalltext {
+        font-size: 13px;
+    }
+    
+    .image img {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .notification {
+        width: 90vw;
+        padding: 15px;
+    }
 }
