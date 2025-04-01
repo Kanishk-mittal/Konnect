@@ -6,6 +6,7 @@ import CryptoJS from "crypto-js";
 import { io } from "socket.io-client";
 import API_BASE_URL from "../Integration/apiConfig.js";
 import "./ChatWindow.css";
+import JSEncrypt from "jsencrypt";
 // Import utility functions
 import { 
   encryptWithAES, 
@@ -18,7 +19,7 @@ import {
 
 const ChatWindow = ({ selectedChat, chatType }) => {
   // Access context for encryption keys
-  const { privateKey, dbKey, serverKey } = useContext(AppContext);
+  const { privateKey, dbKey, serverKey, setServerKey, setPrivateKey, setDbKey } = useContext(AppContext);
   
   // State for messages and UI
   const [messages, setMessages] = useState([]);
@@ -46,7 +47,136 @@ const ChatWindow = ({ selectedChat, chatType }) => {
       'X-Requested-With': 'XMLHttpRequest',
     }
   });
-  
+
+  // Function to recover all encryption keys
+  const recoverAllKeys = async () => {
+    try {
+      // First, recover server key
+      console.log("Attempting to recover all keys...");
+      
+      // Generate RSA key pair for server key recovery
+      const crypt = new JSEncrypt({ default_key_size: 2048 });
+      crypt.getKey();
+      const publicKey = crypt.getPublicKey();
+      const tempPrivateKey = crypt.getPrivateKey();
+      
+      // Extract CSRF token from cookies
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf_access_token='))
+        ?.split('=')[1];
+        
+      if (!csrfToken) {
+        throw new Error("Authentication token not found");
+      }
+      
+      // 1. First get user info so we know the roll number
+      const userResponse = await instance.post('/protected', {}, {
+        headers: { "X-CSRF-TOKEN": csrfToken }
+      });
+      
+      if (!userResponse.data || !userResponse.data.logged_in_as) {
+        throw new Error("Failed to get user information");
+      }
+      
+      const rollNumber = userResponse.data.logged_in_as;
+      console.log(`Recovered user roll number: ${rollNumber}`);
+      
+      // 2. Request server key using our temporary public key
+      const response = await instance.post('/server_key', 
+        { publicKey },
+        { headers: { "X-CSRF-TOKEN": csrfToken } }  // Added missing closing parenthesis here
+      );
+      
+      // 3. Decrypt the server key using our temporary private key
+      const decrypt = new JSEncrypt();
+      decrypt.setPrivateKey(tempPrivateKey);
+      const recoveredServerKey = decrypt.decrypt(response.data.key);
+      
+      if (!recoveredServerKey) {
+        throw new Error("Failed to decrypt server key");
+      }
+      
+      // Update context with server key
+      setServerKey(recoveredServerKey);
+      console.log("Server key recovered successfully");
+      
+      // 4. Now use server key to recover private key and DB key from localStorage
+      const encryptedPrivateKey = localStorage.getItem(`encryptedPrivateKey_${rollNumber}`);
+      const encryptedAESKey = localStorage.getItem(`encryptedAESKey_${rollNumber}`);
+      
+      if (!encryptedPrivateKey || !encryptedAESKey) {
+        throw new Error("Stored encryption keys not found in localStorage");
+      }
+      
+      // Define a local decryptWithAES function to ensure consistent decryption
+      const localDecryptWithAES = (encryptedData, key) => {
+        if (!encryptedData) return null;
+        try {
+          // Convert the base64 encoded encrypted data to bytes
+          const encryptedBytes = CryptoJS.enc.Base64.parse(encryptedData);
+          
+          // Split the encrypted data into the IV and the ciphertext
+          const iv = encryptedBytes.clone();
+          iv.sigBytes = 16; // AES block size is 16 bytes for IV
+          iv.clamp();
+          
+          const ciphertext = encryptedBytes.clone();
+          ciphertext.words.splice(0, 4); // Remove the first 4 words (16 bytes) which is the IV
+          ciphertext.sigBytes -= 16;
+          
+          // Create decryption parameters
+          const decryptParams = {
+            iv: iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+          };
+          
+          // Decrypt the data
+          const decryptedData = CryptoJS.AES.decrypt(
+            { ciphertext: ciphertext },
+            CryptoJS.enc.Utf8.parse(key),
+            decryptParams
+          );
+          
+          return decryptedData.toString(CryptoJS.enc.Utf8);
+        } catch (error) {
+          console.error("Decryption error:", error);
+          return null;
+        }
+      };
+      
+      // Decrypt keys using our local function to ensure consistent behavior
+      // Decrypt the private key using recovered server key
+      const decryptedPrivateKey = localDecryptWithAES(encryptedPrivateKey, recoveredServerKey);
+      if (!decryptedPrivateKey || !decryptedPrivateKey.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+        throw new Error("Failed to decrypt private key");
+      }
+      
+      // Decrypt the AES/DB key using recovered server key
+      const decryptedDBKey = localDecryptWithAES(encryptedAESKey, recoveredServerKey);
+      if (!decryptedDBKey) {
+        throw new Error("Failed to decrypt database key");
+      }
+      
+      // Update context with all recovered keys
+      setPrivateKey(decryptedPrivateKey);
+      setDbKey(decryptedDBKey);
+      
+      console.log("All keys recovered successfully");
+      
+      return {
+        serverKey: recoveredServerKey,
+        privateKey: decryptedPrivateKey,
+        dbKey: decryptedDBKey
+      };
+    } catch (err) {
+      console.error("Failed to recover keys:", err);
+      setError("Key recovery failed: " + (err.message || "Please try logging in again"));
+      return null;
+    }
+  };
+
   // Initialize IndexedDB
   const initializeDB = () => {
     return new Promise((resolve, reject) => {
@@ -298,7 +428,7 @@ const ChatWindow = ({ selectedChat, chatType }) => {
     }
     
     try {
-      const response = await instance.post('/get_user_key', {
+      const response = await instance.post('/get_user_key', { 
         roll: userId
       }, {
         headers: { "X-CSRF-TOKEN": csrfToken }
@@ -349,12 +479,12 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   // Set up socket connection
   const setupSocketConnection = () => {
     if (!currentUser) return false;
-    
+
     // Close existing connection
     if (socketRef.current) {
         socketRef.current.disconnect();
     }
-    
+
     try {
         // Create socket with minimal options (matching the working Messages.jsx)
         socketRef.current = io('http://localhost:5000', {
@@ -424,7 +554,6 @@ const ChatWindow = ({ selectedChat, chatType }) => {
         
         // Check if this message belongs to the currently active chat
         let belongsToCurrentChat = false;
-        
         if (chatType === 'user') {
             // For direct messages:
             const isFromSelectedChatToMe = selectedChat === sender && currentUser.logged_in_as === receiver;
@@ -464,7 +593,6 @@ const ChatWindow = ({ selectedChat, chatType }) => {
                     // Message already exists, no need to save it again
                     return;
                 }
-                
                 // Message doesn't exist, save it
                 saveAndDisplayMessage(newMessage, belongsToCurrentChat);
             };
@@ -482,7 +610,7 @@ const ChatWindow = ({ selectedChat, chatType }) => {
         setError("Failed to process message: " + (error.message || error));
     }
   };
-  
+
   // Helper function to save and display a message
   const saveAndDisplayMessage = (message, belongsToCurrentChat) => {
     saveMessageToDB(message)
@@ -496,7 +624,6 @@ const ChatWindow = ({ selectedChat, chatType }) => {
                         sender: message.sender === currentUser.logged_in_as ? "user" : "friend"
                     }
                 ]);
-                
                 // Scroll to bottom
                 if (messagesContainerRef.current) {
                     messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
@@ -524,54 +651,48 @@ const ChatWindow = ({ selectedChat, chatType }) => {
 
   // Initialize DB and fetch user info when component mounts
   useEffect(() => {
-    initializeDB()
-        .then(() => fetchCurrentUserInfo())
-        .then(user => {
-            if (user) {
-                // Fetch stored messages and set up socket
-                fetchStoredMessages();
-            }
-        })
-        .catch(err => {
-            setError("Failed to initialize: " + err);
-        });
-    
-    return () => {
-        // Clean up socket connection on unmount
-        if (socketRef.current) {
-            socketRef.current.disconnect();
+    const initializeApp = async () => {
+      try {
+        // Check if any keys are missing
+        if (!privateKey || !dbKey || !serverKey) {
+          console.log("Some keys are missing, attempting full key recovery...");
+          const recoveredKeys = await recoverAllKeys();
+          if (!recoveredKeys) {
+            throw new Error("Could not recover encryption keys");
+          }
         }
         
-        // Set user offline
-        if (currentUser) {
-            try {
-                const csrfToken = document.cookie
-                    .split('; ')
-                    .find(row => row.startsWith('csrf_access_token='))
-                    ?.split('=')[1];
-                    
-                if (csrfToken) {
-                    // Use a synchronous request to ensure it completes before component unmounts
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', `${API_BASE_URL}/set_offline`, false); // false makes it synchronous
-                    xhr.setRequestHeader('Content-Type', 'application/json');
-                    xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
-                    xhr.withCredentials = true;
-                    xhr.send(JSON.stringify({}));
-                    
-                    console.log("User set to offline on component unmount");
-                }
-            } catch (error) {
-                console.error("Failed to set user offline:", error);
-            }
+        // Continue with normal initialization
+        await initializeDB();
+        const user = await fetchCurrentUserInfo();
+        
+        if (user) {
+          // Fetch stored messages and set up socket
+          fetchStoredMessages();
         }
+      } catch (err) {
+        setError("Failed to initialize: " + err.message);
+      }
     };
-  }, []);
+    
+    initializeApp();
+    
+    return () => {
+      // Clean up socket connection on unmount
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+      // Set user offline
+      if (currentUser) {
+        setUserOffline();
+      }
+    };
+  }, [privateKey, dbKey, serverKey]); // Added all keys to dependency array
 
   // Set up socket connection when user info is available
   useEffect(() => {
     if (currentUser && currentUser.logged_in_as) {
-        setupSocketConnection();
+        setupSocketConnection();  
     }
   }, [currentUser]);
 
@@ -579,9 +700,9 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   useEffect(() => {
     if (currentUser && currentUser.logged_in_as) {
         // If socket doesn't exist, create one (similar to Messages.jsx)
-        if (!socketRef.current) { 
-            socketRef.current = io('http://localhost:5000', {
-                withCredentials: true
+        if (!socketRef.current) {
+            socketRef.current = io('http://localhost:5000', { 
+                withCredentials: true 
             });
             
             // Join room immediately
@@ -604,7 +725,6 @@ const ChatWindow = ({ selectedChat, chatType }) => {
         if (socketRef.current) {
             socketRef.current.disconnect();
         }
-        
         // Clean up event listeners
         window.removeEventListener('beforeunload', handleBeforeUnload);
         window.removeEventListener('unload', handleBeforeUnload);
@@ -617,40 +737,30 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   // Function to set user offline - ensures this only happens once
   const setUserOffline = () => {
     if (!currentUser) return;
-    
-    const csrfToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrf_access_token='))
-        ?.split('=')[1];
-        
-    if (!csrfToken) return;
-    
+
     // For more reliable delivery during page unload
-    const data = JSON.stringify({});
-    
+    const data = JSON.stringify({
+      roll_number: currentUser.logged_in_as,
+      timestamp: new Date().toISOString()
+    });
+
     try {
-        // Use sendBeacon for more reliable delivery during page unload
-        if (navigator.sendBeacon) {
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            };
-            
-            const blob = new Blob([data], { type: 'application/json' });
-            navigator.sendBeacon(`${API_BASE_URL}/set_offline`, blob);
-        } else {
-            // Fallback to synchronous XHR for older browsers
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', `${API_BASE_URL}/set_offline`, false); // false makes it synchronous
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
-            xhr.withCredentials = true;
-            xhr.send(data);
-        }
-        
-        console.log("User set to offline");
+      // Use sendBeacon for more reliable delivery during page unload
+      if (navigator.sendBeacon) {
+        const blob = new Blob([data], { type: 'application/json' });
+        navigator.sendBeacon(`${API_BASE_URL}/set_offline`, blob);
+      } else {
+        // Fallback to synchronous XHR for older browsers
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE_URL}/set_offline`, false); // false makes it synchronous
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
+        xhr.send(data);
+      }
+      
+      console.log("User set to offline");
     } catch (error) {
-        console.error("Failed to set user offline:", error);
+      console.error("Failed to set user offline:", error);
     }
   };
 
@@ -684,7 +794,7 @@ const ChatWindow = ({ selectedChat, chatType }) => {
         new Date().toISOString() +
         (chatType === 'group' ? selectedChat : '')
       ).toString();
-      
+       
       if (chatType === 'user') {
         // Direct message to user
         const publicKey = await getUserKey(selectedChat);
@@ -723,7 +833,6 @@ const ChatWindow = ({ selectedChat, chatType }) => {
           
           // Create message with unique transmission ID but preserve consistent database ID
           const messageObject = createMessage(receiver, text, publicKey, selectedChat, consistentMessageId);
-          
           messageArray.push(messageObject);
         }
       }
@@ -740,7 +849,6 @@ const ChatWindow = ({ selectedChat, chatType }) => {
           group: chatType === 'group' ? selectedChat : null,
           is_seen: true // Rule 1: If we are sender then it's always true
         };
-        
         // Save to IndexedDB
         await saveMessageToDB(displayMessage);
         

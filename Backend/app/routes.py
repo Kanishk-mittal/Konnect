@@ -360,19 +360,30 @@ def get_messages():
     }), 200
 
 @main_bp.route("/set_offline", methods=["POST", "OPTIONS"])
-@jwt_required(locations='cookies')
 def set_offline():
     if request.method == "OPTIONS":
         return handle_options()
     
-    current_user = get_jwt_identity()
-    user = User.from_db(current_user, db)
+    data = request.get_json()
+    roll_number = data.get("roll_number")
+    
+    if not roll_number:
+        return jsonify({"error": "Roll number is required"}), 400
+    
+    # Simple timestamp check for minimal security
+    timestamp = data.get("timestamp")
+    if not timestamp:
+        return jsonify({"error": "Timestamp is required"}), 400
+    
+    user = User.from_db(roll_number, db)
     if not user:
         return jsonify({"error": "User not found"}), 404
     
     # Update user's online status
     user.is_online = False
     user.update_db(db)
+    
+    print(f"User {roll_number} is now offline")
     
     return jsonify({
         "message": "Status set to offline"
@@ -446,17 +457,6 @@ def receive_message(data):
         decrypted_receiver = decrypt_AES_CBC(receiver, key_str=external_key)
         print(f"Message for receiver: {decrypted_receiver}")
         
-        # Store message in database for offline delivery
-        from app.utils import save_message
-        save_message(
-            sender=data.get('sender'),
-            receiver=receiver,  # Keep encrypted for storage
-            message=data.get('message'),
-            group=data.get('group'),
-            timestamp=data.get('timestamp'),
-            aes_key=data.get('key')
-        )
-        
         # Check if the receiver is online before emitting
         is_receiver_online = User.is_online(decrypted_receiver, db)
         
@@ -465,6 +465,16 @@ def receive_message(data):
             emit('receive_message', data, room=decrypted_receiver)
             print(f"Message emitted to online user: {decrypted_receiver}")
         else:
+            # Only store message in database for offline delivery
+            from app.utils import save_message
+            save_message(
+                sender=data.get('sender'),
+                receiver=receiver,  # Keep encrypted for storage
+                message=data.get('message'),
+                group=data.get('group'),
+                timestamp=data.get('timestamp'),
+                aes_key=data.get('key')
+            )
             print(f"Receiver {decrypted_receiver} is offline. Message stored for later retrieval.")
         
         # Always emit confirmation to sender
@@ -486,3 +496,28 @@ def handle_connect():
 def handle_disconnect():
     sid = request.sid
     print(f"Client disconnected: {sid}")
+
+@main_bp.route("/server_key", methods=["POST", "OPTIONS"])
+@jwt_required(locations='cookies')
+def get_server_key():
+    if request.method == "OPTIONS":
+        return handle_options()
+    
+    data = request.get_json()
+    user_public_key = data.get("publicKey")
+    
+    if not user_public_key:
+        return jsonify({"error": "Public key is required"}), 400
+    
+    # Get the current user identity from JWT
+    current_user = get_jwt_identity()
+    user = User.from_db(current_user, db)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Encrypt the external key with the user's public key
+    encrypted_key = encryptRSA(external_key, user_public_key)
+    
+    return jsonify({
+        "key": encrypted_key
+    }), 200

@@ -1,10 +1,12 @@
 import React, { useState, useContext, useEffect, useRef } from "react";
 import { AppContext } from "../src/context/AppContext";
 import axios from "axios";
+import CryptoJS from "crypto-js"; // Add this import for decryption
 import API_BASE_URL from "../Integration/apiConfig.js";
 import { io } from "socket.io-client";
 import { getAllUnreadCounts } from "./ChatUtils.jsx";
 import "./Sidebar.css";
+import JSEncrypt from "jsencrypt";
 
 const Sidebar = ({ onSelectChat }) => {
   const [activeTab, setActiveTab] = useState("personal");
@@ -23,7 +25,7 @@ const Sidebar = ({ onSelectChat }) => {
   const socketRef = useRef(null);
   
   // Get context values for authentication
-  const { privateKey, dbKey } = useContext(AppContext);
+  const { privateKey, dbKey, serverKey, setServerKey, setPrivateKey, setDbKey } = useContext(AppContext);
   
   // Create axios instance with credentials
   const instance = axios.create({
@@ -37,6 +39,210 @@ const Sidebar = ({ onSelectChat }) => {
     }
   });
   
+  // Function to recover server key if it's missing
+  const recoverServerKey = async () => {
+    try {
+      // Generate RSA key pair
+      const crypt = new JSEncrypt({ default_key_size: 2048 });
+      crypt.getKey();
+      const publicKey = crypt.getPublicKey();
+      const privateKey = crypt.getPrivateKey();
+      
+      // Extract CSRF token from cookies
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf_access_token='))
+        ?.split('=')[1];
+        
+      if (!csrfToken) {
+        throw new Error("Authentication token not found");
+      }
+      
+      // Request server key using our public key
+      const response = await instance.post('/server_key', 
+        { publicKey },
+        { headers: { "X-CSRF-TOKEN": csrfToken } }
+      );
+      
+      // Decrypt the server key using our private key
+      const decrypt = new JSEncrypt();
+      decrypt.setPrivateKey(privateKey);
+      const decryptedServerKey = decrypt.decrypt(response.data.key);
+      
+      if (!decryptedServerKey) {
+        throw new Error("Failed to decrypt server key");
+      }
+      
+      // Update the context with the recovered server key
+      setServerKey(decryptedServerKey);
+      console.log("Server key recovered successfully in Sidebar");
+      
+      return decryptedServerKey;
+    } catch (err) {
+      console.error("Failed to recover server key in Sidebar:", err);
+      
+      // More specific error messages based on the error type
+      let errorMsg = "Authentication error: ";
+      
+      if (err.message.includes("token")) {
+        errorMsg += "Session expired or authentication token missing. Please log in again.";
+      } else if (err.response && err.response.status === 401) {
+        errorMsg += "Unauthorized access. Please log in again.";
+      } else if (err.message.includes("decrypt")) {
+        errorMsg += "Failed to decrypt server key. Please log in again.";
+      } else {
+        errorMsg += (err.message || "Please try logging in again");
+      }
+      
+      setError(errorMsg);
+      return null;
+    }
+  };
+
+  // Function to recover all encryption keys (server key, private key, DB key)
+  const recoverAllKeys = async () => {
+    try {
+      // First, recover server key
+      console.log("Attempting to recover all keys in Sidebar...");
+      
+      // Generate RSA key pair for server key recovery
+      const crypt = new JSEncrypt({ default_key_size: 2048 });
+      crypt.getKey();
+      const publicKey = crypt.getPublicKey();
+      const tempPrivateKey = crypt.getPrivateKey();
+      
+      // Extract CSRF token from cookies
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf_access_token='))
+        ?.split('=')[1];
+        
+      if (!csrfToken) {
+        throw new Error("Authentication token not found");
+      }
+      
+      // 1. First get user info so we know the roll number
+      const userResponse = await instance.post('/protected', {}, {
+        headers: { "X-CSRF-TOKEN": csrfToken }
+      });
+      
+      if (!userResponse.data || !userResponse.data.logged_in_as) {
+        throw new Error("Failed to get user information");
+      }
+      
+      const rollNumber = userResponse.data.logged_in_as;
+      console.log(`Recovered user roll number: ${rollNumber}`);
+      
+      // 2. Request server key using our temporary public key
+      const response = await instance.post('/server_key', 
+        { publicKey },
+        { headers: { "X-CSRF-TOKEN": csrfToken } }
+      );
+      
+      // 3. Decrypt the server key using our temporary private key
+      const decrypt = new JSEncrypt();
+      decrypt.setPrivateKey(tempPrivateKey);
+      const recoveredServerKey = decrypt.decrypt(response.data.key);
+      
+      if (!recoveredServerKey) {
+        throw new Error("Failed to decrypt server key");
+      }
+      
+      // Update context with server key
+      setServerKey(recoveredServerKey);
+      console.log("Server key recovered successfully in Sidebar");
+      
+      // 4. Now use server key to recover private key and DB key from localStorage
+      const encryptedPrivateKey = localStorage.getItem(`encryptedPrivateKey_${rollNumber}`);
+      const encryptedAESKey = localStorage.getItem(`encryptedAESKey_${rollNumber}`);
+      
+      if (!encryptedPrivateKey || !encryptedAESKey) {
+        throw new Error("Stored encryption keys not found in localStorage");
+      }
+      
+      // Import decryptWithAES function for local use
+      const decryptWithAES = (encryptedData, key) => {
+        if (!encryptedData) return null;
+        try {
+          // Convert the base64 encoded encrypted data to bytes
+          const encryptedBytes = CryptoJS.enc.Base64.parse(encryptedData);
+          
+          // Split the encrypted data into the IV and the ciphertext
+          const iv = encryptedBytes.clone();
+          iv.sigBytes = 16; // AES block size is 16 bytes for IV
+          iv.clamp();
+          
+          const ciphertext = encryptedBytes.clone();
+          ciphertext.words.splice(0, 4); // Remove the first 4 words (16 bytes) which is the IV
+          ciphertext.sigBytes -= 16;
+          
+          // Create decryption parameters
+          const decryptParams = {
+            iv: iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+          };
+          
+          // Decrypt the data
+          const decryptedData = CryptoJS.AES.decrypt(
+            { ciphertext: ciphertext },
+            CryptoJS.enc.Utf8.parse(key),
+            decryptParams
+          );
+          
+          return decryptedData.toString(CryptoJS.enc.Utf8);
+        } catch (error) {
+          console.error("Decryption error:", error);
+          return null;
+        }
+      };
+      
+      // Decrypt the private key using recovered server key
+      const decryptedPrivateKey = decryptWithAES(encryptedPrivateKey, recoveredServerKey);
+      if (!decryptedPrivateKey || !decryptedPrivateKey.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+        throw new Error("Failed to decrypt private key");
+      }
+      
+      // Decrypt the AES/DB key using recovered server key
+      const decryptedDBKey = decryptWithAES(encryptedAESKey, recoveredServerKey);
+      if (!decryptedDBKey) {
+        throw new Error("Failed to decrypt database key");
+      }
+      
+      // Update context with all recovered keys
+      setPrivateKey(decryptedPrivateKey);
+      setDbKey(decryptedDBKey);
+      
+      console.log("All keys recovered successfully in Sidebar");
+      
+      return {
+        serverKey: recoveredServerKey,
+        privateKey: decryptedPrivateKey,
+        dbKey: decryptedDBKey
+      };
+    } catch (err) {
+      console.error("Failed to recover keys in Sidebar:", err);
+      
+      // More specific error messages based on the error type
+      let errorMsg = "Key recovery failed: ";
+      
+      if (err.message.includes("token")) {
+        errorMsg += "Session expired or authentication token missing. Please log in again.";
+      } else if (err.response && err.response.status === 401) {
+        errorMsg += "Unauthorized access. Please log in again.";
+      } else if (err.message.includes("decrypt")) {
+        errorMsg += "Failed to decrypt keys. Please log in again.";
+      } else if (err.message.includes("localStorage")) {
+        errorMsg += "Stored keys not found. Please log in again.";
+      } else {
+        errorMsg += (err.message || "Please try logging in again");
+      }
+      
+      setError(errorMsg);
+      return null;
+    }
+  };
+
   // Initialize IndexedDB
   const initializeDB = () => {
     return new Promise((resolve, reject) => {
@@ -158,16 +364,25 @@ const Sidebar = ({ onSelectChat }) => {
   
   // Fetch data when component mounts
   useEffect(() => {
-    // Check if user is authenticated
-    if (!privateKey || !dbKey) {
-      setError("Authentication required. Please log in.");
-      setLoading(false);
-      return;
+    // Check if any key is missing
+    const isMissingKeys = !privateKey || !dbKey || !serverKey;
+    
+    if (isMissingKeys) {
+      setError("Attempting to recover keys...");
+      setLoading(true);
     }
 
     const fetchData = async () => {
-      setLoading(true);
       try {
+        // Check if any keys are missing
+        if (isMissingKeys) {
+          console.log("Some keys are missing in Sidebar, attempting full key recovery...");
+          const recoveredKeys = await recoverAllKeys();
+          if (!recoveredKeys) {
+            throw new Error("Could not recover encryption keys");
+          }
+        }
+        
         // Initialize database first
         await initializeDB();
         
@@ -189,7 +404,8 @@ const Sidebar = ({ onSelectChat }) => {
         }
       } catch (err) {
         console.error("Error fetching data:", err);
-        setError("Error loading data. Please try again.");
+        // More specific error message
+        setError(err.message || "Error loading data. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -212,7 +428,7 @@ const Sidebar = ({ onSelectChat }) => {
         socketRef.current.disconnect();
       }
     };
-  }, [privateKey, dbKey]);
+  }, [privateKey, dbKey, serverKey]); // Added serverKey to dependencies
   
   // Add message read event listener
   useEffect(() => {
