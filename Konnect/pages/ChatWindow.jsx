@@ -568,89 +568,143 @@ const ChatWindow = ({ selectedChat, chatType }) => {
     };
   }, []);
 
-  // Load messages when chat selection changesn user
   // Set up socket connection when user info is available
-  useEffect(() => {() => {
+  useEffect(() => {
     if (currentUser && currentUser.logged_in_as) {
-        setupSocketConnection();okie
-    }t('; ')
-  }, [currentUser]);ind(row => row.startsWith('csrf_access_token='))
+        setupSocketConnection();
+    }
+  }, [currentUser]);
 
   // Add an additional socket setup in useEffect to match Messages.jsx's redundancy
-  useEffect(() => {csrfToken) {
-    if (currentUser && currentUser.logged_in_as) {re reliable delivery during page unload
+  useEffect(() => {
+    if (currentUser && currentUser.logged_in_as) {
         // If socket doesn't exist, create one (similar to Messages.jsx)
-        if (!socketRef.current) { const headers = {
-            socketRef.current = io('http://localhost:5000', {       'Content-Type': 'application/json',
-                withCredentials: true        'X-CSRF-TOKEN': csrfToken
+        if (!socketRef.current) { 
+            socketRef.current = io('http://localhost:5000', {
+                withCredentials: true
             });
             
             // Join room immediately
-            socketRef.current.emit('join', { room: currentUser.logged_in_as });   `${API_BASE_URL}/set_offline`, 
-                  new Blob([data], { type: 'application/json' })
+            socketRef.current.emit('join', { room: currentUser.logged_in_as });
+            
             // Add event listeners
-            socketRef.current.on('receive_message', handleReceivedMessage);        }
+            socketRef.current.on('receive_message', handleReceivedMessage);
         }
     }
     
-    return () => {ener('beforeunload', handleBeforeUnload);
+    // Set up event listeners for page unload
+    const handleBeforeUnload = () => {
+        setUserOffline();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleBeforeUnload);
+    
+    return () => {
         if (socketRef.current) {
             socketRef.current.disconnect();
         }
-    };oreunload', handleBeforeUnload);
+        
+        // Clean up event listeners
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.removeEventListener('unload', handleBeforeUnload);
+        
+        // Set user offline when component unmounts
+        setUserOffline();
+    };
   }, [currentUser]);
+  
+  // Function to set user offline - ensures this only happens once
+  const setUserOffline = () => {
+    if (!currentUser) return;
+    
+    const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrf_access_token='))
+        ?.split('=')[1];
+        
+    if (!csrfToken) return;
+    
+    // For more reliable delivery during page unload
+    const data = JSON.stringify({});
+    
+    try {
+        // Use sendBeacon for more reliable delivery during page unload
+        if (navigator.sendBeacon) {
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            };
+            
+            const blob = new Blob([data], { type: 'application/json' });
+            navigator.sendBeacon(`${API_BASE_URL}/set_offline`, blob);
+        } else {
+            // Fallback to synchronous XHR for older browsers
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${API_BASE_URL}/set_offline`, false); // false makes it synchronous
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+            xhr.withCredentials = true;
+            xhr.send(data);
+        }
+        
+        console.log("User set to offline");
+    } catch (error) {
+        console.error("Failed to set user offline:", error);
+    }
+  };
 
-  // Load messages when chat selection changestUser]);
+  // Load messages when chat selection changes
   useEffect(() => {
-    if (selectedChat && chatType && currentUser) { socket setup in useEffect to match Messages.jsx's redundancy
-      setIsLoading(true);Effect(() => {
-      // Fetch chat name_as) {
-      getChatName(selectedChat, chatType).then(name => {        // If socket doesn't exist, create one (similar to Messages.jsx)
+    if (selectedChat && chatType && currentUser) {
+      setIsLoading(true);
+      // Fetch chat name
+      getChatName(selectedChat, chatType).then(name => {
         setChatName(name);
-        // Fetch messages for this chatcalhost:5000', {
+        // Fetch messages for this chat
         fetchMessagesFromDB(selectedChat, chatType);
-      });        });
-    } else {   
-      setChatName("Select a chat");ediately
-      setMessages([]);s });
+      });
+    } else {
+      setChatName("Select a chat");
+      setMessages([]);
     }
   }, [selectedChat, chatType, currentUser]);
-receive_message', handleReceivedMessage);
+
   // Handle sending a new message
   const handleSendMessage = async (text) => {
     if (!text.trim() || !selectedChat || !currentUser) return;
     
-    try {  if (socketRef.current) {
-      let messageArray = [];sconnect();
+    try {
+      let messageArray = [];
       // Generate a consistent message ID for display and database storage
       // This ensures we only have one entry per message, even for group chats
       const consistentMessageId = CryptoJS.SHA256(
         currentUser.logged_in_as +
-        text +s when chat selection changes
-        new Date().toISOString() +ct(() => {
-        (chatType === 'group' ? selectedChat : '')selectedChat && chatType && currentUser) {
+        text +
+        new Date().toISOString() +
+        (chatType === 'group' ? selectedChat : '')
       ).toString();
       
-      if (chatType === 'user') {ame(selectedChat, chatType).then(name => {
-        // Direct message to user);
+      if (chatType === 'user') {
+        // Direct message to user
         const publicKey = await getUserKey(selectedChat);
-        if (!publicKey) {(selectedChat, chatType);
+        if (!publicKey) {
           setError("Couldn't get recipient's public key");
           return;
-        }ChatName("Select a chat");
-        tMessages([]);
+        }
+        
         const messageObject = createMessage(selectedChat, text, publicKey);
-        messageArray.push(messageObject);entUser]);
+        messageArray.push(messageObject);
       } else {
         // Group message
         const keys = await getGroupKeys(selectedChat);
-        if (!keys.length) {|| !currentUser) return;
+        if (!keys.length) {
           setError("Couldn't get group members' keys");
           return;
-        } messageArray = [];
-         Generate a consistent message ID for display and database storage
-        // Determine who gets the first message (for consistent ID reference)sage, even for group chats
-        let firstRecipient = null;56(
+        }
+        
+        // Determine who gets the first message (for consistent ID reference)
+        let firstRecipient = null;
         for (let i = 0; i < keys.length; i++) {
           const receiver = keys[i].roll_number;
           if (receiver !== currentUser.logged_in_as) {
