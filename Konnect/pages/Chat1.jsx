@@ -65,6 +65,34 @@ const Chat1 = () => {
     fetchCurrentUserInfo();
   }, []);
 
+  // Add a cleanup function for component unmount
+  useEffect(() => {
+    return () => {
+      // Set user as offline when navigating away from chat
+      if (currentUser && currentUser.logged_in_as) {
+        // Don't send if chatWindow has already sent a request in the last 3 seconds
+        if (window.lastOfflineRequest && 
+            Date.now() - window.lastOfflineRequest < 3000) {
+          console.log("Skipping duplicate offline request in Chat1");
+          return;
+        }
+        
+        window.lastOfflineRequest = Date.now();
+        
+        // Simple POST request without JWT
+        fetch(`${API_BASE_URL}/set_offline`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roll_number: currentUser.logged_in_as,
+            timestamp: new Date().toISOString(),
+            request_id: `chat1_${Date.now()}`
+          })
+        }).catch(err => console.error("Error setting user offline:", err));
+      }
+    };
+  }, [currentUser]);
+
   // Handle chat selection from sidebar
   const handleSelectChat = (chatId, type) => {
     setSelectedChat(chatId);

@@ -252,8 +252,8 @@ def assign_user_to_groups(roll_number, db):
     year = roll_number[:4]
     branch_code = roll_number[4:7]
     
-    # Calculate batch based on last digit mod 3
-    last_digit = int(roll_number[-1])
+    # Calculate batch based on last 3 digit mod 3
+    last_digit = int(roll_number[-3:])
     batch_mapping = {
         0: '3',
         1: '1',

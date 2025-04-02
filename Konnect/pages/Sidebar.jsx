@@ -454,6 +454,47 @@ const Sidebar = ({ onSelectChat }) => {
     };
   }, []);
   
+  // Set up listeners for message events
+  useEffect(() => {
+    const handleNewMessage = (event) => {
+      const { chatId, type } = event.detail;
+      
+      console.log(`New message received for ${type}: ${chatId}`);
+      
+      // Update unread count - FIXED: using setUnreadCounts instead of setUnreadMessages
+      setUnreadCounts(prev => ({
+        ...prev,
+        [chatId]: {
+          count: ((prev[chatId] && prev[chatId].count) || 0) + 1,
+          type: type
+        }
+      }));
+    };
+    
+    const handleMessagesRead = (event) => {
+      const { chatId } = event.detail;
+      
+      // Clear unread count for this chat - FIXED: using setUnreadCounts instead of setUnreadMessages
+      setUnreadCounts(prev => ({
+        ...prev,
+        [chatId]: {
+          count: 0,
+          type: prev[chatId] ? prev[chatId].type : 'user'
+        }
+      }));
+    };
+    
+    // Listen for new message notifications
+    window.addEventListener('newMessage', handleNewMessage);
+    // Listen for messages being read
+    window.addEventListener('messagesRead', handleMessagesRead);
+    
+    return () => {
+      window.removeEventListener('newMessage', handleNewMessage);
+      window.removeEventListener('messagesRead', handleMessagesRead);
+    };
+  }, []);
+  
   // Filter users and groups based on search term
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
