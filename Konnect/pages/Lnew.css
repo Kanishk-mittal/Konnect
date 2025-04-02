@@ -1,0 +1,235 @@
+.landing-page {
+    background: #ffae01;
+    width: 100%;
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .content-wrapper {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  
+  .top-nav {
+    position: absolute;
+    top: -4px;
+    left: 0;
+    width: 100%;
+    z-index: 1;
+  }
+  
+  .top-nav img {
+    width: 100%;
+    height: 142.61px;
+    object-fit: cover;
+  }
+  
+  .logo {
+    margin-top: 29px;
+    text-align: center;
+  }
+  
+  .frame-36 {
+    font-size: 63.79px;
+    font-weight: 700;
+    line-height: 120%;
+    display: inline-block;
+  }
+  
+  .kon {
+    color: #f17228;
+    letter-spacing: -1.59px;
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+  
+  .nect {
+    color: #ffb30e;
+    letter-spacing: -1.28px;
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+  
+  .card {
+    background: white;
+    border-radius: 27.6px;
+    width: 738px;
+    padding: 33px;
+    margin-top: 147px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  .description {
+    color: #ffae01;
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+    font-weight: 400;
+    text-align: center;
+    margin: 0;
+    line-height: 1.4;
+  }
+  
+  .auth-buttons {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    margin-top: 60px;
+  }
+  
+  .login-btn, .register-btn {
+    display: flex;
+    align-items: center;
+    gap: 15.14px;
+    padding: 21.2px 36.34px;
+    border-radius: 12.11px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Source Sans Pro', sans-serif;
+    font-weight: 700;
+    font-size: 27.25px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .login-btn {
+    background: white;
+    color: #f59500;
+  }
+  
+  .register-btn {
+    background: linear-gradient(92.84deg, rgba(255,184,0,1) 47.71%, rgba(255,138,0,1) 136.81%);
+    color: white;
+  }
+  
+  .login-btn:hover, .register-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  }
+  
+  .user-icon {
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    font-size: 27.25px;
+    line-height: 1;
+  }
+  
+  .decorative-elements {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  
+  .group-1 {
+    position: absolute;
+    top: 100px;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: auto;
+    z-index: 1;
+    top: auto;
+    transform: translateY(200px);
+    
+      
+     }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  .group-4 {
+    position: absolute;
+    bottom: 150px;
+    right: 15%;
+    width: 378px;
+    height: auto;
+    z-index: 2;
+  }
+  
+  .group-5 {
+    position: absolute;
+    top: 45%;
+    right: 5%;
+    width: 325.6px;
+    height: auto;
+    z-index: 2;
+  }
+  
+  .group-14 {
+    position: absolute;
+    top: 50%;
+    left: 8%;
+    width: 108px;
+    height: auto;
+    z-index: 2;
+  }
+  
+  .ellipse {
+    position: absolute;
+    border-radius: 50%;
+  }
+  
+  .ellipse-14 {
+    width: 61px;
+    height: 61px;
+    top: 185px;
+    right: 15%;
+    background: linear-gradient(305.73deg, rgba(255,255,255,1) 4.29%, rgba(255,255,255,0) 96.26%);
+  }
+  
+  .ellipse-11 {
+    width: 41px;
+    height: 41px;
+    top: 374px;
+    left: 126px;
+    background: linear-gradient(305.73deg, rgba(255,255,255,1) 4.29%, rgba(255,255,255,0) 96.27%);
+  }
+  
+  .ellipse-15 {
+    width: 25px;
+    height: 25px;
+    bottom: 20%;
+    right: 5%;
+    background: #ffae01;
+  }
+  
+  .ellipse-12 {
+    width: 14px;
+    height: 14px;
+    top: 30%;
+    left: 30%;
+    background: #ffc247;
+  }
+  
+  .ellipse-13 {
+    width: 14px;
+    height: 14px;
+    top: 25%;
+    right: 20%;
+    background: #ffae01;
+  }
+  
+  .ellipse-9 {
+    width: 29px;
+    height: 29px;
+    bottom: 15%;
+    left: 10%;
+    background: #ffae01;
+  }
+  

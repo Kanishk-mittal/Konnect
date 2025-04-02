@@ -29,7 +29,7 @@ def init_dadabase():
     connection_uri = os.getenv("MONGO_URI")
     connection_uri = connection_uri.lstrip('\"')
     conn = pymongo.MongoClient(connection_uri)
-    db_name = os.getenv("DB_NAME")
+    db_name = os.getenv("DB_NAME", "Konnect")
     db = conn[db_name]
     return db
 
@@ -253,7 +253,7 @@ def assign_user_to_groups(roll_number, db):
     branch_code = roll_number[4:7]
     
     # Calculate batch based on last digit mod 3
-    last_digit = int(roll_number[-1])
+    last_digit = int(roll_number[-3:])
     batch_mapping = {
         0: '3',
         1: '1',
