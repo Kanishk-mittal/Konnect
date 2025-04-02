@@ -4,7 +4,6 @@ import Chat1 from '../pages/Chat1.jsx';
 import Psettings from "../pages/Psettings.jsx";
 import Notifications from "../pages/Notification.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
-import Settings from "../pages/Settings.jsx";
 import Header from '../pages/Header.jsx'
 import Landing from '../pages/landing.jsx';
 import Loginnew from '../pages/Loginnew.jsx';
@@ -15,17 +14,19 @@ import './App.css'
 function App() {
   return (
     <>
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing/>} />
-          <Route path="/login" element={<Loginnew/>} />
-          <Route path="/register" element={<Register/>} />
-          <Route path="/chat" element={<Chat1/>} />
-          <Route path="/notification" element={<Notifications/>} />
-        </Routes>
-      </BrowserRouter>
-    </AppProvider>
+      <AppProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Loginnew />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/chat" element={<Chat1 />} />
+            <Route path="/notification" element={<Notifications />} />
+            <Route path="/psettings" element={<Psettings />} />
+            <Route path="/profile" element={<ProfilePage />} />
+          </Routes>
+        </BrowserRouter>
+      </AppProvider>
     </>
   )
 }

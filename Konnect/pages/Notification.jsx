@@ -32,18 +32,42 @@ function Notification() {
     }
   });
 
-  // Initialize IndexedDB
+  // Initialize IndexedDB - Changed to use user-specific database name
   useEffect(() => {
-    const request = indexedDB.open('messagesDB', 1);
-    
-    request.onsuccess = (event) => {
-      setDbRef(event.target.result);
+    const initializeDb = async () => {
+      try {
+        // Get current user info first to know which database to open
+        const currentUser = await fetchCurrentUserInfo();
+        if (!currentUser || !currentUser.logged_in_as) {
+          setError('User information not available');
+          setLoading(false);
+          return;
+        }
+
+        // Open the user-specific database
+        const dbName = `messagesDB_${currentUser.logged_in_as}`;
+        console.log(`Opening database: ${dbName}`);
+        
+        const request = indexedDB.open(dbName, 1);
+        
+        request.onsuccess = (event) => {
+          setDbRef(event.target.result);
+          console.log(`Successfully opened database: ${dbName}`);
+        };
+        
+        request.onerror = (event) => {
+          console.error('Failed to open IndexedDB:', event.target.error);
+          setError(`Failed to open message database: ${event.target.error}`);
+          setLoading(false);
+        };
+      } catch (err) {
+        console.error('Error initializing database:', err);
+        setError('Failed to initialize database');
+        setLoading(false);
+      }
     };
-    
-    request.onerror = (event) => {
-      setError('Failed to open message database');
-      setLoading(false);
-    };
+
+    initializeDb();
   }, []);
 
   // Fetch user data from API
@@ -99,58 +123,83 @@ function Notification() {
 
   // Fetch unread messages from IndexedDB
   const fetchUnreadMessages = async (currentUserId) => {
-    if (!dbRef) return {};
+    if (!dbRef) {
+      console.error('Database reference not available');
+      return {};
+    }
     
     return new Promise((resolve, reject) => {
-      const transaction = dbRef.transaction(['messages'], 'readonly');
-      const store = transaction.objectStore('messages');
-      const receiverIndex = store.index('receiver');
-      const request = receiverIndex.getAll(currentUserId);
-      
-      request.onsuccess = () => {
-        const messages = request.result;
-        
-        // Filter for unread messages
-        const unreadMessages = messages.filter(msg => !msg.is_seen);
-        
-        if (unreadMessages.length > 0) {
-          setHasUnread(true);
+      try {
+        // Check if the object store exists first
+        if (!dbRef.objectStoreNames.contains('messages')) {
+          console.error('Messages object store not found in database');
+          resolve({});
+          return;
         }
         
-        // Decrypt message content
-        const decryptedMessages = unreadMessages.map(msg => {
-          try {
-            return {
-              ...msg,
-              text: decryptWithAES(msg.text, dbKey)
-            };
-          } catch (error) {
-            return {
-              ...msg,
-              text: "Encrypted message"
-            };
+        const transaction = dbRef.transaction(['messages'], 'readonly');
+        const store = transaction.objectStore('messages');
+        
+        // Check if the receiver index exists
+        if (!store.indexNames.contains('receiver')) {
+          console.error('Receiver index not found in messages store');
+          resolve({});
+          return;
+        }
+        
+        const receiverIndex = store.index('receiver');
+        const request = receiverIndex.getAll(currentUserId);
+        
+        // Rest of the function remains the same
+        request.onsuccess = () => {
+          const messages = request.result;
+          
+          // Filter for unread messages
+          const unreadMessages = messages.filter(msg => !msg.is_seen);
+          
+          if (unreadMessages.length > 0) {
+            setHasUnread(true);
           }
-        });
+          
+          // Decrypt message content
+          const decryptedMessages = unreadMessages.map(msg => {
+            try {
+              return {
+                ...msg,
+                text: decryptWithAES(msg.text, dbKey)
+              };
+            } catch (error) {
+              return {
+                ...msg,
+                text: "Encrypted message"
+              };
+            }
+          });
+          
+          // Sort all messages by timestamp (newest first)
+          decryptedMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          
+          // Group by date
+          const groupedMessages = {};
+          decryptedMessages.forEach(msg => {
+            const date = formatMessageDate(msg.timestamp);
+            if (!groupedMessages[date]) {
+              groupedMessages[date] = [];
+            }
+            groupedMessages[date].push(msg);
+          });
+          
+          resolve(groupedMessages);
+        };
         
-        // Sort all messages by timestamp (newest first)
-        decryptedMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        
-        // Group by date
-        const groupedMessages = {};
-        decryptedMessages.forEach(msg => {
-          const date = formatMessageDate(msg.timestamp);
-          if (!groupedMessages[date]) {
-            groupedMessages[date] = [];
-          }
-          groupedMessages[date].push(msg);
-        });
-        
-        resolve(groupedMessages);
-      };
-      
-      request.onerror = (error) => {
-        reject('Error fetching unread messages: ' + error);
-      };
+        request.onerror = (error) => {
+          console.error('IndexedDB error:', error);
+          reject('Error fetching unread messages: ' + error);
+        };
+      } catch (error) {
+        console.error('Transaction error:', error);
+        resolve({}); // Return empty object instead of failing
+      }
     });
   };
 

@@ -6,12 +6,15 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useContext } from "react";
 import { AppContext } from "../src/context/AppContext";
 import { getAllUnreadCounts } from "./ChatUtils.jsx";
+import API_BASE_URL from "../Integration/apiConfig.js"; // Import API base URL
 
-function Header() {
+const Header = () => {
     const navigate = useNavigate();
     const [unreadCount, setUnreadCount] = useState(0);
     const { dbKey } = useContext(AppContext);
     const [dbRef, setDbRef] = useState(null);
+    const [totalUnread, setTotalUnread] = useState(0);
+    const [notifications, setNotifications] = useState([]);
 
     useEffect(() => {
         // Initialize IndexedDB connection
@@ -54,7 +57,8 @@ function Header() {
                 
             if (!csrfToken) return;
             
-            const response = await fetch('/api/protected', {
+            // FIXED: Use API_BASE_URL instead of relative /api/protected path
+            const response = await fetch(`${API_BASE_URL}/protected`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -83,9 +87,59 @@ function Header() {
         }
     };
 
+    // Set up listeners for message events
+    useEffect(() => {
+        const handleNewMessage = (event) => {
+            const { sender, chatId, type, message } = event.detail;
+            
+            // Add to notifications list
+            setNotifications(prev => [
+                { 
+                    id: Date.now(),
+                    sender,
+                    chatId,
+                    type,
+                    message,
+                    timestamp: new Date().toISOString()
+                },
+                ...prev.slice(0, 4) // Keep only the 5 most recent
+            ]);
+            
+            // Increment total unread counter
+            setTotalUnread(count => count + 1);
+        };
+        
+        const handleMessagesUpdate = () => {
+            // Recalculate total unread from IndexedDB
+            fetchUnreadCountFromDB().then(count => {
+                setTotalUnread(count);
+            });
+        };
+        
+        // Listen for new message notifications
+        window.addEventListener('newMessage', handleNewMessage);
+        // Listen for messages being read
+        window.addEventListener('messagesUpdate', handleMessagesUpdate);
+        
+        return () => {
+            window.removeEventListener('newMessage', handleNewMessage);
+            window.removeEventListener('messagesUpdate', handleMessagesUpdate);
+        };
+    }, []);
+
+    // Function to fetch unread count from IndexedDB
+    const fetchUnreadCountFromDB = async () => {
+        // Implementation would depend on your IndexedDB structure
+        // This is just a placeholder
+        return 0;
+    };
+
     const handleNotificationClick = () => {
         navigate("/notification");
     };
+    const handlePsettingsClick = () => {
+        navigate("/psettings");
+    }
 
     return (
         <header className={styles.headhome}>
@@ -105,15 +159,41 @@ function Header() {
                 )}
             </div>
 
-            <div className={styles.settings}>
+            <div className="notification-area">
+                <div className="notification-icon">
+                    <i className="fa fa-bell"></i>
+                    {totalUnread > 0 && (
+                        <span className="notification-badge">{totalUnread}</span>
+                    )}
+                </div>
+                
+                {/* Notification dropdown */}
+                {notifications.length > 0 && (
+                    <div className="notification-dropdown">
+                        {notifications.map(notif => (
+                            <div key={notif.id} className="notification-item">
+                                <div className="notification-sender">{notif.sender}</div>
+                                <div className="notification-message">{notif.message}</div>
+                                <div className="notification-time">
+                                    {new Date(notif.timestamp).toLocaleTimeString()}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className={styles.settings}
+                onClick={handlePsettingsClick}>
                 <img src={setting} alt="settings" />
             </div>
 
-            <div className={styles.profile}>
+            <div className={styles.profile}
+                onClick={() => navigate("/profile")}>
                 <img src={profile} alt="profile" />
             </div>
         </header>
     );
-}
+};
 
 export default Header;

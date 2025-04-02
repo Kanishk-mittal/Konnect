@@ -1,14 +1,14 @@
 import hashlib
-import datetime  # Add this import to fix the error
+import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.utils import encrypt_AES_CBC, decrypt_AES_CBC, encryptRSA, external_key  # Changed from extenal_key
+from app.utils import encrypt_AES_CBC, decrypt_AES_CBC, encryptRSA, external_key
 
 def hash_roll(roll: str) -> str:
     # Returns a hex digest of the SHA256 hash of the roll number.
     return hashlib.sha256(roll.encode()).hexdigest()
 
 class User:
-    def __init__(self, name: str, roll_number: str, password: str, email: str, role: str, public_key: str = None, profile_pic: str = None, is_online: bool = False):
+    def __init__(self, name: str, roll_number: str, password: str, email: str, role: str, public_key: str = None, profile_pic: str = None, is_online: bool = False, description: str = None):
         self.name = name
         self.roll_number = roll_number
         self.password = generate_password_hash(password)
@@ -17,40 +17,61 @@ class User:
         self.public_key = public_key
         self.profile_pic = profile_pic
         self.is_online = is_online
+        self.description = description if description else f"Hello my name is {name} and i am student of IIITK"
 
     def to_db(self, db):
+        # Create a hash of the roll number for stable lookups
+        roll_hash = hash_roll(self.roll_number)
+        
         return db.users.insert_one({
             "name": encrypt_AES_CBC(self.name),
-            "roll_number": encrypt_AES_CBC(self.roll_number),  # Roll number should be encrypted, not hashed
+            "roll_number": encrypt_AES_CBC(self.roll_number),
+            "roll_number_hash": roll_hash,  # Store a hash for lookup
             "password": self.password,
             "email": encrypt_AES_CBC(self.email),
             "role": encrypt_AES_CBC(self.role),
             "public_key": encrypt_AES_CBC(self.public_key) if self.public_key else None,
             "profile_pic": encrypt_AES_CBC(self.profile_pic) if self.profile_pic else None,
-            "is_online": self.is_online
+            "is_online": self.is_online,
+            "description": encrypt_AES_CBC(self.description) if self.description else None
         })
 
     def update_db(self, db):
         """Update user data in the database"""
-        return db.users.update_one(
-            {"roll_number": encrypt_AES_CBC(self.roll_number)},
+        # Use roll_number_hash for reliable lookups
+        roll_hash = hash_roll(self.roll_number)
+        
+        # Log more details to debug the update issue
+        print(f"Updating user {self.roll_number} in database, setting online status to: {self.is_online}")
+        
+        # Use find_one_and_update with the hash for reliable lookups
+        result = db.users.find_one_and_update(
+            {"roll_number_hash": roll_hash},
             {"$set": {
                 "name": encrypt_AES_CBC(self.name),
                 "email": encrypt_AES_CBC(self.email),
                 "role": encrypt_AES_CBC(self.role),
                 "public_key": encrypt_AES_CBC(self.public_key) if self.public_key else None,
                 "profile_pic": encrypt_AES_CBC(self.profile_pic) if self.profile_pic else None,
-                "is_online": self.is_online
-            }}
+                "is_online": self.is_online,
+                "description": encrypt_AES_CBC(self.description) if self.description else None
+            }},
+            return_document=True  # Return the updated document
         )
+        
+        # Check if update was successful and log it
+        if result:
+            print(f"Updated user {self.roll_number} successfully, now online status is: {result.get('is_online')}")
+            return {"modified_count": 1}
+        else:
+            print(f"Failed to update user {self.roll_number}, document not found")
+            return {"modified_count": 0}
 
     def check_unique(self, db):
         """Check if a user with this roll number already exists"""
-        users = db.users.find()
-        for user in users:
-            if decrypt_AES_CBC(user["roll_number"]) == self.roll_number:
-                return False
-        return True
+        roll_hash = hash_roll(self.roll_number)
+        user = db.users.find_one({"roll_number_hash": roll_hash})
+        return user is None
     
     def get_AES_key(self):
         """Encrypt external AES key using user's public key to return to client"""
@@ -116,7 +137,8 @@ class User:
             "roll_number": self.roll_number,
             "name": self.name,
             "email": self.email,
-            "is_online": self.is_online
+            "is_online": self.is_online,
+            "description": self.description
         }
 
     @staticmethod
@@ -133,15 +155,16 @@ class User:
                 decrypt_AES_CBC(user_doc["role"]),
                 decrypt_AES_CBC(user_doc["public_key"]) if user_doc.get("public_key") else None,
                 decrypt_AES_CBC(user_doc["profile_pic"]) if user_doc.get("profile_pic") else None,
-                user_doc.get("is_online", False)
+                user_doc.get("is_online", False),
+                decrypt_AES_CBC(user_doc["description"]) if user_doc.get("description") else None
             )
         
-        # If searching by roll number - Fix the boolean evaluation of db
+        # If searching by roll number - use hash for reliable lookups
         if roll_number is not None and db is not None:
-            users = db.users.find()
-            for user in users:
-                if decrypt_AES_CBC(user["roll_number"]) == roll_number:
-                    return User.from_db(user_doc=user)
+            roll_hash = hash_roll(roll_number)
+            user = db.users.find_one({"roll_number_hash": roll_hash})
+            if user:
+                return User.from_db(user_doc=user)
         
         return None
 
@@ -181,8 +204,15 @@ class User:
         Returns:
             bool: True if the user is online, False otherwise
         """
-        users = db.users.find()
-        for user in users:
-            if decrypt_AES_CBC(user.get("roll_number")) == roll_number:
-                return user.get("is_online", False)
+        # Use roll_number_hash for reliable lookups instead of encrypted roll
+        roll_hash = hash_roll(roll_number)
+        user = db.users.find_one({"roll_number_hash": roll_hash})
+        
+        if user:
+            # Add debug logging to help diagnose the issue
+            online_status = user.get("is_online", False)
+            print(f"Checking online status for {roll_number}: {online_status}")
+            return online_status
+        
+        print(f"User {roll_number} not found in database when checking online status")
         return False

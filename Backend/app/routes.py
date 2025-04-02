@@ -375,18 +375,36 @@ def set_offline():
     if not timestamp:
         return jsonify({"error": "Timestamp is required"}), 400
     
+    # Find user in database
     user = User.from_db(roll_number, db)
     if not user:
         return jsonify({"error": "User not found"}), 404
     
+    # Don't update if user is already offline
+    if not user.is_online:
+        print(f"User {roll_number} already offline, skipping update")
+        return jsonify({
+            "message": "User was already offline",
+            "updated": False
+        }), 200
+    
     # Update user's online status
     user.is_online = False
-    user.update_db(db)
+    result = user.update_db(db)
     
-    print(f"User {roll_number} is now offline")
+    # Add logging to verify the database was updated
+    update_success = result.get("modified_count", 0) > 0
+    print(f"User {roll_number} is now offline (DB updated: {update_success})")
+    
+    # Force database to flush changes
+    try:
+        db.client.admin.command({'fsync': 1})
+    except Exception as e:
+        print(f"Error flushing database: {str(e)}")
     
     return jsonify({
-        "message": "Status set to offline"
+        "message": "Status set to offline",
+        "updated": update_success
     }), 200
 
 @main_bp.route("/set_online", methods=["POST", "OPTIONS"])
@@ -521,3 +539,36 @@ def get_server_key():
     return jsonify({
         "key": encrypted_key
     }), 200
+
+@main_bp.route("/get_profile", methods=["GET", "OPTIONS"])
+@jwt_required(locations='cookies')
+def get_profile():
+    if request.method == "OPTIONS":
+        return handle_options()
+    
+    # Get current user identity directly from JWT
+    current_user_roll = get_jwt_identity()
+    
+    # Get the user from the database
+    user = User.from_db(current_user_roll, db)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Convert profile picture to base64 if it exists
+    profile_pic = None
+    if user.profile_pic:
+        if isinstance(user.profile_pic, bytes):
+            profile_pic = base64.b64encode(user.profile_pic).decode('utf-8')
+    
+    # Construct the response
+    profile_data = {
+        "name": user.name,
+        "roll_number": user.roll_number,
+        "email": user.email,
+        "role": user.role,
+        "profile_pic": profile_pic,
+        "is_online": user.is_online,
+        "description": user.description
+    }
+    
+    return jsonify(profile_data), 200

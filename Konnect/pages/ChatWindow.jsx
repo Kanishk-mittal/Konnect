@@ -180,10 +180,17 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   // Initialize IndexedDB
   const initializeDB = () => {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open('messagesDB', 1);
+      if (!currentUser || !currentUser.logged_in_as) {
+        reject(new Error('User information not available'));
+        return;
+      }
+      
+      // Include roll number in database name for user-specific storage
+      const dbName = `messagesDB_${currentUser.logged_in_as}`;
+      const request = indexedDB.open(dbName, 1);
       
       request.onerror = (event) => {
-        reject('Error opening database');
+        reject(new Error(`Error opening database: ${event.target.error}`));
       };
       
       request.onupgradeneeded = (event) => {
@@ -200,6 +207,7 @@ const ChatWindow = ({ selectedChat, chatType }) => {
       
       request.onsuccess = (event) => {
         dbRef.current = event.target.result;
+        console.log(`Opened user-specific database: ${dbName}`);
         resolve(event.target.result);
       };
     });
@@ -209,7 +217,7 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   const saveMessageToDB = (message) => {
     return new Promise((resolve, reject) => {
       if (!dbRef.current) {
-        reject('Database not initialized');
+        reject(new Error('Database not initialized'));
         return;
       }
       
@@ -231,8 +239,8 @@ const ChatWindow = ({ selectedChat, chatType }) => {
         resolve();
       };
       
-      request.onerror = () => {
-        reject('Error saving message to database');
+      request.onerror = (event) => {
+        reject(new Error(`Error saving message to database: ${event.target.error}`));
       };
     });
   };
@@ -387,16 +395,24 @@ const ChatWindow = ({ selectedChat, chatType }) => {
         ?.split('=')[1];
 
       if (!csrfToken) {
+        console.error("No CSRF token found in cookies");
         return null;
       }
 
+      console.log("Making request to /protected endpoint");
       const response = await instance.post('/protected', {}, {
         headers: { "X-CSRF-TOKEN": csrfToken }
       });
       
-      setCurrentUser(response.data);
+      if (!response.data || !response.data.logged_in_as) {
+        console.error("Invalid response from /protected endpoint:", response.data);
+        return null;
+      }
+      
+      console.log("User data received:", response.data.logged_in_as);
       return response.data;
     } catch (err) {
+      console.error("Authentication error:", err);
       setError("Failed to authenticate. Please log in again.");
       return null;
     }
@@ -586,6 +602,20 @@ const ChatWindow = ({ selectedChat, chatType }) => {
             is_seen: sender === currentUser.logged_in_as || belongsToCurrentChat // Rule 1 or 2.1
         };
         
+        // When message doesn't belong to current chat, trigger notification
+        if (!belongsToCurrentChat && sender !== currentUser.logged_in_as) {
+          // Dispatch notification event for new message
+          window.dispatchEvent(new CustomEvent('newMessage', {
+            detail: {
+              sender: sender,
+              chatId: group || sender,
+              type: group ? 'group' : 'user',
+              message: decryptedMessage.substring(0, 30) + (decryptedMessage.length > 30 ? '...' : '')
+            }
+          }));
+          console.log(`Notification event dispatched for ${group ? 'group' : 'user'} message`);
+        }
+        
         // Check if this message already exists in database (for group messages)
         // to avoid duplicate messages
         if (group) {
@@ -659,6 +689,8 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        console.log("Starting initialization...");
+        
         // Check if any keys are missing
         if (!privateKey || !dbKey || !serverKey) {
           console.log("Some keys are missing, attempting full key recovery...");
@@ -668,16 +700,71 @@ const ChatWindow = ({ selectedChat, chatType }) => {
           }
         }
         
-        // Continue with normal initialization
-        await initializeDB();
+        // Get user info first and make sure it's available before proceeding
         const user = await fetchCurrentUserInfo();
+        console.log("User info received:", user ? "success" : "failed");
         
-        if (user) {
+        if (!user || !user.logged_in_as) {
+          throw new Error("User information not available, please log in again");
+        }
+        
+        // Set current user in state and wait for it to be updated
+        setCurrentUser(user);
+        
+        // Initialize DB with the user information we just fetched (don't use state yet)
+        try {
+          // Create a local initializeDB function that doesn't rely on currentUser state
+          const initDB = () => {
+            return new Promise((resolve, reject) => {
+              if (!user || !user.logged_in_as) {
+                reject(new Error('User information not available for DB initialization'));
+                return;
+              }
+              
+              // Include roll number in database name for user-specific storage
+              const dbName = `messagesDB_${user.logged_in_as}`;
+              console.log(`Initializing database: ${dbName}`);
+              const request = indexedDB.open(dbName, 1);
+              
+              request.onerror = (event) => {
+                console.error("DB open error:", event.target.error);
+                reject(new Error(`Error opening database: ${event.target.error}`));
+              };
+              
+              request.onupgradeneeded = (event) => {
+                console.log("Creating DB schema...");
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('messages')) {
+                  const store = db.createObjectStore('messages', { keyPath: 'id' });
+                  store.createIndex('sender', 'sender', { unique: false });
+                  store.createIndex('receiver', 'receiver', { unique: false });
+                  store.createIndex('group', 'group', { unique: false });
+                  store.createIndex('timestamp', 'timestamp', { unique: false });
+                  store.createIndex('is_seen', 'is_seen', { unique: false });
+                }
+              };
+              
+              request.onsuccess = (event) => {
+                dbRef.current = event.target.result;
+                console.log(`Opened user-specific database: ${dbName}`);
+                resolve(event.target.result);
+              };
+            });
+          };
+          
+          await initDB();
+          console.log("Database initialized successfully");
+          
           // Fetch stored messages and set up socket
-          fetchStoredMessages();
+          await fetchStoredMessages();
+          
+        } catch (dbError) {
+          console.error("Database initialization error:", dbError);
+          throw dbError; // Re-throw to be caught by the outer catch
         }
       } catch (err) {
-        setError("Failed to initialize: " + err.message);
+        console.error("Initialization error:", err);
+        setError("Failed to initialize: " + (err.message || err.toString() || "Unknown error"));
       }
     };
     
@@ -741,34 +828,42 @@ const ChatWindow = ({ selectedChat, chatType }) => {
   }, [currentUser]);
   
   // Function to set user offline - ensures this only happens once
-  const setUserOffline = () => {
-    if (!currentUser) return;
+const setUserOffline = () => {
+  if (!currentUser) return;
 
-    // For more reliable delivery during page unload
-    const data = JSON.stringify({
-      roll_number: currentUser.logged_in_as,
-      timestamp: new Date().toISOString()
-    });
+  // Use a unique ID to deduplicate requests
+  const requestId = `offline_${currentUser.logged_in_as}_${Date.now()}`;
+  
+  // Don't send if we've already sent a request in the last 3 seconds
+  if (window.lastOfflineRequest && 
+      Date.now() - window.lastOfflineRequest < 3000) {
+    console.log("Skipping duplicate offline request");
+    return;
+  }
+  
+  window.lastOfflineRequest = Date.now();
 
-    try {
-      // Use sendBeacon for more reliable delivery during page unload
-      if (navigator.sendBeacon) {
-        const blob = new Blob([data], { type: 'application/json' });
-        navigator.sendBeacon(`${API_BASE_URL}/set_offline`, blob);
-      } else {
-        // Fallback to synchronous XHR for older browsers
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_BASE_URL}/set_offline`, false); // false makes it synchronous
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.withCredentials = true;
-        xhr.send(data);
-      }
-      
-      console.log("User set to offline");
-    } catch (error) {
-      console.error("Failed to set user offline:", error);
-    }
+  // Prepare data for the request
+  const data = {
+    roll_number: currentUser.logged_in_as,
+    timestamp: new Date().toISOString(),
+    request_id: requestId
   };
+
+  try {
+    // For normal navigation, fetch is more reliable than sendBeacon
+    fetch(`${API_BASE_URL}/set_offline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data)
+    }).catch(err => console.error("Fetch error:", err));
+    
+    console.log("User set to offline");
+  } catch (error) {
+    console.error("Failed to set user offline:", error);
+  }
+};
 
   // Load messages when chat selection changes
   useEffect(() => {

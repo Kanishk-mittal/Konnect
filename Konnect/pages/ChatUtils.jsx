@@ -169,51 +169,78 @@ export const groupMessagesByDate = (messages) => {
 export const getUnreadCountByChatId = (db, currentUserId, chatId, type) => {
   return new Promise((resolve, reject) => {
     if (!db) {
-      reject('Database not initialized');
+      console.warn('Database not initialized');
+      resolve(0); // Return 0 instead of rejecting
       return;
     }
     
-    const transaction = db.transaction(['messages'], 'readonly');
-    const store = transaction.objectStore('messages');
-    let request;
-    
-    if (type === 'user') {
-      // For user chats, we only want direct messages where receiver is current user
-      const receiverIndex = store.index('receiver');
-      request = receiverIndex.getAll(currentUserId);
-    } else if (type === 'group') {
-      // For group chats, we filter by group ID
-      const groupIndex = store.index('group');
-      request = groupIndex.getAll(chatId);
-    } else {
-      reject('Invalid chat type');
+    // Check if the 'messages' object store exists
+    if (!Array.from(db.objectStoreNames).includes('messages')) {
+      console.warn("Messages object store doesn't exist yet");
+      resolve(0); // Return 0 count
       return;
     }
     
-    request.onsuccess = () => {
-      const messages = request.result;
+    try {
+      const transaction = db.transaction(['messages'], 'readonly');
+      const store = transaction.objectStore('messages');
+      let request;
       
-      // Filter messages based on criteria
-      const unreadMessages = messages.filter(msg => {
-        if (type === 'user') {
-          return msg.receiver === currentUserId && 
-                 msg.sender === chatId && 
-                 !msg.is_seen && 
-                 msg.group === null;
-        } else if (type === 'group') {
-          return msg.receiver === currentUserId && 
-                 !msg.is_seen && 
-                 msg.group === chatId;
+      if (type === 'user') {
+        // For user chats, check if receiver index exists
+        if (!store.indexNames.contains('receiver')) {
+          console.warn("Receiver index doesn't exist in messages store");
+          resolve(0);
+          return;
         }
-        return false;
-      });
+        // For user chats, we only want direct messages where receiver is current user
+        const receiverIndex = store.index('receiver');
+        request = receiverIndex.getAll(currentUserId);
+      } else if (type === 'group') {
+        // For group chats, check if group index exists
+        if (!store.indexNames.contains('group')) {
+          console.warn("Group index doesn't exist in messages store");
+          resolve(0);
+          return;
+        }
+        // For group chats, we filter by group ID
+        const groupIndex = store.index('group');
+        request = groupIndex.getAll(chatId);
+      } else {
+        console.warn('Invalid chat type');
+        resolve(0);
+        return;
+      }
       
-      resolve(unreadMessages.length);
-    };
-    
-    request.onerror = (error) => {
-      reject('Error getting unread messages: ' + error);
-    };
+      request.onsuccess = () => {
+        const messages = request.result;
+        
+        // Filter messages based on criteria
+        const unreadMessages = messages.filter(msg => {
+          if (type === 'user') {
+            return msg.receiver === currentUserId && 
+                  msg.sender === chatId && 
+                  !msg.is_seen && 
+                  msg.group === null;
+          } else if (type === 'group') {
+            return msg.receiver === currentUserId && 
+                  !msg.is_seen && 
+                  msg.group === chatId;
+          }
+          return false;
+        });
+        
+        resolve(unreadMessages.length);
+      };
+      
+      request.onerror = (error) => {
+        console.error('Error getting unread messages:', error);
+        resolve(0); // Resolve with 0 on error instead of rejecting
+      };
+    } catch (err) {
+      console.error('Error accessing database:', err);
+      resolve(0); // Resolve with 0 on any error
+    }
   });
 };
 
@@ -221,44 +248,66 @@ export const getUnreadCountByChatId = (db, currentUserId, chatId, type) => {
 export const getAllUnreadCounts = (db, currentUserId) => {
   return new Promise((resolve, reject) => {
     if (!db) {
-      reject('Database not initialized');
+      console.warn('Database not initialized');
+      resolve({}); // Return empty counts object instead of rejecting
       return;
     }
     
-    const transaction = db.transaction(['messages'], 'readonly');
-    const store = transaction.objectStore('messages');
-    const receiverIndex = store.index('receiver');
-    const request = receiverIndex.getAll(currentUserId);
+    // Check if the 'messages' object store exists
+    if (!db.objectStoreNames.contains('messages')) {
+      console.warn("Messages object store doesn't exist yet");
+      resolve({}); // Return empty counts object
+      return;
+    }
     
-    request.onsuccess = () => {
-      const messages = request.result;
-      const unreadCounts = {};
+    try {
+      const transaction = db.transaction(['messages'], 'readonly');
+      const store = transaction.objectStore('messages');
       
-      // Count unread messages by sender (for user chats)
-      messages.forEach(msg => {
-        if (!msg.is_seen) {
-          if (msg.group === null) {
-            // Direct message
-            if (!unreadCounts[msg.sender]) {
-              unreadCounts[msg.sender] = { count: 0, type: 'user' };
+      // Check if 'receiver' index exists
+      if (!store.indexNames.contains('receiver')) {
+        console.warn("Receiver index doesn't exist in messages store");
+        resolve({});
+        return;
+      }
+      
+      const receiverIndex = store.index('receiver');
+      const request = receiverIndex.getAll(currentUserId);
+      
+      request.onsuccess = () => {
+        const messages = request.result;
+        const unreadCounts = {};
+        
+        // Count unread messages by sender (for user chats)
+        messages.forEach(msg => {
+          if (!msg.is_seen) {
+            if (msg.group === null) {
+              // Direct message
+              if (!unreadCounts[msg.sender]) {
+                unreadCounts[msg.sender] = { count: 0, type: 'user' };
+              }
+              unreadCounts[msg.sender].count++;
+            } else {
+              // Group message
+              if (!unreadCounts[msg.group]) {
+                unreadCounts[msg.group] = { count: 0, type: 'group' };
+              }
+              unreadCounts[msg.group].count++;
             }
-            unreadCounts[msg.sender].count++;
-          } else {
-            // Group message
-            if (!unreadCounts[msg.group]) {
-              unreadCounts[msg.group] = { count: 0, type: 'group' };
-            }
-            unreadCounts[msg.group].count++;
           }
-        }
-      });
+        });
+        
+        resolve(unreadCounts);
+      };
       
-      resolve(unreadCounts);
-    };
-    
-    request.onerror = (error) => {
-      reject('Error getting unread counts: ' + error);
-    };
+      request.onerror = (error) => {
+        console.error('Error getting unread counts:', error);
+        resolve({}); // Resolve with empty object on error instead of rejecting
+      };
+    } catch (err) {
+      console.error('Error accessing database:', err);
+      resolve({}); // Resolve with empty object on any error
+    }
   });
 };
 
@@ -266,67 +315,92 @@ export const getAllUnreadCounts = (db, currentUserId) => {
 export const markMessagesAsRead = (db, currentUserId, chatId, type) => {
   return new Promise((resolve, reject) => {
     if (!db) {
-      reject('Database not initialized');
+      console.warn('Database not initialized');
+      resolve(0);
       return;
     }
     
-    const transaction = db.transaction(['messages'], 'readwrite');
-    const store = transaction.objectStore('messages');
-    let request;
-    
-    if (type === 'user') {
-      // For user chats, we only want direct messages where receiver is current user
-      const receiverIndex = store.index('receiver');
-      request = receiverIndex.getAll(currentUserId);
-    } else if (type === 'group') {
-      // For group chats, we filter by group ID
-      const groupIndex = store.index('group');
-      request = groupIndex.getAll(chatId);
-    } else {
-      reject('Invalid chat type');
+    // Check if the 'messages' object store exists
+    if (!Array.from(db.objectStoreNames).includes('messages')) {
+      console.warn("Messages object store doesn't exist yet");
+      resolve(0);
       return;
     }
     
-    request.onsuccess = () => {
-      const messages = request.result;
-      let updatedCount = 0;
+    try {
+      const transaction = db.transaction(['messages'], 'readwrite');
+      const store = transaction.objectStore('messages');
+      let request;
       
-      // Filter and update unread messages
-      const updatePromises = messages.filter(msg => {
-        if (type === 'user') {
-          return msg.receiver === currentUserId && 
-                 msg.sender === chatId && 
-                 !msg.is_seen && 
-                 msg.group === null;
-        } else if (type === 'group') {
-          return msg.receiver === currentUserId && 
-                 !msg.is_seen && 
-                 msg.group === chatId;
+      if (type === 'user') {
+        // Check if receiver index exists
+        if (!store.indexNames.contains('receiver')) {
+          console.warn("Receiver index doesn't exist in messages store");
+          resolve(0);
+          return;
         }
-        return false;
-      }).map(msg => {
-        return new Promise((resolveUpdate) => {
-          msg.is_seen = true;
-          const updateRequest = store.put(msg);
-          
-          updateRequest.onsuccess = () => {
-            updatedCount++;
-            resolveUpdate();
-          };
-          
-          updateRequest.onerror = () => {
-            resolveUpdate(); // Continue even if one update fails
-          };
-        });
-      });
+        const receiverIndex = store.index('receiver');
+        request = receiverIndex.getAll(currentUserId);
+      } else if (type === 'group') {
+        // Check if group index exists
+        if (!store.indexNames.contains('group')) {
+          console.warn("Group index doesn't exist in messages store");
+          resolve(0);
+          return;
+        }
+        const groupIndex = store.index('group');
+        request = groupIndex.getAll(chatId);
+      } else {
+        console.warn('Invalid chat type');
+        resolve(0);
+        return;
+      }
       
-      Promise.all(updatePromises).then(() => {
-        resolve(updatedCount);
-      });
-    };
-    
-    request.onerror = (error) => {
-      reject('Error getting messages to mark as read: ' + error);
-    };
+      request.onsuccess = () => {
+        const messages = request.result;
+        let updatedCount = 0;
+        
+        // Filter and update unread messages
+        const updatePromises = messages.filter(msg => {
+          if (type === 'user') {
+            return msg.receiver === currentUserId && 
+                  msg.sender === chatId && 
+                  !msg.is_seen && 
+                  msg.group === null;
+          } else if (type === 'group') {
+            return msg.receiver === currentUserId && 
+                  !msg.is_seen && 
+                  msg.group === chatId;
+          }
+          return false;
+        }).map(msg => {
+          return new Promise((resolveUpdate) => {
+            msg.is_seen = true;
+            const updateRequest = store.put(msg);
+            
+            updateRequest.onsuccess = () => {
+              updatedCount++;
+              resolveUpdate();
+            };
+            
+            updateRequest.onerror = () => {
+              resolveUpdate(); // Continue even if one update fails
+            };
+          });
+        });
+        
+        Promise.all(updatePromises).then(() => {
+          resolve(updatedCount);
+        });
+      };
+      
+      request.onerror = (error) => {
+        console.error('Error getting messages to mark as read:', error);
+        resolve(0); // Resolve with 0 on error instead of rejecting
+      };
+    } catch (err) {
+      console.error('Error accessing database:', err);
+      resolve(0); // Resolve with 0 on any error
+    }
   });
 };
