@@ -58,11 +58,12 @@ def register():
     encrypted_name = base64.b64decode(data["name"])
     encrypted_email = base64.b64decode(data["email"])
     user_public_key = data["publicKey"]
-    otp_input = data.get("otp")
+    otp_input = base64.b64decode(data["otp"])
     roll = decrypt_RSA(encrypted_roll)
     password = decrypt_RSA(encrypted_password)
     name = decrypt_RSA(encrypted_name)
     email = decrypt_RSA(encrypted_email)
+    otp= decrypt_RSA(otp_input)
     
     # Validate that email contains transformed roll number
     def transform_roll_number(roll):
@@ -80,7 +81,7 @@ def register():
     if not transformed_roll or transformed_roll not in email.lower():
         return make_response(jsonify({'msg': 'Email must contain your roll number identifier. Please use your own college ID.'}), 400)
     
-    if not OTP.verify(db, email, otp_input):
+    if not OTP.verify(db, email, otp):
         return make_response(jsonify({'msg': 'Invalid or expired OTP. Please request a new OTP.'}), 400)
     user = User(
         name=name,

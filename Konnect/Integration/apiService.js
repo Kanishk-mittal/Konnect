@@ -1,16 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000';
+import API_BASE_URL from './apiConfig';
 
 const instance = axios.create({
-  baseURL: API_BASE_URL,
   withCredentials: true,
+  baseURL: API_BASE_URL,
+  mode: 'cors',
   headers: {
-    "Content-Type": "application/json",
-    "Accept": "application/json"
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest'
   }
 });
-
 function getCSRFToken() {
   return document.cookie
     .split('; ')

@@ -7,7 +7,6 @@ import Logo from "../src/assets/Logo.png";
 import styles from  "./landing.module.css"; 
 const Landing = () => {
     const navigate = useNavigate();
-
   return (
     <motion.div className={styles.landcontainter}  initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <motion.div className={styles.Topnav} initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}transition={{ delay: 0.2 }}>

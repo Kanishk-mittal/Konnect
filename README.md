@@ -55,12 +55,14 @@ pip install -r requirements.txt
 
 Create a `.env` file in the Backend folder with the following variables:
 ```
-MONGO_URI=your_mongodb_connection_string 
-SECRET_KEY=your_app_secret_key 
-SENDER_PASSWORD=email_service_password 
-JWT_SECRET_KEY=your_jwt_secret 
-AES_KEY_INTERNAL=your_internal_aes_key 
-AES_KEY_EXTERNAL=your_external_aes_key
+MONGO_URI = <Mongo Uri>
+DB_NAME=Konnect
+SECRET_KEY=secret
+SENDER_EMAIL=<your email>
+SENDER_PASSWORD=<email password>
+JWT_SECRET_KEY=secret
+AES_KEY_INTERNAL='i0aMCxqkGJpklT4G7JYg9A=='
+AES_KEY_EXTERNAL='i0aMCxqkGJpklT4G7JYg9A=='
 ```
 
 ### Step 4: Start the Backend Server

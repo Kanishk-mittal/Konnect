@@ -1,13 +1,11 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { motion } from "framer-motion";
 import { FaUser } from "react-icons/fa";
 import { useNavigate } from 'react-router-dom';
 import Logo from "../src/assets/Logo.png";
 import './Register.css';
-import JSEncrypt from "jsencrypt";
-import CryptoJS from 'crypto-js';
-import { AppContext } from '../src/context/AppContext';
 import { postData } from '../Integration/apiService';
+import { generateRSAKeys, encryptWithAES, generateAESKey, encryptWithRSA } from '../Integration/Encryption';
 
 const Register = ({ style = {} }) => {
   const navigate = useNavigate();
@@ -23,9 +21,6 @@ const Register = ({ style = {} }) => {
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState('');
   const [rollError, setRollError] = useState('');
-  
-  // Get context for storing encryption keys
-  const { setPrivateKey, setDbKey, setServerKey } = useContext(AppContext);
 
   const handleChange = (e) => {
     setFormData({
@@ -57,64 +52,12 @@ const Register = ({ style = {} }) => {
 
   // Validate roll number against email
   const validateRollWithEmail = (rollNumber, email) => {
-    if (!rollNumber) {
-      setRollError('Please enter your roll number to proceed');
-      return false;
-    }
-    
     const transformedRoll = transformRollNumber(rollNumber);
-    
     if (!email.includes(transformedRoll)) {
       setRollError('Please use your own college ID. The roll number should match your email.');
       return false;
     }
-    
     return true;
-  };
-
-  // Generate random AES key for local storage encryption
-  const generateAESKey = () => {
-    const randomBytes = CryptoJS.lib.WordArray.random(16);
-    return CryptoJS.enc.Base64.stringify(randomBytes);
-  };
-
-  // Generate RSA key pair
-  const generateRSAKeys = () => {
-    const crypt = new JSEncrypt({ default_key_size: 2048 });
-    crypt.getKey();
-    return {
-      publicKey: crypt.getPublicKey(),
-      privateKey: crypt.getPrivateKey()
-    };
-  };
-
-  // Encrypt data with AES
-  const encryptWithAES = (data, key) => {
-    if (!data) return null;
-    try {
-      // Generate a random IV
-      const iv = CryptoJS.lib.WordArray.random(16);
-      
-      // Create encryption parameters
-      const encryptParams = {
-        iv: iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7
-      };
-      
-      // Encrypt the data
-      const encrypted = CryptoJS.AES.encrypt(
-        data,
-        CryptoJS.enc.Utf8.parse(key),
-        encryptParams
-      );
-      
-      // Combine IV and ciphertext and convert to base64
-      const ivAndCiphertext = iv.concat(encrypted.ciphertext);
-      return CryptoJS.enc.Base64.stringify(ivAndCiphertext);
-    } catch (error) {
-      return null;
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -123,6 +66,7 @@ const Register = ({ style = {} }) => {
     setRollError('');
     
     if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
+      setError('Please use your own college ID. The roll number should match your email.');
       return;
     }
     
@@ -141,49 +85,39 @@ const Register = ({ style = {} }) => {
       
       // 3. Generate user's AES key for local storage encryption
       const userAESKey = generateAESKey();
-      
-      // 4. Set up encryption with server's public key
-      const key = new JSEncrypt();
-      key.setPublicKey(publicKeyPem);
 
-      // 5. Encrypt all user data with server's RSA key
+      // 4. Encrypt all user data with server's RSA key
       const encryptedData = {
-        name: key.encrypt(formData.name),
-        roll: key.encrypt(formData.rollNumber),
-        email: key.encrypt(formData.email),
-        otp: formData.otp,
-        password: key.encrypt(formData.password),
+        name: encryptWithRSA(formData.name, publicKey),
+        roll: encryptWithRSA(formData.rollNumber, publicKey),
+        email: encryptWithRSA(formData.email, publicKey),
+        otp: encryptWithRSA(formData.otp, publicKey),
+        password: encryptWithRSA(formData.password, publicKey),
         publicKey: publicKey
       };
 
-      // 6. Send registration request
+      // 5. Send registration request
       const response = await postData('register', encryptedData, { credentials: 'include' });
       
-      // 7. Decrypt the returned server AES key using user's private key
-      const decrypt = new JSEncrypt();
-      decrypt.setPrivateKey(privateKey);
-      const serverAESKey = decrypt.decrypt(response.key);
+      // 6. Decrypt the returned server AES key using user's private key
+      const serverAESKey = decryptWithRSA(response.key, privateKey);
       
       if (!serverAESKey) {
-        throw new Error("Failed to decrypt server AES key");
+        alert("Unable do get keys please try again");
+        return;
       }
       
-      // 8. Encrypt private key and user AES key for storage
+      // 7. Encrypt private key and user AES key for storage
       const encryptedPrivateKey = encryptWithAES(privateKey, serverAESKey);
       const encryptedUserAESKey = encryptWithAES(userAESKey, serverAESKey);
       
-      // 9. Store encrypted keys with user-specific names using roll number
+      // 8. Store encrypted keys with user-specific names using roll number
       localStorage.setItem(`encryptedPrivateKey_${formData.rollNumber}`, encryptedPrivateKey);
       localStorage.setItem(`encryptedAESKey_${formData.rollNumber}`, encryptedUserAESKey);
-      
-      // 10. Set keys in context
-      setServerKey(serverAESKey);
-      setPrivateKey(privateKey);
-      setDbKey(userAESKey);
-      
+      alert("Registration successful! redirecting to chat page");
       navigate('/chat'); // Redirect to chat page after successful registration
     } catch (error) {
-      setError(error.response?.data?.msg || "Registration failed. Please try again.");
+      setError("Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -210,21 +144,15 @@ const Register = ({ style = {} }) => {
     
     setLoading(true);
     try {
-      const response = await postData('otp', { email: formData.email });
+      await postData('otp', { email: formData.email });
       setOtpSent(true);
       setError('');
     } catch (error) {
-      setError(error.response?.data?.msg || "Failed to send OTP. Please try again.");
+      setError("Failed to send OTP. Please check your email and try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  const handleLogin = () => {
-    navigate('/login'); // Redirect to login page
-  };
-
-  // ...existing UI code...
   return (
     <div className="register-container">
       <motion.div className="Top-nav" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
@@ -232,7 +160,7 @@ const Register = ({ style = {} }) => {
       </motion.div>
       <motion.div className="container1" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}>
         <motion.div className="buttons1" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.6 }}>
-          <button className="login-button1" onClick={handleLogin}><FaUser /> Login</button>
+          <button className="login-button1" onClick={()=>navigate('/login')}><FaUser /> Login</button>
           <button className="reg-button1" onClick={() => navigate('/register')}><FaUser /> Register</button>
         </motion.div>
         <form onSubmit={handleSubmit}>
@@ -293,7 +221,7 @@ const Register = ({ style = {} }) => {
             {loading ? 'Processing...' : 'Proceed'}
           </motion.button>
           <motion.div className="login-link" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.5 }}>
-            Have an account? <a href="#" onClick={handleLogin}> -Login</a>
+            Have an account? <a href="/login"> Login</a>
           </motion.div>
         </form>
       </motion.div>

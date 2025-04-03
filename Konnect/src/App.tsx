@@ -1,14 +1,12 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from '../pages/Login.jsx';
-import Chat1 from '../pages/Chat1.jsx';
+import Chat from '../pages/Chat.jsx';
 import Psettings from "../pages/Psettings.jsx";
 import Notifications from "../pages/Notification.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
-import Header from '../pages/Header.jsx'
 import Landing from '../pages/landing.jsx';
-import Loginnew from '../pages/Loginnew.jsx';
 import Register from '../pages/Register.jsx';
-import { AppProvider } from './context/AppContext';
+import AppProvider from '../context/AppContext.jsx';
 import './App.css'
 
 function App() {
@@ -18,9 +16,9 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Loginnew />} />
+            <Route path="/login" element={<Login/>} />
             <Route path="/register" element={<Register />} />
-            <Route path="/chat" element={<Chat1 />} />
+            <Route path="/chat" element={<Chat />} />
             <Route path="/notification" element={<Notifications />} />
             <Route path="/psettings" element={<Psettings />} />
             <Route path="/profile" element={<ProfilePage />} />

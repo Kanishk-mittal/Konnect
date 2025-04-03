@@ -6,21 +6,21 @@ export const AppContext = createContext();
 // Create the App Provider component
 export const AppProvider = ({ children }) => {
   // State for encryption keys
-  const [privateKey, setPrivateKey] = useState(null);
-  const [dbKey, setDbKey] = useState(null);
-  const [serverKey, setServerKey] = useState(null);
+  const [selectedChat, setselectedChat] = useState();
+  const [selectedChatType, setselectedChatType] = useState();
+  const [unreadCount, setunreadCount] = useState(0);
 
   // Create the context value object
   const contextValue = {
-    // Keys
-    privateKey,
-    dbKey,
-    serverKey,
+    // State variables
+    selectedChat,
+    unreadCount,
+    selectedChatType,
     
     // Setters
-    setPrivateKey,
-    setDbKey,
-    setServerKey
+    setselectedChat,
+    setunreadCount,
+    setselectedChatType,
   };
 
   // Provide the context to children components
