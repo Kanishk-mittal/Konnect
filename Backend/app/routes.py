@@ -6,6 +6,7 @@ from app.Models.User import User
 from app.Models.OTP import OTP
 from . import socketio
 from flask_socketio import emit, join_room
+from werkzeug.security import generate_password_hash
 
 main_bp = Blueprint("main", __name__)
 
@@ -540,7 +541,7 @@ def get_server_key():
         "key": encrypted_key
     }), 200
 
-@main_bp.route("/get_profile", methods=["GET", "OPTIONS"])
+@main_bp.route("/get_profile", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_profile():
     if request.method == "OPTIONS":
@@ -572,3 +573,87 @@ def get_profile():
     }
     
     return jsonify(profile_data), 200
+
+@main_bp.route("/get_credentials", methods=["POST", "OPTIONS"])
+@jwt_required(locations='cookies')
+def get_credentials():
+    if request.method == "OPTIONS":
+        return handle_options()
+    current_user = get_jwt_identity()
+    user = User.from_db(current_user, db)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    credentials = user.get_credentials()
+    return jsonify(credentials), 200
+
+@main_bp.route("/update_profile", methods=["POST", "OPTIONS"])
+@jwt_required(locations='cookies')
+def update_profile():
+    if request.method == "OPTIONS":
+        return handle_options()
+    
+    current_user = get_jwt_identity()
+    data = request.get_json()
+    
+    # First decrypt the AES key using the server's private key
+    encrypted_aes_key = data.get("aesKey")
+    if not encrypted_aes_key:
+        return jsonify({"error": "Missing encryption key"}), 400
+    
+    try:
+        # JSEncrypt output needs to be base64 decoded before RSA decryption
+        encrypted_aes_key = base64.b64decode(encrypted_aes_key)
+        aes_key = decrypt_RSA(encrypted_aes_key)
+        
+        # Prepare updates dictionary - will only contain fields that were sent
+        updates = {}
+        
+        # Only process username if it was included in the request
+        if "username" in data:
+            print(f"Decrypting username: {data['username'][:30]}...")
+            updates["name"] = decrypt_AES_CBC(data["username"], key_str=aes_key)
+            print(f"Username decrypted successfully: {updates['name']}")
+        
+        # Only process description if it was included in the request
+        if "description" in data:
+            print(f"Decrypting description: {data['description'][:30]}...")
+            updates["description"] = decrypt_AES_CBC(data["description"], key_str=aes_key)
+            print(f"Description decrypted successfully: {updates['description']}")
+        
+        # Handle password change if both fields are provided
+        if "newPassword" in data and "otp" in data:
+            print("Processing password change request")
+            new_password = decrypt_AES_CBC(data["newPassword"], key_str=aes_key)
+            otp = decrypt_AES_CBC(data["otp"], key_str=aes_key)
+            
+            # Get user to verify email for OTP
+            user = User.from_db(current_user, db)
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+                
+            # Verify OTP
+            if not OTP.verify(db, user.email, otp):
+                return jsonify({"error": "Invalid or expired OTP"}), 400
+            
+            # Add password to updates
+            updates["password"] = generate_password_hash(new_password)
+            print("Password updated successfully")
+        
+        # Only proceed if there are actual updates to make
+        if not updates:
+            return jsonify({"message": "No changes to update"}), 200
+            
+        # Use the static method to update user details with only the changed fields
+        result = User.update_user_details(current_user, updates, db)
+        
+        # Check if update was successful
+        if result.get("modified_count", 0) > 0:
+            return jsonify({"message": "Profile updated successfully"}), 200
+        else:
+            return jsonify({"message": "No changes made to the database"}), 200
+            
+    except Exception as e:
+        print(f"Error updating profile: {str(e)}")
+        import traceback
+        traceback.print_exc()  # Print full stack trace for debugging
+        return jsonify({"error": f"Failed to update profile: {str(e)}"}), 500

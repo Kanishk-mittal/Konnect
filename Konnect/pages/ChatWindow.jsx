@@ -17,6 +17,12 @@ import {
   groupMessagesByDate 
 } from "./ChatUtils";
 
+// Add function to generate a random AES key
+const generateAESKey = () => {
+  const randomBytes = CryptoJS.lib.WordArray.random(16);
+  return CryptoJS.enc.Base64.stringify(randomBytes);
+};
+
 const ChatWindow = ({ selectedChat, chatType }) => {
   // Access context for encryption keys
   const { privateKey, dbKey, serverKey, setServerKey, setPrivateKey, setDbKey } = useContext(AppContext);

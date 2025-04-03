@@ -67,6 +67,32 @@ class User:
             print(f"Failed to update user {self.roll_number}, document not found")
             return {"modified_count": 0}
 
+    @staticmethod
+    def update_user_details(roll_number, updates_dict, db):
+        """
+        Static method to update user details.
+        
+        Args:
+            roll_number (str): The roll number of the user to update
+            updates_dict (dict): Dictionary containing the updated fields
+            db: Database connection
+            
+        Returns:
+            dict: Result of the update operation
+        """
+        # Get the user from database
+        user = User.from_db(roll_number, db)
+        if not user:
+            return {"error": "User not found", "modified_count": 0}
+        
+        # Update the user attributes
+        for key, value in updates_dict.items():
+            if hasattr(user, key):
+                setattr(user, key, value)
+        
+        # Save the updates to the database
+        return user.update_db(db)
+
     def check_unique(self, db):
         """Check if a user with this roll number already exists"""
         roll_hash = hash_roll(self.roll_number)
@@ -216,3 +242,9 @@ class User:
         
         print(f"User {roll_number} not found in database when checking online status")
         return False
+
+    def get_credentials(self):
+        return {
+            "username": self.name,
+            "description": self.description
+        }
