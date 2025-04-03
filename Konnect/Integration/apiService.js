@@ -31,12 +31,28 @@ export async function postData(url, data = {}, config = {}) {
 }
 
 export async function getData(endpoint) {
+  try {
+    const csrfToken = getCSRFToken();
+    const response = await instance.post(endpoint, {}, {
+      headers: {
+        "X-CSRF-TOKEN": csrfToken,
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      mode: 'cors'
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching data from ${endpoint}:`, error.response?.data || error.message);
+    throw error;
+  }
+}
+
+export async function getPublicKey() {
   const csrfToken = getCSRFToken();
-  // Changed from instance.get() to instance.post()
-  const response = await instance.post(endpoint, {}, {
+  const response = await instance.post('/publicKey', {}, {
     headers: {
       "X-CSRF-TOKEN": csrfToken
     }
   });
-  return response.data;
+  return response.data.public_key;
 }
