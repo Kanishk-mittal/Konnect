@@ -22,6 +22,7 @@ const Register = ({ style = {} }) => {
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState('');
+  const [rollError, setRollError] = useState('');
   
   // Get context for storing encryption keys
   const { setPrivateKey, setDbKey, setServerKey } = useContext(AppContext);
@@ -31,6 +32,44 @@ const Register = ({ style = {} }) => {
       ...formData,
       [e.target.name]: e.target.value
     });
+    
+    // Clear roll error when user changes roll number
+    if (e.target.name === 'rollNumber') {
+      setRollError('');
+    }
+  };
+
+  // Transform roll number function
+  const transformRollNumber = (rollNumber) => {
+    if (!rollNumber) return '';
+    
+    // 1. Remove first two characters
+    let transformed = rollNumber.substring(2);
+    
+    // 2. Remove all 0's
+    transformed = transformed.replace(/0/g, '');
+    
+    // 3. Convert to lowercase
+    transformed = transformed.toLowerCase();
+    
+    return transformed;
+  };
+
+  // Validate roll number against email
+  const validateRollWithEmail = (rollNumber, email) => {
+    if (!rollNumber) {
+      setRollError('Please enter your roll number to proceed');
+      return false;
+    }
+    
+    const transformedRoll = transformRollNumber(rollNumber);
+    
+    if (!email.includes(transformedRoll)) {
+      setRollError('Please use your own college ID. The roll number should match your email.');
+      return false;
+    }
+    
+    return true;
   };
 
   // Generate random AES key for local storage encryption
@@ -81,7 +120,11 @@ const Register = ({ style = {} }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setRollError('');
+    
+    if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
+      return;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
@@ -147,8 +190,21 @@ const Register = ({ style = {} }) => {
   };
 
   const handleGetOTP = async () => {
+    setError('');
+    setRollError('');
+    
     if (!formData.email) {
       setError("Please enter your email address");
+      return;
+    }
+    
+    if (!formData.rollNumber) {
+      setRollError("Please enter your roll number to proceed");
+      return;
+    }
+    
+    // Validate roll number against email
+    if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
       return;
     }
     
@@ -190,6 +246,7 @@ const Register = ({ style = {} }) => {
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.8 }}>
               <label className="form-label">Roll number</label>
               <input type="text" name="rollNumber" className="form-input1" value={formData.rollNumber} onChange={handleChange} placeholder="Roll number" />
+              {rollError && <div className="error-message" style={{color: 'red', fontSize: '12px'}}>{rollError}</div>}
             </motion.div>
           </div>
           <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.9 }}>

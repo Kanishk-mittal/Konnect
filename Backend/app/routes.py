@@ -63,6 +63,23 @@ def register():
     password = decrypt_RSA(encrypted_password)
     name = decrypt_RSA(encrypted_name)
     email = decrypt_RSA(encrypted_email)
+    
+    # Validate that email contains transformed roll number
+    def transform_roll_number(roll):
+        if not roll:
+            return ''
+        # 1. Remove first two characters
+        transformed = roll[2:]
+        # 2. Remove all 0's
+        transformed = transformed.replace('0', '')
+        # 3. Convert to lowercase
+        transformed = transformed.lower()
+        return transformed
+    
+    transformed_roll = transform_roll_number(roll)
+    if not transformed_roll or transformed_roll not in email.lower():
+        return make_response(jsonify({'msg': 'Email must contain your roll number identifier. Please use your own college ID.'}), 400)
+    
     if not OTP.verify(db, email, otp_input):
         return make_response(jsonify({'msg': 'Invalid or expired OTP. Please request a new OTP.'}), 400)
     user = User(

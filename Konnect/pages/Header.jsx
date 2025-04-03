@@ -7,6 +7,7 @@ import { useEffect, useState, useContext } from "react";
 import { AppContext } from "../src/context/AppContext";
 import { getAllUnreadCounts } from "./ChatUtils.jsx";
 import API_BASE_URL from "../Integration/apiConfig.js"; // Import API base URL
+import { color } from "framer-motion";
 
 const Header = () => {
     const navigate = useNavigate();
@@ -140,11 +141,20 @@ const Header = () => {
     const handlePsettingsClick = () => {
         navigate("/psettings");
     }
+    
+    const handleLogoClick = () => {
+        navigate("/chat");
+    }
 
     return (
         <header className={styles.headhome}>
-            <div className={styles.logo}>KON</div>
-            <div className={styles.logo1}>NET</div>
+            <div 
+                onClick={handleLogoClick} 
+                style={{ cursor: 'pointer', display: 'flex' }}
+            >
+                <div className={styles.logo}>KON</div>
+                <div className={styles.logo1}>NECT</div>
+            </div>
 
             <div 
                 className={styles.notifications} 
@@ -152,35 +162,15 @@ const Header = () => {
                 style={{ cursor: 'pointer', position: 'relative' }}
             >
                 <img src={notification} alt="notification" />
-                {unreadCount > 0 && (
-                    <div className={styles.notificationBadge}>
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                    </div>
-                )}
             </div>
 
             <div className="notification-area">
                 <div className="notification-icon">
                     <i className="fa fa-bell"></i>
                     {totalUnread > 0 && (
-                        <span className="notification-badge">{totalUnread}</span>
+                        <span className="notification-badge" style={{color:'black'}}>{totalUnread}</span>
                     )}
                 </div>
-                
-                {/* Notification dropdown */}
-                {notifications.length > 0 && (
-                    <div className="notification-dropdown">
-                        {notifications.map(notif => (
-                            <div key={notif.id} className="notification-item">
-                                <div className="notification-sender">{notif.sender}</div>
-                                <div className="notification-message">{notif.message}</div>
-                                <div className="notification-time">
-                                    {new Date(notif.timestamp).toLocaleTimeString()}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
 
             <div className={styles.settings}
