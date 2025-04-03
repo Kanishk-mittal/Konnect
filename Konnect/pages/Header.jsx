@@ -166,21 +166,6 @@ const Header = () => {
                         <span className="notification-badge">{totalUnread}</span>
                     )}
                 </div>
-                
-                {/* Notification dropdown */}
-                {notifications.length > 0 && (
-                    <div className="notification-dropdown">
-                        {notifications.map(notif => (
-                            <div key={notif.id} className="notification-item">
-                                <div className="notification-sender">{notif.sender}</div>
-                                <div className="notification-message">{notif.message}</div>
-                                <div className="notification-time">
-                                    {new Date(notif.timestamp).toLocaleTimeString()}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
 
             <div className={styles.settings}
