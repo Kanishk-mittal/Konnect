@@ -263,8 +263,14 @@ const Sidebar = ({ onSelectChat }) => {
   const fetchUsers = async () => {
     try {
       const response = await instance.get('/get_users');
-      setUsers(response.data.users);
+      if (response.data && Array.isArray(response.data.users)) {
+        setUsers(response.data.users);
+      } else {
+        console.error('Invalid user data format:', response.data);
+        setError('Invalid user data received');
+      }
     } catch (err) {
+      console.error('Failed to load users:', err);
       setError('Failed to load users. Please try again later.');
     }
   };
@@ -496,14 +502,24 @@ const Sidebar = ({ onSelectChat }) => {
   }, []);
   
   // Filter users and groups based on search term
-  const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    user.roll_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = searchTerm 
+    ? users.filter(user => 
+        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        user.roll_number?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : users;
   
-  const filteredGroups = groups.filter(group => 
-    group.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredGroups = searchTerm
+    ? groups.filter(group => 
+        group.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        group.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : groups;
+
+  // Update the search input handler
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+  };
 
   return (
     <div className="sidebar">
@@ -525,10 +541,10 @@ const Sidebar = ({ onSelectChat }) => {
       <div className="sidebar-content">
         <input 
           type="text" 
-          placeholder="Search..." 
+          placeholder="Search by name or roll number..." 
           className="search-bar" 
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearch}
         />
 
         {loading ? (

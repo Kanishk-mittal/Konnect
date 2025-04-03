@@ -4,6 +4,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    min-height: 100vh;
 }
 
 .header {
@@ -16,13 +17,17 @@
 
 .theme {
     background-color: white;
-    margin: 90px auto 30px;
+    margin: 90px 0px 0px 200px;
     width: 80%;
     max-width: 800px;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     padding: 25px;
     overflow: hidden;
+    flex: 1;
+    padding: 20px;
+    max-width: 1000px;
+    width: 100%;
 }
 
 .heading {
@@ -36,6 +41,10 @@
     width: 100%;
     clear: both;
     display: block;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #333;
 }
 
 .image {
@@ -145,6 +154,7 @@
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     text-align: center;
+    min-height: 200px;
 }
 
 .errorText {
@@ -158,6 +168,10 @@
     gap: 12px;
     width: 100%;
     margin-bottom: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
 }
 
 .dateGroup {
@@ -166,6 +180,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    margin-bottom: 24px;
 }
 
 @media (max-width: 768px) {
