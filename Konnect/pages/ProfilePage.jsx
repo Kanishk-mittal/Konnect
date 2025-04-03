@@ -84,7 +84,6 @@ const ProfilePage = () => {
           <div className="profile-details">
             <p><span>Roll Number :</span> {profileData?.roll_number}</p>
             <p><span>E - Mail  :</span> {profileData?.email}</p>
-            <p><span>Status :</span> {profileData?.is_online ? 'Online' : 'Offline'}</p>
           </div>
 
           <button className="back-button" onClick={handleBackClick}>Back</button>

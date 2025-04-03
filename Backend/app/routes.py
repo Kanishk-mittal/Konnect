@@ -540,7 +540,7 @@ def get_server_key():
         "key": encrypted_key
     }), 200
 
-@main_bp.route("/get_profile", methods=["GET", "OPTIONS"])
+@main_bp.route("/get_profile", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_profile():
     if request.method == "OPTIONS":
@@ -572,3 +572,15 @@ def get_profile():
     }
     
     return jsonify(profile_data), 200
+
+@main_bp.route("/get_credentials", methods=["POST", "OPTIONS"])
+@jwt_required(locations='cookies')
+def get_credentials():
+    if request.method == "OPTIONS":
+        return handle_options()
+    current_user = get_jwt_identity()
+    user = User.from_db(current_user, db)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    credentials = user.get_credentials()
+    return jsonify(credentials), 200

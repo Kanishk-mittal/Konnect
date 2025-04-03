@@ -216,3 +216,9 @@ class User:
         
         print(f"User {roll_number} not found in database when checking online status")
         return False
+
+    def get_credentials(self):
+        return {
+            "username": self.name,
+            "description": self.description
+        }
