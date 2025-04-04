@@ -1,312 +1,171 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import MessageInput from "../pages/MessageInput.jsx";
 import { AppContext } from "../src/context/AppContext.jsx";
-import axios from "axios";
-import CryptoJS from "crypto-js";
-import { io } from "socket.io-client";
-import API_BASE_URL from "../Integration/apiConfig.js";
+import CryptoJS, { enc, SHA256 } from "crypto-js";
 import "./ChatWindow.css";
-import JSEncrypt from "jsencrypt";
-// Import utility functions
-import { 
-  encryptWithAES, 
-  decryptWithAES, 
-  decryptRSAKey, 
-  createMessage as createMessageUtil, 
-  createPacket as createPacketUtil, 
-  groupMessagesByDate 
-} from "../pages/ChatUtils.jsx";
+import { postData, instance } from "../Integration/apiService.js";
+import { generateRSAKeys, decryptWithRSA, encryptWithAES, decryptWithAES, generateAESKey,encryptWithRSA } from "../Integration/Encryption.js";
 
-// Add function to generate a random AES key
-const generateAESKey = () => {
-  const randomBytes = CryptoJS.lib.WordArray.random(16);
-  return CryptoJS.enc.Base64.stringify(randomBytes);
-};
 
-const ChatWindow = ({ selectedChat, chatType }) => {
-  // Access context for encryption keys
-  const { privateKey, dbKey, serverKey, setServerKey, setPrivateKey, setDbKey } = useContext(AppContext);
-  
-  // State for messages and UI
-  const [messages, setMessages] = useState([]);
-  const [chatName, setChatName] = useState("Select a chat");
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [error, setError] = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  
+const ChatWindow = ({ socketRef}) => {  
   // Database reference
   const dbRef = useRef(null);
-  // Socket reference
-  const socketRef = useRef(null);
+  //Server key reference
+  const serverKey = useRef(null);
   // Messages container reference for scrolling
   const messagesContainerRef = useRef(null);
-  
-  // Create axios instance with credentials
-  const instance = axios.create({
-    withCredentials: true,
-    baseURL: API_BASE_URL,
-    mode: 'cors',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-    }
-  });
+  // Database key reference
+  const dbKey = useRef(null);
+  // private key reference
+  const privateKey = useRef(null);
+  // roll number reference 
+  const roll = useRef(null);
 
-  // Function to recover all encryption keys
-  const recoverAllKeys = async () => {
-    try {
-      // First, recover server key
-      console.log("Attempting to recover all keys...");
-      
-      // Generate RSA key pair for server key recovery
-      const crypt = new JSEncrypt({ default_key_size: 2048 });
-      crypt.getKey();
-      const publicKey = crypt.getPublicKey();
-      const tempPrivateKey = crypt.getPrivateKey();
-      
-      // Extract CSRF token from cookies
-      const csrfToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrf_access_token='))
-        ?.split('=')[1];
-        
-      if (!csrfToken) {
-        throw new Error("Authentication token not found");
-      }
-      
-      // 1. First get user info so we know the roll number
-      const userResponse = await instance.post('/protected', {}, {
-        headers: { "X-CSRF-TOKEN": csrfToken }
-      });
-      
-      if (!userResponse.data || !userResponse.data.logged_in_as) {
-        throw new Error("Failed to get user information");
-      }
-      
-      const rollNumber = userResponse.data.logged_in_as;
-      console.log(`Recovered user roll number: ${rollNumber}`);
-      
-      // 2. Request server key using our temporary public key
-      const response = await instance.post('/server_key', 
-        { publicKey },
-        { headers: { "X-CSRF-TOKEN": csrfToken } }  // Added missing closing parenthesis here
-      );
-      
-      // 3. Decrypt the server key using our temporary private key
-      const decrypt = new JSEncrypt();
-      decrypt.setPrivateKey(tempPrivateKey);
-      const recoveredServerKey = decrypt.decrypt(response.data.key);
-      
-      if (!recoveredServerKey) {
-        throw new Error("Failed to decrypt server key");
-      }
-      
-      // Update context with server key
-      setServerKey(recoveredServerKey);
-      console.log("Server key recovered successfully");
-      
-      // 4. Now use server key to recover private key and DB key from localStorage
-      const encryptedPrivateKey = localStorage.getItem(`encryptedPrivateKey_${rollNumber}`);
-      const encryptedAESKey = localStorage.getItem(`encryptedAESKey_${rollNumber}`);
-      
-      if (!encryptedPrivateKey || !encryptedAESKey) {
-        throw new Error("Stored encryption keys not found in localStorage");
-      }
-      
-      // Define a local decryptWithAES function to ensure consistent decryption
-      const localDecryptWithAES = (encryptedData, key) => {
-        if (!encryptedData) return null;
-        try {
-          // Convert the base64 encoded encrypted data to bytes
-          const encryptedBytes = CryptoJS.enc.Base64.parse(encryptedData);
-          
-          // Split the encrypted data into the IV and the ciphertext
-          const iv = encryptedBytes.clone();
-          iv.sigBytes = 16; // AES block size is 16 bytes for IV
-          iv.clamp();
-          
-          const ciphertext = encryptedBytes.clone();
-          ciphertext.words.splice(0, 4); // Remove the first 4 words (16 bytes) which is the IV
-          ciphertext.sigBytes -= 16;
-          
-          // Create decryption parameters
-          const decryptParams = {
-            iv: iv,
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-          };
-          
-          // Decrypt the data
-          const decryptedData = CryptoJS.AES.decrypt(
-            { ciphertext: ciphertext },
-            CryptoJS.enc.Utf8.parse(key),
-            decryptParams
-          );
-          
-          return decryptedData.toString(CryptoJS.enc.Utf8);
-        } catch (error) {
-          console.error("Decryption error:", error);
-          return null;
-        }
-      };
-      
-      // Decrypt keys using our local function to ensure consistent behavior
-      // Decrypt the private key using recovered server key
-      const decryptedPrivateKey = localDecryptWithAES(encryptedPrivateKey, recoveredServerKey);
-      if (!decryptedPrivateKey || !decryptedPrivateKey.includes("-----BEGIN RSA PRIVATE KEY-----")) {
-        throw new Error("Failed to decrypt private key");
-      }
-      
-      // Decrypt the AES/DB key using recovered server key
-      const decryptedDBKey = localDecryptWithAES(encryptedAESKey, recoveredServerKey);
-      if (!decryptedDBKey) {
-        throw new Error("Failed to decrypt database key");
-      }
-      
-      // Update context with all recovered keys
-      setPrivateKey(decryptedPrivateKey);
-      setDbKey(decryptedDBKey);
-      
-      console.log("All keys recovered successfully");
-      
-      return {
-        serverKey: recoveredServerKey,
-        privateKey: decryptedPrivateKey,
-        dbKey: decryptedDBKey
-      };
-    } catch (err) {
-      console.error("Failed to recover keys:", err);
-      setError("Key recovery failed: " + (err.message || "Please try logging in again"));
-      return null;
-    }
-  };
+  const [dbReady, setDbReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [chatName, setChatName] = useState("");
+  // loading context 
+  const { setMessages,
+    messages,
+    unreadCount,
+    setunreadCount,
+    socReady,
+    selectedChat,
+    selectedChatType,
+    unsavedMessages,
+    setUnsavedMessages } = useContext(AppContext)
 
   // Initialize IndexedDB
-  const initializeDB = () => {
-    return new Promise((resolve, reject) => {
-      if (!currentUser || !currentUser.logged_in_as) {
-        reject(new Error('User information not available'));
-        return;
+  const initializeDB = async() => {
+    // gettign userinfo
+    if (roll.current === null) {
+      const userDetails = await postData('user_details', {}, { credentials: 'include' });
+      roll.current = userDetails.logged_in_as;
+      
+    }
+    const dbName = `messagesDB_${roll.current}`;
+    const request = indexedDB.open(dbName, 1);
+    request.onerror = (event) => {
+      // Error handler
+    };
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('messages')) {
+        const store = db.createObjectStore('messages', { keyPath: 'id' });
+        store.createIndex('sender', 'sender', { unique: false });
+        store.createIndex('receiver', 'receiver', { unique: false });
+        store.createIndex('group', 'group', { unique: false });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+        store.createIndex('is_seen', 'is_seen', { unique: false });
       }
-      
-      // Include roll number in database name for user-specific storage
-      const dbName = `messagesDB_${currentUser.logged_in_as}`;
-      const request = indexedDB.open(dbName, 1);
-      
-      request.onerror = (event) => {
-        reject(new Error(`Error opening database: ${event.target.error}`));
-      };
-      
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('messages')) {
-          const store = db.createObjectStore('messages', { keyPath: 'id' });
-          store.createIndex('sender', 'sender', { unique: false });
-          store.createIndex('receiver', 'receiver', { unique: false });
-          store.createIndex('group', 'group', { unique: false });
-          store.createIndex('timestamp', 'timestamp', { unique: false });
-          store.createIndex('is_seen', 'is_seen', { unique: false }); // Add index for is_seen
-        }
-      };
-      
-      request.onsuccess = (event) => {
-        dbRef.current = event.target.result;
-        console.log(`Opened user-specific database: ${dbName}`);
-        resolve(event.target.result);
-      };
-    });
+    };
+    request.onsuccess = (event) => {
+      dbRef.current = event.target.result;
+      setDbReady(true);
+    };
+    request.onblocked = () => {
+      alert("Please close all other tabs with this site open!");
+    };
   };
+
+  // load keys
+  const loadKeys = async () => {
+    const userDetails = await postData('user_details', {}, { credentials: 'include' });
+    roll.current = userDetails.logged_in_as;
+    const keys = generateRSAKeys();
+    const response = await postData('server_key', { publicKey: keys.publicKey }, { credentials: 'include' });
+    serverKey.current = decryptWithRSA(response.key, keys.privateKey);
+    const encryptedPrivateKey = localStorage.getItem(`encryptedPrivateKey_${roll.current}`);
+    const encryptedAESKey = localStorage.getItem(`encryptedAESKey_${roll.current}`);
+    if (!encryptedPrivateKey || !encryptedAESKey) {
+      return;
+    }
+    try {
+      // Decrypt the private key
+      const decryptedPrivateKey = decryptWithAES(encryptedPrivateKey, serverKey.current);
+      if (decryptedPrivateKey && decryptedPrivateKey.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+        privateKey.current = decryptedPrivateKey;
+        // Decrypt the AES key
+        const decryptedAESKey = decryptWithAES(encryptedAESKey, serverKey.current);
+        if (decryptedAESKey) {
+          dbKey.current = decryptedAESKey;
+          return true;
+        }
+      }
+    } catch (error) {
+      // Error handling
+    }
+  }
   
   // Save message to IndexedDB
-  const saveMessageToDB = (message) => {
-    return new Promise((resolve, reject) => {
-      if (!dbRef.current) {
-        reject(new Error('Database not initialized'));
-        return;
-      }
-      
-      // Encrypt the message text with dbKey before saving
-      const encryptedText = encryptWithAES(message.text, dbKey);
-      
-      const messageToStore = {
-        ...message,
-        text: encryptedText, // Store encrypted message text
-        is_seen: message.is_seen !== undefined ? message.is_seen : false // Ensure is_seen property exists
-      };
-      
-      const transaction = dbRef.current.transaction(['messages'], 'readwrite');
-      const store = transaction.objectStore('messages');
-      
-      const request = store.put(messageToStore);
-      
-      request.onsuccess = () => {
-        resolve();
-      };
-      
-      request.onerror = (event) => {
-        reject(new Error(`Error saving message to database: ${event.target.error}`));
-      };
-    });
+  // TODO Check this one 
+  const saveMessageToDB = async(message) => {
+    if (!dbRef.current) {
+      return;
+    }
+    const encryptedMessage = encryptWithAES(message.text, dbKey.current);
+    const messageToStore = {
+      ...message,
+      text: encryptedMessage,
+    };
+    const transaction = dbRef.current.transaction(['messages'], 'readwrite');
+    const store = transaction.objectStore('messages');
+    const request = store.put(messageToStore);
+    request.onerror = (event) => {
+      // Error handling
+    }
   };
 
   // Fetch messages from IndexedDB for a specific chat
   const fetchMessagesFromDB = (chatId, type) => {
-    if (!dbRef.current || !currentUser) {
+    if (!dbRef.current) {
       return;
     }
-    
     setIsLoading(true);
+
+    if (unreadCount[chatId]) {
+      const updatedUnreadCount = { ...unreadCount };
+      updatedUnreadCount[chatId] = 0;
+      setunreadCount(updatedUnreadCount);
+    }
     
     const transaction = dbRef.current.transaction(['messages'], 'readwrite'); // Changed to readwrite to update is_seen
     const store = transaction.objectStore('messages');
-    
+    console.log(type)
     if (type === 'user') {
       // For user chats, fetch both sent and received messages
       const allMessages = [];
       
       // Get messages where the user is sender
       const senderIndex = store.index('sender');
-      const senderRequest = senderIndex.getAll(currentUser.logged_in_as);
+      const senderRequest = senderIndex.getAll(roll.current);
       
       senderRequest.onsuccess = () => {
         allMessages.push(...senderRequest.result);
         
         // Get messages where the user is receiver
         const receiverIndex = store.index('receiver');
-        const receiverRequest = receiverIndex.getAll(currentUser.logged_in_as);
+        const receiverRequest = receiverIndex.getAll(roll.current);
         
         receiverRequest.onsuccess = () => {
           allMessages.push(...receiverRequest.result);
           
           // Filter relevant messages between current user and selected chat
           const relevantMessages = allMessages.filter(msg => 
-            ((msg.sender === chatId && msg.receiver === currentUser.logged_in_as) || 
-            (msg.sender === currentUser.logged_in_as && msg.receiver === chatId)) &&
+            ((msg.sender === chatId && msg.receiver === roll.current) || 
+            (msg.sender === roll.current && msg.receiver === chatId)) &&
             msg.group === null // Exclude group messages from DM conversations
           );
           
           // Mark all received messages as seen since user is viewing the chat
-          let hasUnreadMessages = false;
           for (const msg of relevantMessages) {
-            if (msg.receiver === currentUser.logged_in_as && !msg.is_seen) {
+            if (msg.receiver === roll.current && !msg.is_seen) {
               // Mark message as seen
               msg.is_seen = true;
-              hasUnreadMessages = true;
               // Update in database
               store.put(msg);
             }
-          }
-          
-          // Notify other components (like sidebar) that messages were read
-          if (hasUnreadMessages && window.dispatchEvent) {
-            window.dispatchEvent(new CustomEvent('messagesRead', {
-              detail: { chatId, type }
-            }));
-            
-            // Also dispatch a general update event for Header notifications
-            window.dispatchEvent(new CustomEvent('messagesUpdate'));
           }
           
           // Sort by timestamp
@@ -317,50 +176,38 @@ const ChatWindow = ({ selectedChat, chatType }) => {
             try {
               return {
                 ...msg,
-                text: decryptWithAES(msg.text, dbKey),
-                sender: msg.sender === currentUser.logged_in_as ? "user" : "friend"
+                text: decryptWithAES(msg.text, dbKey.current),
               };
             } catch (error) {
               return {
                 ...msg,
                 text: "Error: Message could not be decrypted",
-                sender: msg.sender === currentUser.logged_in_as ? "user" : "friend"
+                sender: "Error"
               };
             }
           });
-          
           setMessages(decryptedMessages);
           setIsLoading(false);
         };
       };
     } else if (type === 'group') {
+      console.log("Fetching group messages for chatId2:", chatId);
       // For group chats, fetch by group ID
       const groupIndex = store.index('group');
       const request = groupIndex.getAll(chatId);
       
       request.onsuccess = () => {
         const messages = request.result;
+        console.log("Fetched group messages:", messages);
         
         // Mark all received messages as seen since user is viewing the chat
-        let hasUnreadMessages = false;
         for (const msg of messages) {
-          if (msg.receiver === currentUser.logged_in_as && !msg.is_seen) {
+          if (!msg.is_seen) {
             // Mark message as seen
             msg.is_seen = true;
-            hasUnreadMessages = true;
             // Update in database
             store.put(msg);
           }
-        }
-        
-        // Notify other components (like sidebar) that messages were read
-        if (hasUnreadMessages && window.dispatchEvent) {
-          window.dispatchEvent(new CustomEvent('messagesRead', {
-            detail: { chatId, type }
-          }));
-          
-          // Also dispatch a general update event for Header notifications
-          window.dispatchEvent(new CustomEvent('messagesUpdate'));
         }
         
         // Sort by timestamp
@@ -373,14 +220,13 @@ const ChatWindow = ({ selectedChat, chatType }) => {
           try {
             return {
               ...msg,
-              text: decryptWithAES(msg.text, dbKey),
-              sender: msg.sender === currentUser.logged_in_as ? "user" : "friend"
+              text: decryptWithAES(msg.text, dbKey.current),
             };
           } catch (error) {
             return {
               ...msg,
               text: "Error: Message could not be decrypted",
-              sender: msg.sender === currentUser.logged_in_as ? "user" : "friend"
+              sender: "Error"
             };
           }
         });
@@ -391,50 +237,17 @@ const ChatWindow = ({ selectedChat, chatType }) => {
     }
   };
 
-  // Fetch current user info
-  const fetchCurrentUserInfo = async () => {
-    try {
-      // Extract CSRF token from cookies
-      const csrfToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrf_access_token='))
-        ?.split('=')[1];
-
-      if (!csrfToken) {
-        console.error("No CSRF token found in cookies");
-        return null;
-      }
-
-      console.log("Making request to /protected endpoint");
-      const response = await instance.post('/protected', {}, {
-        headers: { "X-CSRF-TOKEN": csrfToken }
-      });
-      
-      if (!response.data || !response.data.logged_in_as) {
-        console.error("Invalid response from /protected endpoint:", response.data);
-        return null;
-      }
-      
-      console.log("User data received:", response.data.logged_in_as);
-      return response.data;
-    } catch (err) {
-      console.error("Authentication error:", err);
-      setError("Failed to authenticate. Please log in again.");
-      return null;
-    }
-  };
-
   // Get chat name from users or groups array
   const getChatName = async (chatId, type) => {
     try {
       if (type === 'user') {
-        const response = await instance.get('/get_users');
-        const users = response.data.users;
+        const response = await postData('get_users', {}, { credentials: 'include' });
+        const users = response.users;
         const user = users.find(u => u.roll_number === chatId);
         return user ? user.name : chatId;
       } else if (type === 'group') {
-        const response = await instance.get('/get_user_groups');
-        const groups = response.data.groups;
+        const response = await postData('get_user_groups', {}, { credentials: 'include' });
+        const groups = response.groups;
         const group = groups.find(g => g.id === chatId);
         return group ? group.name : chatId;
       }
@@ -446,463 +259,123 @@ const ChatWindow = ({ selectedChat, chatType }) => {
 
   // Get user public key
   const getUserKey = async (userId) => { 
-    const csrfToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('csrf_access_token='))
-      ?.split('=')[1];
-    
-    if (!csrfToken) {
-      return null;
-    }
-    
-    try {
-      const response = await instance.post('/get_user_key', { 
-        roll: userId
-      }, {
-        headers: { "X-CSRF-TOKEN": csrfToken }
-      });
-      
-      return response.data.key;
-    } catch (error) {
-      setError("Failed to get user's public key");
+    const response = await postData('get_user_key', { roll: userId }, { credentials: 'include' });
+    if (response) {
+      return response.key;
+    } else {
       return null;
     }
   };
 
   // Get group member keys
   const getGroupKeys = async (groupId) => {
-    const csrfToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('csrf_access_token='))
-      ?.split('=')[1];
+    const response = await postData('get_group_keys', { group_id: groupId }, { credentials: 'include' });
+    console.log("Group keys response:", response);
+    return response;
     
-    if (!csrfToken) {
-      return [];
-    }
-    
-    try {
-      const response = await instance.post('/get_group_keys', {
-        group_id: groupId
-      }, {
-        headers: { "X-CSRF-TOKEN": csrfToken }
-      });
-      
-      return response.data.keys || [];
-    } catch (error) {
-      setError("Failed to get group keys");
-      return [];
-    }
   };
 
   // Create message object - wrapper for the utility function
+  // Create message object
+  const createMessageUtil = (currentUser, receiver, message, publicKey, group = null,) => {
+    // Create a unique message ID using CryptoJS
+    const messageId = CryptoJS.SHA256(
+      currentUser +
+      receiver +
+      message +
+      new Date().getTime().toString()
+    ).toString();
+    
+    const aesKey = generateAESKey();
+    
+    return {
+      id: messageId,
+      sender: currentUser,
+      receiver: receiver,
+      text: message,
+      timestamp: new Date().toISOString(),
+      group: group,
+      key: aesKey,
+      receiverPublicKey: publicKey,
+    };
+  };
   const createMessage = (receiver, message, publicKey, group = null) => {
-    return createMessageUtil(currentUser, receiver, message, publicKey, group);
+    return createMessageUtil(roll.current, receiver, message, publicKey, group);
   };
 
   // Create encrypted packet for sending - wrapper for the utility function
-  const createPacket = (message) => {
-    return createPacketUtil(message, serverKey);
-  };
+  const createPacket = async (message) => {
+    // Encrypt the message using AES
+    if (!serverKey.current) {
+      const keys = generateRSAKeys();
+      const response = await postData('server_key', { publicKey: keys.publicKey }, { credentials: 'include' });
+      serverKey.current = decryptWithRSA(response.key, keys.privateKey);
+    }
+    const aesKey = message.key;
+    const encryptedMessage = encryptWithAES(message.text, aesKey);
 
-  // Set up socket connection
-  const setupSocketConnection = () => {
-    if (!currentUser) return false;
+    const encryptedKey = encryptWithRSA(aesKey, message.receiverPublicKey);
 
-    // Close existing connection
-    if (socketRef.current) {
-        socketRef.current.disconnect();
+    // Encrypt sender, receiver and group with server AES key
+    const encryptedSender = encryptWithAES(message.sender, serverKey.current);
+    const encryptedReceiver = encryptWithAES(message.receiver, serverKey.current);
+    let encryptedGroup = message.group;
+
+    if (message.group) {
+      console.log("Encrypting group:", message.group);
+      encryptedGroup = encryptWithAES(message.group, serverKey.current);
+      console.log("Encrypted group:", encryptedGroup);
     }
 
-    try {
-        // Create socket with minimal options (matching the working Messages.jsx)
-        socketRef.current = io('http://localhost:5000', {
-            withCredentials: true
-        });
-        
-        // Join room IMMEDIATELY after creating the socket (don't wait for connect event)
-        socketRef.current.emit('join', { room: currentUser.logged_in_as });
-        
-        // Set up event handlers
-        socketRef.current.on('receive_message', handleReceivedMessage);
-        socketRef.current.on('message_sent', data => console.log("Message delivered:", data));
-        socketRef.current.on('message_error', error => setError("Failed to send message"));
-        socketRef.current.on('connect', () => console.log("Socket connected successfully"));
-        socketRef.current.on('connect_error', error => console.error("Socket connection error:", error));
-        socketRef.current.on('disconnect', reason => console.log("Socket disconnected:", reason));
-        
-        return true;
-    } catch (error) {
-        console.error("Socket connection error:", error);
-        setError("Failed to connect to messaging server");
-        return false;
-    }
+    // Create the packet
+    return {
+      message: encryptedMessage,
+      key: encryptedKey,
+      sender: encryptedSender,
+      receiver: encryptedReceiver,
+      group: encryptedGroup,
+      timestamp: message.timestamp
+    };
   };
 
   // Send message via socket
-  const sendMessage = (message) => {
-    const packet = createPacket(message);
+  const sendMessage = async (message) => {
+    console.log("Sending message:", message);
+    const packet = await createPacket(message);
+    console.log(packet)
     
     if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit('send_message', packet);
+      console.log("Socket is connected, sending message:", packet);
+      socketRef.current.emit('send_message', packet);
     } else {
-        setupSocketConnection();
-        setTimeout(() => {
-            if (socketRef.current && socketRef.current.connected) {
-                socketRef.current.emit('send_message', packet);
-            } else {
-                setError("Could not connect to messaging server");
-            }
-        }, 500);
+      setError('Message not sent please try again ')
     }
   };
-
-  // Handle received messages from socket
-  const handleReceivedMessage = (data) => {
-    try {
-        // Decrypt sender
-        const sender = decryptWithAES(data.sender, serverKey);
-        
-        // Decrypt receiver
-        const receiver = decryptWithAES(data.receiver, serverKey);
-        
-        // Check if group message
-        let group = null;
-        if (data.group) {
-            group = decryptWithAES(data.group, serverKey);
-        }
-        
-        // Decrypt the AES key using private RSA key
-        const decryptedAESKey = decryptRSAKey(data.key, privateKey);
-        if (!decryptedAESKey) {
-            return;
-        }
-        
-        // Decrypt the message
-        const decryptedMessage = decryptWithAES(data.message, decryptedAESKey);
-        
-        // Check if this message belongs to the currently active chat
-        let belongsToCurrentChat = false;
-        if (chatType === 'user') {
-            // For direct messages:
-            const isFromSelectedChatToMe = selectedChat === sender && currentUser.logged_in_as === receiver;
-            const isNotGroupMessage = group === null;
-            belongsToCurrentChat = isFromSelectedChatToMe && isNotGroupMessage;
-        } else if (chatType === 'group') {
-            // For group messages, just check if the group ID matches
-            belongsToCurrentChat = selectedChat === group;
-        }
-        
-        // Generate message ID - for group messages, use consistent ID based on group+sender+timestamp
-        const messageId = group ? 
-            CryptoJS.SHA256(sender + group + data.timestamp).toString() :
-            CryptoJS.SHA256(sender + receiver + data.timestamp).toString();
-        
-        // Create message object
-        const newMessage = {
-            id: messageId,
-            text: decryptedMessage,
-            sender: sender,
-            receiver: receiver,
-            timestamp: data.timestamp,
-            group: group,
-            is_seen: sender === currentUser.logged_in_as || belongsToCurrentChat // Rule 1 or 2.1
-        };
-        
-        // When message doesn't belong to current chat, trigger notification
-        if (!belongsToCurrentChat && sender !== currentUser.logged_in_as) {
-          // Dispatch notification event for new message
-          window.dispatchEvent(new CustomEvent('newMessage', {
-            detail: {
-              sender: sender,
-              chatId: group || sender,
-              type: group ? 'group' : 'user',
-              message: decryptedMessage.substring(0, 30) + (decryptedMessage.length > 30 ? '...' : '')
-            }
-          }));
-          console.log(`Notification event dispatched for ${group ? 'group' : 'user'} message`);
-        }
-        
-        // Check if this message already exists in database (for group messages)
-        // to avoid duplicate messages
-        if (group) {
-            const transaction = dbRef.current.transaction(['messages'], 'readonly');
-            const store = transaction.objectStore('messages');
-            const request = store.get(messageId);
-            
-            request.onsuccess = (event) => {
-                const existingMessage = event.target.result;
-                if (existingMessage) {
-                    // Message already exists, no need to save it again
-                    return;
-                }
-                // Message doesn't exist, save it
-                saveAndDisplayMessage(newMessage, belongsToCurrentChat);
-            };
-            
-            request.onerror = () => {
-                // On error, try to save anyway
-                saveAndDisplayMessage(newMessage, belongsToCurrentChat);
-            };
-        } else {
-            // For direct messages, just save and display
-            saveAndDisplayMessage(newMessage, belongsToCurrentChat);
-        }
-    } catch (error) {
-        console.error("Message processing error:", error);
-        setError("Failed to process message: " + (error.message || error));
-    }
-  };
-
-  // Helper function to save and display a message
-  const saveAndDisplayMessage = (message, belongsToCurrentChat) => {
-    saveMessageToDB(message)
-        .then(() => {
-            if (belongsToCurrentChat) {
-                // Update UI with new message
-                setMessages(prevMessages => [
-                    ...prevMessages, 
-                    {
-                        ...message,
-                        sender: message.sender === currentUser.logged_in_as ? "user" : "friend"
-                    }
-                ]);
-                // Scroll to bottom
-                if (messagesContainerRef.current) {
-                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-                }
-            }
-        })
-        .catch(error => {
-            console.error("Database save error:", error);
-            setError("Failed to save message: " + (error.message || error));
-        });
-  };
-
-  // Fetch stored messages from server
-  const fetchStoredMessages = async () => {
-    try {
-        const response = await instance.get('/get_messages');
-        // This call also marks the user as online
-        if (response.data.messages && response.data.messages.length > 0) {
-            // Process each message as needed
-        }
-    } catch (err) {
-        // Silently fail - we'll still have messages from IndexedDB
-    }
-  };
-
-  // Initialize DB and fetch user info when component mounts
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        console.log("Starting initialization...");
-        
-        // Check if any keys are missing
-        if (!privateKey || !dbKey || !serverKey) {
-          console.log("Some keys are missing, attempting full key recovery...");
-          const recoveredKeys = await recoverAllKeys();
-          if (!recoveredKeys) {
-            throw new Error("Could not recover encryption keys");
-          }
-        }
-        
-        // Get user info first and make sure it's available before proceeding
-        const user = await fetchCurrentUserInfo();
-        console.log("User info received:", user ? "success" : "failed");
-        
-        if (!user || !user.logged_in_as) {
-          throw new Error("User information not available, please log in again");
-        }
-        
-        // Set current user in state and wait for it to be updated
-        setCurrentUser(user);
-        
-        // Initialize DB with the user information we just fetched (don't use state yet)
-        try {
-          // Create a local initializeDB function that doesn't rely on currentUser state
-          const initDB = () => {
-            return new Promise((resolve, reject) => {
-              if (!user || !user.logged_in_as) {
-                reject(new Error('User information not available for DB initialization'));
-                return;
-              }
-              
-              // Include roll number in database name for user-specific storage
-              const dbName = `messagesDB_${user.logged_in_as}`;
-              console.log(`Initializing database: ${dbName}`);
-              const request = indexedDB.open(dbName, 1);
-              
-              request.onerror = (event) => {
-                console.error("DB open error:", event.target.error);
-                reject(new Error(`Error opening database: ${event.target.error}`));
-              };
-              
-              request.onupgradeneeded = (event) => {
-                console.log("Creating DB schema...");
-                const db = event.target.result;
-                if (!db.objectStoreNames.contains('messages')) {
-                  const store = db.createObjectStore('messages', { keyPath: 'id' });
-                  store.createIndex('sender', 'sender', { unique: false });
-                  store.createIndex('receiver', 'receiver', { unique: false });
-                  store.createIndex('group', 'group', { unique: false });
-                  store.createIndex('timestamp', 'timestamp', { unique: false });
-                  store.createIndex('is_seen', 'is_seen', { unique: false });
-                }
-              };
-              
-              request.onsuccess = (event) => {
-                dbRef.current = event.target.result;
-                console.log(`Opened user-specific database: ${dbName}`);
-                resolve(event.target.result);
-              };
-            });
-          };
-          
-          await initDB();
-          console.log("Database initialized successfully");
-          
-          // Fetch stored messages and set up socket
-          await fetchStoredMessages();
-          
-        } catch (dbError) {
-          console.error("Database initialization error:", dbError);
-          throw dbError; // Re-throw to be caught by the outer catch
-        }
-      } catch (err) {
-        console.error("Initialization error:", err);
-        setError("Failed to initialize: " + (err.message || err.toString() || "Unknown error"));
-      }
-    };
-    
-    initializeApp();
-    
-    return () => {
-      // Clean up socket connection on unmount
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-      // Set user offline
-      if (currentUser) {
-        setUserOffline();
-      }
-    };
-  }, [privateKey, dbKey, serverKey]); // Added all keys to dependency array
-
-  // Set up socket connection when user info is available
-  useEffect(() => {
-    if (currentUser && currentUser.logged_in_as) {
-        setupSocketConnection();  
-    }
-  }, [currentUser]);
-
-  // Add an additional socket setup in useEffect to match Messages.jsx's redundancy
-  useEffect(() => {
-    if (currentUser && currentUser.logged_in_as) {
-        // If socket doesn't exist, create one (similar to Messages.jsx)
-        if (!socketRef.current) {
-            socketRef.current = io('http://localhost:5000', { 
-                withCredentials: true 
-            });
-            
-            // Join room immediately
-            socketRef.current.emit('join', { room: currentUser.logged_in_as });
-            
-            // Add event listeners
-            socketRef.current.on('receive_message', handleReceivedMessage);
-        }
-    }
-    
-    // Set up event listeners for page unload
-    const handleBeforeUnload = () => {
-        setUserOffline();
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('unload', handleBeforeUnload);
-    
-    return () => {
-        if (socketRef.current) {
-            socketRef.current.disconnect();
-        }
-        // Clean up event listeners
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        window.removeEventListener('unload', handleBeforeUnload);
-        
-        // Set user offline when component unmounts
-        setUserOffline();
-    };
-  }, [currentUser]);
-  
-  // Function to set user offline - ensures this only happens once
-const setUserOffline = () => {
-  if (!currentUser) return;
-
-  // Use a unique ID to deduplicate requests
-  const requestId = `offline_${currentUser.logged_in_as}_${Date.now()}`;
-  
-  // Don't send if we've already sent a request in the last 3 seconds
-  if (window.lastOfflineRequest && 
-      Date.now() - window.lastOfflineRequest < 3000) {
-    console.log("Skipping duplicate offline request");
-    return;
-  }
-  
-  window.lastOfflineRequest = Date.now();
-
-  // Prepare data for the request
-  const data = {
-    roll_number: currentUser.logged_in_as,
-    timestamp: new Date().toISOString(),
-    request_id: requestId
-  };
-
-  try {
-    // For normal navigation, fetch is more reliable than sendBeacon
-    fetch(`${API_BASE_URL}/set_offline`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data)
-    }).catch(err => console.error("Fetch error:", err));
-    
-    console.log("User set to offline");
-  } catch (error) {
-    console.error("Failed to set user offline:", error);
-  }
-};
 
   // Load messages when chat selection changes
   useEffect(() => {
-    if (selectedChat && chatType && currentUser) {
+    if (selectedChat && selectedChat) {
       setIsLoading(true);
       // Fetch chat name
-      getChatName(selectedChat, chatType).then(name => {
+      getChatName(selectedChat, selectedChatType).then(name => {
         setChatName(name);
         // Fetch messages for this chat
-        fetchMessagesFromDB(selectedChat, chatType);
+        fetchMessagesFromDB(selectedChat, selectedChatType);
       });
     } else {
-      setChatName("Select a chat");
       setMessages([]);
     }
-  }, [selectedChat, chatType, currentUser]);
+    setIsLoading(false);
+  }, [selectedChat, selectedChatType]);
 
   // Handle sending a new message
   const handleSendMessage = async (text) => {
-    if (!text.trim() || !selectedChat || !currentUser) return;
+    if (!text.trim() || !selectedChat ) return;
     
     try {
       let messageArray = [];
-      // Generate a consistent message ID for display and database storage
-      // This ensures we only have one entry per message, even for group chats
-      const consistentMessageId = CryptoJS.SHA256(
-        currentUser.logged_in_as +
-        text +
-        new Date().toISOString() +
-        (chatType === 'group' ? selectedChat : '')
-      ).toString();
-       
-      if (chatType === 'user') {
+      // Generate a consistent message ID for display and database storage       
+      if (selectedChatType === 'user') {
         // Direct message to user
         const publicKey = await getUserKey(selectedChat);
         if (!publicKey) {
@@ -914,20 +387,11 @@ const setUserOffline = () => {
         messageArray.push(messageObject);
       } else {
         // Group message
-        const keys = await getGroupKeys(selectedChat);
+        const response = await getGroupKeys(selectedChat);
+        const keys = response.keys;
         if (!keys.length) {
           setError("Couldn't get group members' keys");
           return;
-        }
-        
-        // Determine who gets the first message (for consistent ID reference)
-        let firstRecipient = null;
-        for (let i = 0; i < keys.length; i++) {
-          const receiver = keys[i].roll_number;
-          if (receiver !== currentUser.logged_in_as) {
-            firstRecipient = receiver;
-            break;
-          }
         }
         
         // Create message objects for each recipient
@@ -936,10 +400,10 @@ const setUserOffline = () => {
           const receiver = keys[i].roll_number;
           
           // Skip creating a message for the current user
-          if (receiver === currentUser.logged_in_as) continue;
+          if (receiver === roll.current) continue;
           
           // Create message with unique transmission ID but preserve consistent database ID
-          const messageObject = createMessage(receiver, text, publicKey, selectedChat, consistentMessageId);
+          const messageObject = createMessage(receiver, text, publicKey, selectedChat);
           messageArray.push(messageObject);
         }
       }
@@ -948,51 +412,164 @@ const setUserOffline = () => {
         // Create a display message that we'll save to IndexedDB
         const displayMessage = {
           // Use the consistent ID for database storage
-          id: consistentMessageId,
+          id: CryptoJS.SHA256(
+            roll.current +
+            messageArray[0].receiver +
+            new Date().getTime().toString()
+          ).toString(),
           text: text,
-          sender: currentUser.logged_in_as,
+          sender: roll.current,
           receiver: messageArray[0].receiver,
           timestamp: new Date().toISOString(),
-          group: chatType === 'group' ? selectedChat : null,
-          is_seen: true // Rule 1: If we are sender then it's always true
+          group: selectedChatType === 'group' ? selectedChat : null,
+          is_seen: true 
         };
         // Save to IndexedDB
         await saveMessageToDB(displayMessage);
-        
+
         // Update UI with the new message
-        setMessages(prevMessages => [
-          ...prevMessages, 
-          {
-            ...displayMessage,
-            sender: "user"
-          }
-        ]);
-        
+        setMessages(messages => [...messages, displayMessage]);
+
         // Send encrypted messages
         for (let i = 0; i < messageArray.length; i++) {
           sendMessage(messageArray[i]);
         }
-        
+
         // Scroll to bottom
         if (messagesContainerRef.current) {
           messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
       }
     } catch (error) {
+      console.error(error)
       setError("Failed to send message: " + error.message);
     }
   };
 
+  const handleReceivedMessage = (data) => { 
+    const sender = decryptWithAES(data.sender, serverKey.current);
+    const receiver = decryptWithAES(data.receiver, serverKey.current);
+    let group = null;
+    if (data.group) {
+      group = decryptWithAES(data.group, serverKey.current);
+    }
+    // get AES key form the packet
+    const decryptedAESKey = decryptWithRSA(data.key, privateKey.current);
+
+    const decryptedMessage = decryptWithAES(data.message, decryptedAESKey);
+
+    // check if the message belong to the currently active caht 
+    let idStrign = "";
+    let isCurrentChat = true;
+    if (selectedChat && chatType) {
+      if (chatType === 'user' && selectedChat !== sender) {
+        isCurrentChat = false;
+        idStrign = `${sender}${receiver}${data.message}`;
+      } else if (chatType === 'group' && group !== selectedChat) {
+        idStrign = `${sender}${group}${data.message}`;
+        isCurrentChat = false;
+      }
+    }
+    const messageId = SHA256(idStrign).toString();
+    const newMessage = {
+      id: messageId,
+      text: decryptedMessage,
+      sender: sender,
+      receiver: receiver,
+      timestamp: data.timestamp,
+      group: group,
+      is_seen: isCurrentChat ? true : false,
+    };
+    if (!isCurrentChat) {
+      const updatedUnreadCount = { ...unreadCount };
+      if (!updatedUnreadCount[group]) {
+        updatedUnreadCount[group] = 0;
+      }
+      updatedUnreadCount[group] += 1;
+      setunreadCount(updatedUnreadCount);
+    }
+    else {
+      setMessages(prevMessages => [
+        ...prevMessages, 
+        newMessage
+      ]);
+    }
+    // Save to IndexedDB
+    let newUnread = { ...unsavedMessages };
+    newUnread.push(newMessage);
+    setUnsavedMessages(newUnread);
+  }
+  const formatMessageDate = (timestamp) => {
+    const messageDate = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return "Today";
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    } else {
+      return messageDate.toLocaleDateString();
+    }
+  };
+  const groupMessagesByDate = (messages) => {
+    const groups = {};
+    messages.forEach(message => {
+      const date = formatMessageDate(message.timestamp);
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push({
+        ...message,
+        time: formatMessageTime(message.timestamp),
+        date
+      });
+    });
+    return groups;
+  };
+  const formatMessageTime = (timestamp) => {
+    const messageDate = new Date(timestamp);
+    return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
   // Get grouped messages using the utility function
   const messageGroups = groupMessagesByDate(messages);
-
+  //use Effect for loading keys and initializing DB
+  useEffect(() => {
+    const loadKeysAndInitDB = async () => {
+      const keysLoaded = await loadKeys();
+      if (keysLoaded) {
+        await initializeDB();
+        setDbReady(true);
+      }
+    };
+    loadKeysAndInitDB();
+  }, [])
+  // use Effect for incoming messages
+  useEffect(() => {
+    if (!socReady) {
+      return;
+    }
+    socketRef.current.on('receive_message', { room: roll.current }, async (packet) => { 
+      handleReceivedMessage(packet);
+    })
+  }, [socReady])
+  // use Effect for savign message
+  useEffect(() => {
+    if (unsavedMessages.length > 0 && dbReady) {
+      unsavedMessages.forEach(message => {
+        saveMessageToDB(message);
+      });
+      setUnsavedMessages([]);
+    }
+  }, [unsavedMessages, dbReady])
+  
   // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages]);
-
   return (
     <div className="chat-window">
       <div className="chat-header">
@@ -1000,7 +577,7 @@ const setUserOffline = () => {
         <div>
           <h3>{chatName}</h3>
           <p className="status">
-            {selectedChat ? (chatType === 'user' ? 'Direct Message' : 'Group Chat') : 'No chat selected'}
+            {selectedChat ? (selectedChatType === 'user' ? 'Direct Message' : 'Group Chat') : 'No chat selected'}
           </p>
         </div>
       </div>
@@ -1023,7 +600,7 @@ const setUserOffline = () => {
               <React.Fragment key={date}>
                 <div className="date-label">{date}</div>
                 {messageGroups[date].map((msg, index) => (
-                  <div key={msg.id || index} className={`message-container ${msg.sender}`}>
+                  <div key={msg.id || index} className={`message-container ${msg.sender === roll.current ? 'user' : 'friend'}`}>
                     <div className="message-bubble">
                       {msg.text}
                       <span className="message-time">{msg.time}</span>
@@ -1041,5 +618,4 @@ const setUserOffline = () => {
     </div>
   );
 };
-
 export default ChatWindow;

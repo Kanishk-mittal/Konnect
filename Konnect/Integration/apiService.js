@@ -2,14 +2,14 @@ import axios from 'axios';
 
 import API_BASE_URL from './apiConfig';
 
-const instance = axios.create({
+export const instance = axios.create({
   withCredentials: true,
   baseURL: API_BASE_URL,
   mode: 'cors',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest'
+    'X-Requested-With': 'XMLHttpRequest',
   }
 });
 function getCSRFToken() {

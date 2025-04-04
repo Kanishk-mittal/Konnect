@@ -69,101 +69,13 @@ export const decryptRSAKey = (encryptedKey, privateKey) => {
   }
 };
 
-// Create message object
-export const createMessage = (currentUser, receiver, message, publicKey, group = null, consistentDbId = null) => {
-  // Create a unique message ID using CryptoJS
-  const messageId = consistentDbId || CryptoJS.SHA256(
-    currentUser.logged_in_as +
-    receiver +
-    message +
-    new Date().getTime().toString()
-  ).toString();
-  
-  const aesKey = generateAESKey();
-  
-  return {
-    id: messageId,
-    sender: currentUser.logged_in_as,
-    receiver: receiver,
-    text: message,
-    timestamp: new Date().toISOString(),
-    group: group,
-    key: aesKey,
-    receiverPublicKey: publicKey,
-    consistentDbId: consistentDbId  // Store this for later reference
-  };
-};
+
 
 // Create encrypted packet for sending
-export const createPacket = (message, serverKey) => {
-  // Encrypt the message using AES
-  const aesKey = message.key;
-  const publicKey = message.receiverPublicKey;
-  const encryptedMessage = encryptWithAES(message.text, aesKey);
-  
-  // Encrypt the AES key using RSA
-  const rsaEncoder = new JSEncrypt();
-  rsaEncoder.setPublicKey(publicKey);
-  const encryptedKey = rsaEncoder.encrypt(aesKey);
-  
-  // Encrypt sender, receiver and group with server AES key
-  const encryptedSender = encryptWithAES(message.sender, serverKey);
-  const encryptedReceiver = encryptWithAES(message.receiver, serverKey);
-  let encryptedGroup = message.group;
-  
-  if (message.group) {
-    encryptedGroup = encryptWithAES(message.group, serverKey);
-  }
-  
-  // Create the packet
-  return {
-    message: encryptedMessage,
-    key: encryptedKey,
-    sender: encryptedSender,
-    receiver: encryptedReceiver,
-    group: encryptedGroup,
-    timestamp: message.timestamp
-  };
-};
+
 
 // Format timestamps for display
-export const formatMessageTime = (timestamp) => {
-  const messageDate = new Date(timestamp);
-  return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
-
-// Format date for message grouping
-export const formatMessageDate = (timestamp) => {
-  const messageDate = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  if (messageDate.toDateString() === today.toDateString()) {
-    return "Today";
-  } else if (messageDate.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  } else {
-    return messageDate.toLocaleDateString();
-  }
-};
-
-// Group messages by date
-export const groupMessagesByDate = (messages) => {
-  const groups = {};
-  messages.forEach(message => {
-    const date = formatMessageDate(message.timestamp);
-    if (!groups[date]) {
-      groups[date] = [];
-    }
-    groups[date].push({
-      ...message,
-      time: formatMessageTime(message.timestamp),
-      date
-    });
-  });
-  return groups;
-};
+export 
 
 // Get unread messages count for a specific chat
 export const getUnreadCountByChatId = (db, currentUserId, chatId, type) => {

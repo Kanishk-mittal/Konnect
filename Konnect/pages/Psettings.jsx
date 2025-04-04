@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom"; // Add this import
-import Header from "./Header.jsx";
+import Header from "../components/Header.jsx";
 import styles from "./Psettings.module.css";
 import { AppContext } from "../src/context/AppContext";
 import { getData, postData, getPublicKey } from '../Integration/apiService';

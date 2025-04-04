@@ -38,7 +38,7 @@ const Login = () => {
       }, { credentials: 'include' });
       
       // 5. Decrypt the server's AES key using our private key
-      const serverAESKey = decryptWithRSA(response.data.aesKey, privateKey);
+      const serverAESKey = decryptWithRSA(response.key, privateKey);
       
       if (!serverAESKey) {
         alert("Failed to decrypt server AES key. Please try again.");
@@ -49,18 +49,16 @@ const Login = () => {
       const encryptedAESKey = localStorage.getItem(`encryptedAESKey_${rollNumber}`);
       
       let foundKeys = false;
-      
       if (encryptedPrivateKey && encryptedAESKey) {
         try {
           // Decrypt the private key
           const decryptedPrivateKey = decryptWithAES(encryptedPrivateKey, serverAESKey);
+          
           if (decryptedPrivateKey && decryptedPrivateKey.includes("-----BEGIN RSA PRIVATE KEY-----")) {
-            setPrivateKey(decryptedPrivateKey);
-            
             // Decrypt the AES key
             const decryptedAESKey = decryptWithAES(encryptedAESKey, serverAESKey);
+            
             if (decryptedAESKey) {
-              setDbKey(decryptedAESKey);
               foundKeys = true;
             }
           }
@@ -83,7 +81,6 @@ const Login = () => {
     }
   };
 
-  // ...existing UI code...
   return (
     <div className="Login-page">
       <motion.div className="Top-nav" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>

@@ -78,8 +78,9 @@ def register():
         return transformed
     
     transformed_roll = transform_roll_number(roll)
-    if not transformed_roll or transformed_roll not in email.lower():
-        return make_response(jsonify({'msg': 'Email must contain your roll number identifier. Please use your own college ID.'}), 400)
+    #TODO enable this check
+    # if not transformed_roll or transformed_roll not in email.lower():
+    #     return make_response(jsonify({'msg': 'Email must contain your roll number identifier. Please use your own college ID.'}), 400)
     
     if not OTP.verify(db, email, otp):
         return make_response(jsonify({'msg': 'Invalid or expired OTP. Please request a new OTP.'}), 400)
@@ -129,9 +130,9 @@ def logout():
     response.set_cookie("csrf_access_token", "", expires=0, secure=True, samesite="None")
     return response
 
-@main_bp.route("/protected", methods=["POST","OPTIONS"])
+@main_bp.route("/user_details", methods=["POST","OPTIONS"])
 @jwt_required(locations='cookies')
-def protected():
+def user_details():
     if request.method == "OPTIONS":
         return handle_options()
     current_user = get_jwt_identity()
@@ -141,39 +142,8 @@ def protected():
     response = make_response(jsonify({
         "logged_in_as": current_user,
         "name": user.name,
-        "email": user.email,
-        "role": user.role,
-        "status": "authenticated"
     }), 200)
     return response
-
-@main_bp.route("/get_AES_key", methods=["POST","OPTIONS"])
-@jwt_required(locations='cookies')
-def get_AES_key():
-    if request.method == "OPTIONS":
-        return handle_options()
-    identity=get_jwt_identity()
-    user=User.from_db(identity,db)
-    encrypted_key=user.get_AES_key()
-    response=make_response(jsonify({'key':encrypted_key}),200)
-    return response
-
-@main_bp.route("/check_roll", methods=["POST","OPTIONS"])
-def check_roll():
-    if request.method == "OPTIONS":
-        return handle_options()
-    data = request.get_json()
-    encrypted_roll = base64.b64decode(data["roll"])
-    roll = decrypt_RSA(encrypted_roll)
-    temp_user = User(
-        name="Temp",
-        roll_number=roll,
-        password="temp_password",
-        email="temp@example.com",
-        role="Student"
-    )
-    is_unique = temp_user.check_unique(db)
-    return jsonify({"available": is_unique}), 200
 
 @main_bp.route("/get_user_key", methods=["POST","OPTIONS"])
 @jwt_required(locations='cookies')
@@ -244,7 +214,7 @@ def get_group_keys():
         "keys": member_keys
     }), 200
 
-@main_bp.route("/get_user_groups", methods=["GET", "OPTIONS"])
+@main_bp.route("/get_user_groups", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_user_groups():
     if request.method == "OPTIONS":
@@ -445,7 +415,7 @@ def set_online():
         "message": "Status set to online"
     }), 200
 
-@main_bp.route("/get_users", methods=["GET", "OPTIONS"])
+@main_bp.route("/get_users", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
 def get_users():
     if request.method == "OPTIONS":

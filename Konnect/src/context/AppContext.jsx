@@ -8,7 +8,10 @@ export const AppProvider = ({ children }) => {
   // State for encryption keys
   const [selectedChat, setselectedChat] = useState();
   const [selectedChatType, setselectedChatType] = useState();
-  const [unreadCount, setunreadCount] = useState(0);
+  const [unreadCount, setunreadCount] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [socReady, setSocReady] = useState(false);
+  const [unsavedMessages, setUnsavedMessages] = useState([]);
 
   // Create the context value object
   const contextValue = {
@@ -16,11 +19,17 @@ export const AppProvider = ({ children }) => {
     selectedChat,
     unreadCount,
     selectedChatType,
+    messages,
+    socReady,
+    unsavedMessages,
     
     // Setters
     setselectedChat,
     setunreadCount,
     setselectedChatType,
+    setMessages,
+    setSocReady,
+    setUnsavedMessages,
   };
 
   // Provide the context to children components
@@ -30,3 +39,5 @@ export const AppProvider = ({ children }) => {
     </AppContext.Provider>
   );
 };
+
+export default AppProvider;

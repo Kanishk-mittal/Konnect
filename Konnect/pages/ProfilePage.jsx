@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "./Header.jsx";
+import Header from "../components/Header.jsx";
 import profile from "../src/assets/Profilepic.png";
 import "./ProfilePage.css";
 import API_BASE_URL from "../Integration/apiConfig.js";

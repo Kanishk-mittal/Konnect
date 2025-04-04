@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useContext } from 'react';
 import styles from "./Notification.module.css";
-import Header from "./Header.jsx";
+import Header from "../components/Header.jsx";
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from "../src/context/AppContext";
 import axios from "axios";
 import API_BASE_URL from "../Integration/apiConfig.js";
-import { formatMessageDate, decryptWithAES } from "./ChatUtils.jsx";
 import wildbeatslogo from "../src/assets/Profilepic.png";
 import NotificationCard from "./NotificationCard.jsx";
 

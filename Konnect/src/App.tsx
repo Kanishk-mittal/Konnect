@@ -6,7 +6,7 @@ import Notifications from "../pages/Notification.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
 import Landing from '../pages/landing.jsx';
 import Register from '../pages/Register.jsx';
-import AppProvider from '../context/AppContext.jsx';
+import AppProvider from "./context/AppContext.jsx";
 import './App.css'
 
 function App() {

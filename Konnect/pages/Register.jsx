@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Logo from "../src/assets/Logo.png";
 import './Register.css';
 import { postData } from '../Integration/apiService';
-import { generateRSAKeys, encryptWithAES, generateAESKey, encryptWithRSA } from '../Integration/Encryption';
+import { generateRSAKeys, encryptWithAES, generateAESKey, encryptWithRSA,decryptWithRSA } from '../Integration/Encryption';
 
 const Register = ({ style = {} }) => {
   const navigate = useNavigate();
@@ -65,10 +65,11 @@ const Register = ({ style = {} }) => {
     setError('');
     setRollError('');
     
-    if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
-      setError('Please use your own college ID. The roll number should match your email.');
-      return;
-    }
+    //TODO" uncomment to enable checking
+    // if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
+    //   setError('Please use your own college ID. The roll number should match your email.');
+    //   return;
+    // }
     
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
@@ -88,11 +89,11 @@ const Register = ({ style = {} }) => {
 
       // 4. Encrypt all user data with server's RSA key
       const encryptedData = {
-        name: encryptWithRSA(formData.name, publicKey),
-        roll: encryptWithRSA(formData.rollNumber, publicKey),
-        email: encryptWithRSA(formData.email, publicKey),
-        otp: encryptWithRSA(formData.otp, publicKey),
-        password: encryptWithRSA(formData.password, publicKey),
+        name: encryptWithRSA(formData.name, publicKeyPem),
+        roll: encryptWithRSA(formData.rollNumber, publicKeyPem),
+        email: encryptWithRSA(formData.email, publicKeyPem),
+        otp: encryptWithRSA(formData.otp, publicKeyPem),
+        password: encryptWithRSA(formData.password, publicKeyPem),
         publicKey: publicKey
       };
 
@@ -137,10 +138,11 @@ const Register = ({ style = {} }) => {
       return;
     }
     
+    // TODO uncomment to enable checking
     // Validate roll number against email
-    if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
-      return;
-    }
+    // if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
+    //   return;
+    // }
     
     setLoading(true);
     try {
