@@ -102,7 +102,7 @@ const Login = () => {
                 placeholder="Enter your roll number"
                 value={rollNumber}
                 onChange={(e) => setRollNumber(e.target.value)}
-              />
+              required/>
             </motion.div>
             <motion.div className="form-group" initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.1 }}>
               <label className="form-label">Password</label>
@@ -112,7 +112,7 @@ const Login = () => {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-              />
+              required/>
               <motion.div 
                 className="forgot-password-link" 
                 initial={{ y: -10, opacity: 0 }} 

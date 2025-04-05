@@ -13,11 +13,12 @@
 .sidebar{
   margin-top: 40px;
   height: 110vh;
+  width: 400px;
   overflow-x: hidden;
   overflow-y: auto;
 }
 .Window{
   margin-top: 75px;
-  width: 1000px;
+  width: 1100px;
 
 }

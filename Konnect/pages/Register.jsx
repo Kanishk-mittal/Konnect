@@ -170,24 +170,24 @@ const Register = ({ style = {} }) => {
           <div className="Flex">
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.7 }}>
               <label className="form-label">Name</label>
-              <input type="text" name="name" className="form-input1" value={formData.name} onChange={handleChange} placeholder="Name" />
+              <input type="text" name="name" className="form-input1" value={formData.name} onChange={handleChange} placeholder="Name" required/>
             </motion.div>
 
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.8 }}>
               <label className="form-label">Roll number</label>
-              <input type="text" name="rollNumber" className="form-input1" value={formData.rollNumber} onChange={handleChange} placeholder="Roll number" />
+              <input type="text" name="rollNumber" className="form-input1" value={formData.rollNumber} onChange={handleChange} placeholder="Roll number" required/>
               {rollError && <div className="error-message" style={{color: 'red', fontSize: '12px'}}>{rollError}</div>}
             </motion.div>
           </div>
           <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.9 }}>
             <label className="form-label">College Mail</label>
-            <input type="email" name="email" className="form-input1" value={formData.email} onChange={handleChange} placeholder="Email" />
+            <input type="email" name="email" className="form-input1" value={formData.email} onChange={handleChange} placeholder="Email" required/>
           </motion.div>
           <div className="Flex">
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.0 }}>
               <label className="form-label">OTP</label>
               <div className="otp-container">
-                <input type="text" name="otp" className="form-input1" value={formData.otp} onChange={handleChange} placeholder="OTP" />
+                <input type="text" name="otp" className="form-input1" value={formData.otp} onChange={handleChange} placeholder="OTP" required/>
               </div>
             </motion.div>
             <motion.button 
@@ -205,11 +205,11 @@ const Register = ({ style = {} }) => {
           <div className="Flex">
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.2 }}>
               <label className="form-label">Password</label>
-              <input type="password" name="password" className="form-input1" value={formData.password} onChange={handleChange} placeholder="Password" />
+              <input type="password" name="password" className="form-input1" value={formData.password} onChange={handleChange} placeholder="Password" required/>
             </motion.div>
             <motion.div className="form-group" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 1.3 }}>
               <label className="form-label">Confirm Password</label>
-              <input type="password" name="confirmPassword" className="form-input1" value={formData.confirmPassword} onChange={handleChange} placeholder="Confirm Password" />
+              <input type="password" name="confirmPassword" className="form-input1" value={formData.confirmPassword} onChange={handleChange} placeholder="Confirm Password" required/>
             </motion.div>
           </div>
           <motion.button 
