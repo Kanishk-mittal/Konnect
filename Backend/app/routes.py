@@ -79,8 +79,8 @@ def register():
     
     transformed_roll = transform_roll_number(roll)
     #TODO enable this check
-    # if not transformed_roll or transformed_roll not in email.lower():
-    #     return make_response(jsonify({'msg': 'Email must contain your roll number identifier. Please use your own college ID.'}), 400)
+    if not transformed_roll or transformed_roll not in email.lower():
+        return make_response(jsonify({'msg': 'Email must contain your roll number identifier. Please use your own college ID.'}), 400)
     
     if not OTP.verify(db, email, otp):
         return make_response(jsonify({'msg': 'Invalid or expired OTP. Please request a new OTP.'}), 400)

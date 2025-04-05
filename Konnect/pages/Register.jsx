@@ -65,11 +65,10 @@ const Register = ({ style = {} }) => {
     setError('');
     setRollError('');
     
-    //TODO" uncomment to enable checking
-    // if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
-    //   setError('Please use your own college ID. The roll number should match your email.');
-    //   return;
-    // }
+    if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
+      setError('Please use your own college ID. The roll number should match your email.');
+      return;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
