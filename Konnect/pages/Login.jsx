@@ -113,6 +113,14 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              <motion.div 
+                className="forgot-password-link" 
+                initial={{ y: -10, opacity: 0 }} 
+                animate={{ y: 0, opacity: 1 }} 
+                transition={{ delay: 1.15 }}
+              >
+                <a href="/forgot_password">Forgot Password?</a>
+              </motion.div>
             </motion.div>
             <motion.button 
               type="submit" 

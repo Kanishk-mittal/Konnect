@@ -41,30 +41,32 @@ class User:
         # Use roll_number_hash for reliable lookups
         roll_hash = hash_roll(self.roll_number)
         
-        # Log more details to debug the update issue
-        print(f"Updating user {self.roll_number} in database, setting online status to: {self.is_online}")
+        # Prepare the update fields
+        update_fields = {
+            "name": encrypt_AES_CBC(self.name),
+            "email": encrypt_AES_CBC(self.email),
+            "role": encrypt_AES_CBC(self.role),
+            "public_key": encrypt_AES_CBC(self.public_key) if self.public_key else None,
+            "profile_pic": encrypt_AES_CBC(self.profile_pic) if self.profile_pic else None,
+            "is_online": self.is_online,
+            "description": encrypt_AES_CBC(self.description) if self.description else None
+        }
+
+        # Include password if it exists
+        if self.password:
+            update_fields["password"] = self.password
         
         # Use find_one_and_update with the hash for reliable lookups
         result = db.users.find_one_and_update(
             {"roll_number_hash": roll_hash},
-            {"$set": {
-                "name": encrypt_AES_CBC(self.name),
-                "email": encrypt_AES_CBC(self.email),
-                "role": encrypt_AES_CBC(self.role),
-                "public_key": encrypt_AES_CBC(self.public_key) if self.public_key else None,
-                "profile_pic": encrypt_AES_CBC(self.profile_pic) if self.profile_pic else None,
-                "is_online": self.is_online,
-                "description": encrypt_AES_CBC(self.description) if self.description else None
-            }},
+            {"$set": update_fields},
             return_document=True  # Return the updated document
         )
         
         # Check if update was successful and log it
         if result:
-            print(f"Updated user {self.roll_number} successfully, now online status is: {result.get('is_online')}")
             return {"modified_count": 1}
         else:
-            print(f"Failed to update user {self.roll_number}, document not found")
             return {"modified_count": 0}
 
     @staticmethod
@@ -122,14 +124,12 @@ class User:
         memberships = GroupMembership.get_user_groups(self.roll_number, db)
         
         if not memberships:
-            print(f"No memberships found for user {self.roll_number}")
             return []
         
         # Get detailed information for each group
         groups = []
         for membership in memberships:
             group_id = membership.group_id
-            print(f"Looking for group with ID: {group_id}")
             group = Group.find_by_id(group_id, db)
             
             if group:
@@ -140,8 +140,6 @@ class User:
                     "role": membership.role,
                     "joined_at": membership.joined_at.isoformat() if isinstance(membership.joined_at, datetime.datetime) else membership.joined_at
                 })
-            else:
-                print(f"Group with ID {group_id} not found")
         
         return groups
 
@@ -237,10 +235,8 @@ class User:
         if user:
             # Add debug logging to help diagnose the issue
             online_status = user.get("is_online", False)
-            print(f"Checking online status for {roll_number}: {online_status}")
             return online_status
         
-        print(f"User {roll_number} not found in database when checking online status")
         return False
 
     def get_credentials(self):

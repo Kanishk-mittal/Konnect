@@ -6,6 +6,7 @@ import Notifications from "../pages/Notification.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
 import Landing from '../pages/landing.jsx';
 import Register from '../pages/Register.jsx';
+import ForgotPassword from '../pages/Forgotpassword.jsx';
 import AppProvider from "./context/AppContext.jsx";
 import './App.css'
 
@@ -22,6 +23,7 @@ function App() {
             <Route path="/notification" element={<Notifications />} />
             <Route path="/psettings" element={<Psettings />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/forgot_password" element={<ForgotPassword />} />
           </Routes>
         </BrowserRouter>
       </AppProvider>

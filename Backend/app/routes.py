@@ -98,7 +98,6 @@ def register():
         return make_response(jsonify({'msg': 'Account already exists'}), 409)
     user.to_db(db)
     assigned_groups = assign_user_to_groups(roll, db)
-    print(f"User {roll} assigned to groups: {assigned_groups}")
     access_token = create_access_token(identity=roll)
     encrypted_key = encryptRSA(external_key, user_public_key)
     response = make_response(jsonify({"msg": "Registration successful","key": encrypted_key}))
@@ -153,17 +152,14 @@ def get_user_key():
     data = request.get_json()
     roll = data.get("roll")
     requester_identity = get_jwt_identity()
-    print(f"User key request: roll={roll}, requested by={requester_identity}")
     if not roll:
         return jsonify({"error": "Roll number is required"}), 400
     if not isinstance(roll, str):
         return jsonify({"error": "Roll number must be a string"}), 400
     target_user = User.from_db(roll, db)
     if not target_user:
-        print(f"User with roll {roll} not found in database")
         return jsonify({"error": f"User with roll number {roll} not found"}), 404
     if not target_user.public_key:
-        print(f"Public key for user {roll} is not available")
         return jsonify({"error": f"Public key for user {roll} is not available"}), 404
     public_key = target_user.public_key
     if isinstance(public_key, bytes):
@@ -181,17 +177,14 @@ def get_group_keys():
     data = request.get_json()
     group_id = data.get("group_id")
     requester_identity = get_jwt_identity()
-    print(f"Group keys request: group_id={group_id}, requested by={requester_identity}")
     if not group_id:
         return jsonify({"error": "Group ID is required"}), 400
     from app.Models.Group import Group
     group = Group.find_by_id(group_id, db)
     if not group:
-        print(f"Group with ID {group_id} not found")
         return jsonify({"error": f"Group with ID {group_id} not found"}), 404
     from app.Models.GroupMembership import GroupMembership
     if not GroupMembership.is_member(requester_identity, group_id, db):
-        print(f"User {requester_identity} is not a member of group {group_id}")
         return jsonify({"error": "You do not have permission to access this group's keys"}), 403
     members = GroupMembership.get_group_members(group_id, db)
     if not members:
@@ -207,7 +200,6 @@ def get_group_keys():
                 "roll_number": member.roll_number,
                 "public_key": public_key
             })
-    print(f"Successfully retrieved {len(member_keys)} keys for group {group_id}")
     return jsonify({
         "group_name": group.name,
         "group_id": group_id,
@@ -220,12 +212,10 @@ def get_user_groups():
     if request.method == "OPTIONS":
         return handle_options()
     current_user = get_jwt_identity()
-    print(f"Getting groups for user: {current_user}")
     user = User.from_db(current_user, db)
     if not user:
         return jsonify({"error": "User not found"}), 404
     user_groups = user.get_user_groups(db)
-    print(f"User {current_user} has {len(user_groups)} groups")
     return jsonify({
         "user": current_user,
         "groups": user_groups
@@ -287,13 +277,19 @@ def request_otp():
     data = request.get_json()
     email = data.get("email")
     if not email:
-        return jsonify({"msg": "Email is required"}), 400
+        roll_number = data.get("roll_number")
+        if not roll_number:
+            return jsonify({"err": "Email or roll number is required"}), 400
+        user = User.from_db(roll_number, db)
+        email = user.email if user else None
+        if not email:
+            return jsonify({"err": "User not found"}), 404
     otp_obj = OTP(email)
     OTP.delete_by_email(email, db)
     otp_obj.save(db)
     email_sent = send_email(recipient_email=email, otp=otp_obj.otp)
     if not email_sent:
-        return jsonify({"msg": "Failed to send OTP email"}), 500
+        return jsonify({"err": "Failed to send OTP email"}), 500
     return jsonify({
         "msg": "OTP sent successfully",
         "expires_at": otp_obj.expires_at
@@ -314,7 +310,6 @@ def get_messages():
     # Set user as online when they fetch messages
     user.is_online = True
     user.update_db(db)
-    print(f"User {current_user} is now online")
     
     from app.Models.Messages import Messages
     
@@ -371,7 +366,6 @@ def set_offline():
     
     # Don't update if user is already offline
     if not user.is_online:
-        print(f"User {roll_number} already offline, skipping update")
         return jsonify({
             "message": "User was already offline",
             "updated": False
@@ -383,13 +377,12 @@ def set_offline():
     
     # Add logging to verify the database was updated
     update_success = result.get("modified_count", 0) > 0
-    print(f"User {roll_number} is now offline (DB updated: {update_success})")
     
     # Force database to flush changes
     try:
         db.client.admin.command({'fsync': 1})
     except Exception as e:
-        print(f"Error flushing database: {str(e)}")
+        pass
     
     return jsonify({
         "message": "Status set to offline",
@@ -447,9 +440,8 @@ def on_join(data):
         
         if room:
             join_room(room)
-            print(f"User joined room: {room}")
     except Exception as e:
-        print(f"Error joining room: {str(e)}")
+        pass
 
 @socketio.on('send_message')
 def receive_message(data):
@@ -462,7 +454,6 @@ def receive_message(data):
             
         # Decrypt the receiver using the external key
         decrypted_receiver = decrypt_AES_CBC(receiver, key_str=external_key)
-        print(f"Message for receiver: {decrypted_receiver}")
         
         # Check if the receiver is online before emitting
         is_receiver_online = User.is_online(decrypted_receiver, db)
@@ -470,7 +461,6 @@ def receive_message(data):
         if is_receiver_online:
             # Emit to the specific room (user) if they're online
             emit('receive_message', data, room=decrypted_receiver)
-            print(f"Message emitted to online user: {decrypted_receiver}")
         else:
             # Only store message in database for offline delivery
             from app.utils import save_message
@@ -482,7 +472,6 @@ def receive_message(data):
                 timestamp=data.get('timestamp'),
                 aes_key=data.get('key')
             )
-            print(f"Receiver {decrypted_receiver} is offline. Message stored for later retrieval.")
         
         # Always emit confirmation to sender
         emit('message_sent', {
@@ -490,19 +479,16 @@ def receive_message(data):
             'timestamp': data.get('timestamp')
         })
     except Exception as e:
-        print(f"Error in socket message handling: {str(e)}")
         emit('message_error', {'error': str(e)})
 
 # Simplified connection event handlers
 @socketio.on('connect')
 def handle_connect():
     sid = request.sid
-    print(f"Client connected: {sid}")
     
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
-    print(f"Client disconnected: {sid}")
 
 @main_bp.route("/server_key", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
@@ -598,19 +584,14 @@ def update_profile():
         
         # Only process username if it was included in the request
         if "username" in data:
-            print(f"Decrypting username: {data['username'][:30]}...")
             updates["name"] = decrypt_AES_CBC(data["username"], key_str=aes_key)
-            print(f"Username decrypted successfully: {updates['name']}")
         
         # Only process description if it was included in the request
         if "description" in data:
-            print(f"Decrypting description: {data['description'][:30]}...")
             updates["description"] = decrypt_AES_CBC(data["description"], key_str=aes_key)
-            print(f"Description decrypted successfully: {updates['description']}")
         
         # Handle password change if both fields are provided
         if "newPassword" in data and "otp" in data:
-            print("Processing password change request")
             new_password = decrypt_AES_CBC(data["newPassword"], key_str=aes_key)
             otp = decrypt_AES_CBC(data["otp"], key_str=aes_key)
             
@@ -625,7 +606,6 @@ def update_profile():
             
             # Add password to updates
             updates["password"] = generate_password_hash(new_password)
-            print("Password updated successfully")
         
         # Only proceed if there are actual updates to make
         if not updates:
@@ -641,7 +621,45 @@ def update_profile():
             return jsonify({"message": "No changes made to the database"}), 200
             
     except Exception as e:
-        print(f"Error updating profile: {str(e)}")
         import traceback
         traceback.print_exc()  # Print full stack trace for debugging
         return jsonify({"error": f"Failed to update profile: {str(e)}"}), 500
+
+@main_bp.route("/update_password", methods=["POST", "OPTIONS"])
+def update_password():
+    if request.method == "OPTIONS":
+        return handle_options()
+    
+    data = request.get_json()
+    
+    if "roll" not in data or "password" not in data or "otp" not in data:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Get encrypted data
+    encrypted_roll = base64.b64decode(data["roll"])
+    encrypted_password = base64.b64decode(data["password"])
+    encrypted_otp = base64.b64decode(data["otp"])
+    
+    # Decrypt data
+    roll = decrypt_RSA(encrypted_roll)
+    password = decrypt_RSA(encrypted_password)
+    otp = decrypt_RSA(encrypted_otp)
+    
+    # Find user by roll number
+    user = User.from_db(roll, db)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Verify OTP
+    if not OTP.verify(db, user.email, otp):
+        return jsonify({"error": "Invalid or expired OTP"}), 400
+    
+    # Update password
+    updates = {"password": generate_password_hash(password)}
+    result = User.update_user_details(roll, updates, db)
+    
+    # Check if update was successful
+    if result.get("modified_count", 0) > 0:
+        return jsonify({"message": "Password updated successfully"}), 200
+    else:
+        return jsonify({"error": "Failed to update password"}), 500

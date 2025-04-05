@@ -145,6 +145,24 @@ body {
     text-decoration: none;
 }
 
+.forgot-password-link {
+    text-align: right;
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+.forgot-password-link a {
+    color: #ff9b00;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.forgot-password-link a:hover {
+    color: #F59500;
+    text-decoration: underline;
+}
+
 @media (max-width: 768px) {
     .login-container {
         width: 95%;
