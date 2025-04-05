@@ -591,7 +591,7 @@ const ChatWindow = ({ socketRef}) => {
         </div>
       ) : !selectedChat ? (
         <div className="messages-container empty-state">
-          <p>Select a chat to start messaging</p>
+          <img src="../src/assets/Chathome.png" alt="Select a chat to start messaging" className="empty-chat-icon" />
         </div>
       ) : (
         <>
