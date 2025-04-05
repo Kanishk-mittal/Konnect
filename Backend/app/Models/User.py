@@ -145,14 +145,16 @@ class User:
 
     @staticmethod
     def verify(roll: str, password: str, db):
-        users = db.users.find()
-        user = None
-        for i in users:
-            if decrypt_AES_CBC(i["roll_number"]) == roll:
-                user = i
-                break
+        # Use roll_number_hash for efficient lookup
+        roll_hash = hash_roll(roll)
+        user = db.users.find_one({"roll_number_hash": roll_hash})
+        print(password)
+        print(check_password_hash(user['password'],password))
+        
+        # If user is not found or password does not match, return False
         if not user or not check_password_hash(user["password"], password):
             return False
+        
         return True
 
     def to_dict(self):

@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar.jsx';
 import ChatWindow from "../components/ChatWindow.jsx";
 import "./Chat.css";
 import { postData } from '../Integration/apiService.js';
+import API_BASE_URL from '../Integration/apiConfig.js';
 import { io } from "socket.io-client";
 import { AppContext } from "../src/context/AppContext.jsx";
 import CryptoJS from 'crypto-js';
@@ -105,11 +106,32 @@ const Chat = () => {
     }
   };
 
+  const setUserOffline = () => {
+    return;
+    const data = {
+      roll_number: localStorage.getItem("roll_number"),
+    };
+
+    try {
+      // Use navigator.sendBeacon for reliable offline updates during tab close
+      const url = `${API_BASE_URL}/set_offline`;
+      const payload = JSON.stringify(data);
+      const blob = new Blob([payload], { type: 'application/json' });
+      navigator.sendBeacon(url, blob);
+
+      console.log("User set to offline using sendBeacon");
+    } catch (error) {
+      console.error("Failed to set user offline:", error);
+    }
+  };
+
   useEffect(() => {
     const tempFunction = async () => {
+      // const response = postData('set_online',{},{ credentials: 'include' });
       // getting user's roll number
       const userDetails = await postData('user_details', {}, { credentials: 'include' });
       rollRef.current = userDetails.logged_in_as;
+      localStorage.setItem("roll_number", rollRef.current);
       // Setting up socket connection
       const socketConnected = await setupSocketConnection();
       if (!socketConnected) {
@@ -117,6 +139,14 @@ const Chat = () => {
       }
     }
     tempFunction();
+    return () => {
+      // Cleanup function to disconnect the socket
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+      // set user as offline
+      setUserOffline();
+    };
   },)
 
 

@@ -295,118 +295,87 @@ def request_otp():
         "expires_at": otp_obj.expires_at
     }), 200
 
-# Add these new routes for messaging functionality
-@main_bp.route("/get_messages", methods=["GET", "OPTIONS"])
-@jwt_required(locations='cookies')
-def get_messages():
-    if request.method == "OPTIONS":
-        return handle_options()
+# # Add these new routes for messaging functionality
+# @main_bp.route("/get_messages", methods=["POST", "OPTIONS"])
+# @jwt_required(locations='cookies')
+# def get_messages():
+#     if request.method == "OPTIONS":
+#         return handle_options()
     
-    current_user = get_jwt_identity()
-    user = User.from_db(current_user, db)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
+#     current_user = get_jwt_identity()
+#     user = User.from_db(current_user, db)
+#     if not user:
+#         return jsonify({"error": "User not found"}), 404
     
-    # Set user as online when they fetch messages
-    user.is_online = True
-    user.update_db(db)
+#     # Set user as online when they fetch messages
+#     user.is_online = True
+#     user.update_db(db)
     
-    from app.Models.Messages import Messages
+#     from app.Models.Messages import Messages
     
-    # Get direct messages
-    messages = []
+#     # Get direct messages
+#     messages = []
     
-    # Get messages from database
-    # For each conversation partner, get up to 50 messages
-    conversations = db.temp_messages.distinct("sender", {"receiver": current_user})
-    for sender in conversations:
-        if isinstance(sender, bytes):
-            try:
-                sender = decrypt_AES_CBC(sender)
-            except:
-                continue
-        conversation_messages = Messages.get_conversation(current_user, sender, db, 50)
-        messages.extend(conversation_messages)
+#     # Get messages from database
+#     # For each conversation partner, get up to 50 messages
+#     conversations = db.temp_messages.distinct("sender", {"receiver": current_user})
+#     for sender in conversations:
+#         if isinstance(sender, bytes):
+#             try:
+#                 sender = decrypt_AES_CBC(sender)
+#             except:
+#                 continue
+#         conversation_messages = Messages.get_conversation(current_user, sender, db, 50)
+#         messages.extend(conversation_messages)
     
-    # Also get received messages
-    received_messages = db.temp_messages.find({"receiver": current_user}).limit(100)
-    for msg_data in received_messages:
-        msg = Messages.from_db(msg_data)
-        if msg:
-            messages.append(msg)
+#     # Also get received messages
+#     received_messages = db.temp_messages.find({"receiver": current_user}).limit(100)
+#     for msg_data in received_messages:
+#         msg = Messages.from_db(msg_data)
+#         if msg:
+#             messages.append(msg)
     
-    # Convert messages to dict format for response
-    message_dicts = [msg.to_dict() for msg in messages]
+#     # Convert messages to dict format for response
+#     message_dicts = [msg.to_dict() for msg in messages]
     
-    return jsonify({
-        "user": current_user,
-        "messages": message_dicts
-    }), 200
+#     return jsonify({
+#         "user": current_user,
+#         "messages": message_dicts
+#     }), 200
 
-@main_bp.route("/set_offline", methods=["POST", "OPTIONS"])
-def set_offline():
-    if request.method == "OPTIONS":
-        return handle_options()
+# @main_bp.route("/set_offline", methods=["POST", "OPTIONS"])
+# def set_offline():
+#     if request.method == "OPTIONS":
+#         return handle_options()
     
-    data = request.get_json()
-    roll_number = data.get("roll_number")
+#     data = request.get_json()
+#     roll_number = data.get("roll_number")
     
-    if not roll_number:
-        return jsonify({"error": "Roll number is required"}), 400
+#     if not roll_number:
+#         return jsonify({"error": "Roll number is required"}), 400
     
-    # Simple timestamp check for minimal security
-    timestamp = data.get("timestamp")
-    if not timestamp:
-        return jsonify({"error": "Timestamp is required"}), 400
-    
-    # Find user in database
-    user = User.from_db(roll_number, db)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    # Don't update if user is already offline
-    if not user.is_online:
-        return jsonify({
-            "message": "User was already offline",
-            "updated": False
-        }), 200
-    
-    # Update user's online status
-    user.is_online = False
-    result = user.update_db(db)
-    
-    # Add logging to verify the database was updated
-    update_success = result.get("modified_count", 0) > 0
-    
-    # Force database to flush changes
-    try:
-        db.client.admin.command({'fsync': 1})
-    except Exception as e:
-        pass
-    
-    return jsonify({
-        "message": "Status set to offline",
-        "updated": update_success
-    }), 200
+#     updates = {"is_online": False}
+#     result = User.update_user_details(roll_number, updates, db)
 
-@main_bp.route("/set_online", methods=["POST", "OPTIONS"])
-@jwt_required(locations='cookies')
-def set_online():
-    if request.method == "OPTIONS":
-        return handle_options()
-    
-    current_user = get_jwt_identity()
-    user = User.from_db(current_user, db)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    # Update user's online status
-    user.is_online = True
-    user.update_db(db)
-    
-    return jsonify({
-        "message": "Status set to online"
-    }), 200
+#     if result.get("modified_count", 0) > 0:
+#         return jsonify({"message": "Status set to offline"}), 200
+#     else:
+#         return jsonify({"error": "Failed to update status"}), 500
+
+# @main_bp.route("/set_online", methods=["POST", "OPTIONS"])
+# @jwt_required(locations='cookies')
+# def set_online():
+#     if request.method == "OPTIONS":
+#         return handle_options()
+
+#     current_user = get_jwt_identity()
+#     updates = {"is_online": True}
+#     result = User.update_user_details(current_user, updates, db)
+
+#     if result.get("modified_count", 0) > 0:
+#         return jsonify({"message": "Status set to online"}), 200
+#     else:
+#         return jsonify({"error": "Failed to update status"}), 500
 
 @main_bp.route("/get_users", methods=["POST", "OPTIONS"])
 @jwt_required(locations='cookies')
@@ -456,7 +425,8 @@ def receive_message(data):
         decrypted_receiver = decrypt_AES_CBC(receiver, key_str=external_key)
         
         # Check if the receiver is online before emitting
-        is_receiver_online = User.is_online(decrypted_receiver, db)
+        # is_receiver_online = User.is_online(decrypted_receiver, db)
+        is_receiver_online = True   # setting it static since updating it is creating trouble 
         
         if is_receiver_online:
             # Emit to the specific room (user) if they're online
@@ -464,14 +434,7 @@ def receive_message(data):
         else:
             # Only store message in database for offline delivery
             from app.utils import save_message
-            save_message(
-                sender=data.get('sender'),
-                receiver=receiver,  # Keep encrypted for storage
-                message=data.get('message'),
-                group=data.get('group'),
-                timestamp=data.get('timestamp'),
-                aes_key=data.get('key')
-            )
+            save_message(data)
         
         # Always emit confirmation to sender
         emit('message_sent', {

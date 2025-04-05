@@ -298,6 +298,7 @@ def assign_user_to_groups(roll_number, db):
     return added_groups
 
 def send_email(recipient_email, otp):
+    print(recipient_email)
     """
     Send an email with the OTP to the specified recipient.
     
@@ -363,14 +364,15 @@ def send_email(recipient_email, otp):
         print(f"Failed to send email: {str(e)}")
         return False
 
-def save_message(sender, receiver, message, group, timestamp, aes_key):
-    from app.Models.Messages import Messages
-    msg=Messages(
-        sender=sender,
-        receiver=receiver,
-        message=message,
-        group=group,
-        timestamp=timestamp,
-        aes_key=aes_key,
-    )
-    msg.to_db(db)
+def save_message(data):
+    print(data)
+    # from app.Models.Messages import Messages
+    # msg=Messages(
+    #     sender=sender,
+    #     receiver=receiver,
+    #     message=message,
+    #     group=group,
+    #     timestamp=timestamp,
+    #     aes_key=aes_key,
+    # )
+    # msg.to_db(db)
