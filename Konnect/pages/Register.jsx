@@ -138,10 +138,10 @@ const Register = ({ style = {} }) => {
     }
     
     // TODO uncomment to enable checking
-    // Validate roll number against email
-    // if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
-    //   return;
-    // }
+    //Validate roll number against email
+    if (!validateRollWithEmail(formData.rollNumber, formData.email)) {
+      return;
+    }
     
     setLoading(true);
     try {

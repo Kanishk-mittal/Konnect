@@ -21,24 +21,7 @@ const Header = () => {
                 <div className={styles.logo1}>NECT</div>
             </div>
 
-            <div 
-                className={styles.notifications} 
-                onClick={()=>navigate('/notifications')}
-                style={{ cursor: 'pointer', position: 'relative' }}
-            >
-                <img src={notification} alt="notification" />
-            </div>
-
-            <div className="notification-area">
-                <div className="notification-icon">
-                    <i className="fa fa-bell"></i>
-                    {unreadCount > 0 && (
-                        <span className="notification-badge" style={{color:'black'}}>{unreadCount}</span>
-                    )}
-                </div>
-            </div>
-
-            <div className={styles.settings}
+            <div className={styles.notifications}
                 onClick={() => navigate("/psettings")}>
                 <img src={setting} alt="settings" />
             </div>
