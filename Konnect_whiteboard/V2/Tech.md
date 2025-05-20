@@ -1,0 +1,3 @@
+- Detox python library 
+- initially use fast api
+- later train tensorflow.js  model on your own 

@@ -55,17 +55,28 @@ pip install -r requirements.txt
 
 Create a `.env` file in the Backend folder with the following variables:
 ```
-MONGO_URI = <Mongo Uri>
+MONGO_URI = <Mongo Uri>  (your own atlas or local MongoDB URI)
 DB_NAME=Konnect
 SECRET_KEY=secret
-SENDER_EMAIL=<your email>
-SENDER_PASSWORD=<email password>
+SENDER_EMAIL=<your email>  (put your email here)
+SENDER_PASSWORD=<email password>   (go to gmail and create an app password and put it here)
 JWT_SECRET_KEY=secret
 AES_KEY_INTERNAL='i0aMCxqkGJpklT4G7JYg9A=='
 AES_KEY_EXTERNAL='i0aMCxqkGJpklT4G7JYg9A=='
 ```
 
-### Step 4: Start the Backend Server
+### Step 4: seed the Database
+Run the following command to seed the database with initial data:
+
+```bash
+# For Windows
+python seed.py
+# For Linux/macOS
+python3 seed.py
+```
+
+
+### Step 5: Start the Backend Server
 
 ```bash 
 # For Windows

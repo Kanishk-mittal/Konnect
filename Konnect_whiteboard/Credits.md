@@ -1,0 +1,2 @@
+illustrations ->  "https://storyset.com/technology" , "https://chatgpt.com"
+color pallete  -> https://coolors.co/palette/ff6d00-ff7900-ff8500-ff9100-ff9e00-240046-3c096c-5a189a-7b2cbf-9d4edd , https://coolors.co/palette/10002b-240046-3c096c-5a189a-7b2cbf-9d4edd-c77dff-e0aaff
