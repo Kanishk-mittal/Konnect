@@ -1,5 +1,0 @@
-- Forget password  (fixed)
-- Fix notification  (probably skip)
-- offline status setting  (fixed)
-- logout button  (assigned to pawan)
-- load messages that were sent while you are offline 

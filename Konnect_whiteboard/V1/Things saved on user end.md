@@ -1,2 +1,0 @@
-- user's private key 
-- AES key used to encrypt data stored in index db

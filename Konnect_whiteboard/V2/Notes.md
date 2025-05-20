@@ -1,1 +1,0 @@
-1. There is no need for user registration as admin is going to register all the students and we are not saving anything on user end also he can generate recovery key whenever he want also on first login of any user we will show them their first set of recovery key 
