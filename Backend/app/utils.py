@@ -142,7 +142,7 @@ def handle_options():
         Response: A Flask response with CORS headers set
     """
     response = make_response()
-    response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
+    response.headers.add("Access-Control-Allow-Origin", "https://3eec-2a09-bac5-4068-1aaa-00-2a8-28.ngrok-free.app")
     response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-TOKEN, X-Requested-With")
     response.headers.add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
     response.headers.add("Access-Control-Allow-Credentials", "true")

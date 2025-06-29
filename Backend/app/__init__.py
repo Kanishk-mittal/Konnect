@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from datetime import timedelta
 import logging
 from flask_socketio import SocketIO
+from flask import request
 
 # Configure logging
 logging.basicConfig(
@@ -33,8 +34,18 @@ def create_app():
     jwt = JWTManager(app)
     
     # Configure CORS directly in the app
-    CORS(app, 
-         resources={r"/*": {"origins": "http://localhost:5173"}},
+    # CORS(app, 
+    #  resources={r"/*": {"origins": [
+    #      "http://localhost:5173", 
+    #      "https://5224-192-140-153-51.ngrok-free.app"
+    #  ]}},
+    #  supports_credentials=True,
+    #  allow_headers=["Content-Type", "Authorization", "X-CSRF-TOKEN", "X-Requested-With"],
+    #  methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    
+
+    CORS(app,
+         origins="https://3eec-2a09-bac5-4068-1aaa-00-2a8-28.ngrok-free.app",
          supports_credentials=True,
          allow_headers=["Content-Type", "Authorization", "X-CSRF-TOKEN", "X-Requested-With"],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
