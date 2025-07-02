@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Test - Konnect</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .message { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Konnect Socket.IO Test</h1>
+        
+        <div id="status" class="status disconnected">
+            Disconnected
+        </div>
+
+        <div>
+            <input type="text" id="userId" placeholder="Enter User ID" value="user123">
+            <input type="text" id="username" placeholder="Enter Username" value="TestUser">
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+        </div>
+
+        <div>
+            <h3>Send Private Message</h3>
+            <input type="text" id="toUser" placeholder="To User ID" value="user456">
+            <input type="text" id="message" placeholder="Message" value="Hello!">
+            <button onclick="sendMessage()">Send Message</button>
+        </div>
+
+        <div>
+            <h3>Join Group</h3>
+            <input type="text" id="groupId" placeholder="Group ID" value="group1">
+            <button onclick="joinGroup()">Join Group</button>
+            <button onclick="leaveGroup()">Leave Group</button>
+        </div>
+
+        <div>
+            <h3>Group Message</h3>
+            <input type="text" id="groupMessage" placeholder="Group Message" value="Hello group!">
+            <button onclick="sendGroupMessage()">Send to Group</button>
+        </div>
+
+        <div>
+            <h3>Messages</h3>
+            <div id="messages" style="height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        let socket;
+        let currentUserId;
+        let currentGroupId;
+
+        function addMessage(message, type = 'message') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `status ${type}`;
+            messageDiv.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateStatus(message, connected) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+        }
+
+        function connect() {
+            const userId = document.getElementById('userId').value;
+            const username = document.getElementById('username').value;
+            
+            if (!userId || !username) {
+                alert('Please enter both User ID and Username');
+                return;
+            }
+
+            currentUserId = userId;
+
+            socket = io('http://localhost:3000');
+
+            socket.on('connect', () => {
+                updateStatus('Connected to Konnect Server', true);
+                addMessage('Connected to server', 'connected');
+                
+                // Join as user
+                socket.emit('join', { userId, username });
+            });
+
+            socket.on('connected', (data) => {
+                addMessage(`Successfully joined as ${username} (${data.userId})`, 'connected');
+            });
+
+            socket.on('user_online', (data) => {
+                addMessage(`${data.username} came online`, 'message');
+            });
+
+            socket.on('user_offline', (data) => {
+                addMessage(`${data.username} went offline`, 'message');
+            });
+
+            socket.on('private_message', (data) => {
+                addMessage(`Private from ${data.from}: ${data.message}`, 'message');
+            });
+
+            socket.on('message_sent', (data) => {
+                addMessage(`Message sent to ${data.to}: ${data.message}`, 'connected');
+            });
+
+            socket.on('group_message', (data) => {
+                addMessage(`Group ${data.groupId} - ${data.from}: ${data.message}`, 'message');
+            });
+
+            socket.on('user_joined_group', (data) => {
+                addMessage(`User ${data.userId} joined group ${data.groupId}`, 'message');
+            });
+
+            socket.on('user_left_group', (data) => {
+                addMessage(`User ${data.userId} left group ${data.groupId}`, 'message');
+            });
+
+            socket.on('disconnect', () => {
+                updateStatus('Disconnected from server', false);
+                addMessage('Disconnected from server', 'disconnected');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                updateStatus('Disconnected', false);
+            }
+        }
+
+        function sendMessage() {
+            const toUser = document.getElementById('toUser').value;
+            const message = document.getElementById('message').value;
+            
+            if (!socket || !toUser || !message) {
+                alert('Please connect first and fill in all fields');
+                return;
+            }
+
+            socket.emit('private_message', {
+                to: toUser,
+                from: currentUserId,
+                message: message,
+                timestamp: new Date()
+            });
+
+            document.getElementById('message').value = '';
+        }
+
+        function joinGroup() {
+            const groupId = document.getElementById('groupId').value;
+            
+            if (!socket || !groupId) {
+                alert('Please connect first and enter a group ID');
+                return;
+            }
+
+            currentGroupId = groupId;
+            socket.emit('join_group', {
+                groupId: groupId,
+                userId: currentUserId
+            });
+
+            addMessage(`Joined group ${groupId}`, 'connected');
+        }
+
+        function leaveGroup() {
+            if (!socket || !currentGroupId) {
+                alert('Please join a group first');
+                return;
+            }
+
+            socket.emit('leave_group', {
+                groupId: currentGroupId,
+                userId: currentUserId
+            });
+
+            addMessage(`Left group ${currentGroupId}`, 'message');
+            currentGroupId = null;
+        }
+
+        function sendGroupMessage() {
+            const message = document.getElementById('groupMessage').value;
+            
+            if (!socket || !currentGroupId || !message) {
+                alert('Please join a group first and enter a message');
+                return;
+            }
+
+            socket.emit('group_message', {
+                groupId: currentGroupId,
+                from: currentUserId,
+                message: message,
+                timestamp: new Date()
+            });
+
+            document.getElementById('groupMessage').value = '';
+        }
+    </script>
+</body>
+</html>
