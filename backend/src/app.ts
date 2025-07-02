@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { createServer, Server } from 'http';
+import mongoose from 'mongoose';
 
 // Import routes
 import pingRoutes from './routes/ping';
@@ -26,9 +27,23 @@ class App {
         this.server = createServer(this.app);
         this.port = process.env.PORT || 3001;
 
+        this.connectDatabase();
         this.initializeMiddlewares();
         this.initializeRoutes();
         this.initializeSocket();
+    }
+
+    private async connectDatabase(): Promise<void> {
+        const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/konnect';
+        try {
+            await mongoose.connect(mongoUri, {
+                // useNewUrlParser and useUnifiedTopology are default in mongoose >=6
+            });
+            console.log('✅ Connected to MongoDB');
+        } catch (error) {
+            console.error('❌ MongoDB connection error:', error);
+            process.exit(1);
+        }
     }
 
     private initializeMiddlewares(): void {
