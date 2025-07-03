@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { createServer, Server } from 'http';
 import mongoose from 'mongoose';
+import cookieParser from 'cookie-parser';
 
 // Import routes
 import pingRoutes from './routes/ping';
@@ -62,6 +63,7 @@ class App {
         // Body parsing middleware
         this.app.use(express.json({ limit: '10mb' }));
         this.app.use(express.urlencoded({ extended: true }));
+        this.app.use(cookieParser());
     }
 
     private initializeRoutes(): void {
