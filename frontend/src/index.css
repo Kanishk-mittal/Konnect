@@ -1,1 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Kaushan+Script&display=swap');
+@import "tailwindcss/preflight";
 @import "tailwindcss";
+
+.kaushan-script-regular {
+    font-family: "Kaushan Script";
+    font-weight: 50;
+    font-style: normal;
+}
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
