@@ -40,3 +40,20 @@
     position: relative;
     height: 90vh;
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .top {
+        height: 70vh;
+    }
+    
+    .top-glass {
+        height: 70vh;
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+    
+    .logo {
+        height: 70vh;
+    }
+}
