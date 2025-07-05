@@ -46,17 +46,17 @@ const Landing = () => {
             </div>
             <img className="w-[25vw] md:w-[13vw]" src={gatekeeper} />
             <div className="buttons flex flex-col md:flex-row gap-4 md:gap-6 w-full md:w-auto px-4 md:px-0 items-center">
-              <Link to={"#"} className="flex justify-center">
+              <Link to={"/club/login"} className="flex justify-center">
                 <div className="bg-[#3C096C] text-white text-base md:text-2xl h-10 md:h-14 w-32 md:w-40 flex justify-center items-center rounded-tl-2xl rounded-b-2xl">
                   Club
                 </div>
               </Link>
-              <Link to={"#"} className="flex justify-center">
+              <Link to={"/admin/login"} className="flex justify-center">
                 <div className="bg-[#8f4cc9] text-white text-base md:text-2xl h-10 md:h-14 w-32 md:w-40 flex justify-center items-center rounded-b-2xl">
                   Admin
                 </div>
               </Link>
-              <Link to={"#"} className="flex justify-center">
+              <Link to={"/student/login"} className="flex justify-center">
                 <div className="bg-[#FF7900] text-white text-base md:text-2xl h-10 md:h-14 w-32 md:w-40 flex justify-center items-center rounded-tr-2xl rounded-b-2xl">
                   Student
                 </div>
@@ -91,7 +91,7 @@ const Landing = () => {
           </div>
           {/* this div is just to provide a gap i know this is not a good practice but this is the easiest fix */}
           <div className="h-10" ></div>
-          <Link to={"#"} className="mx-4 md:mx-28 text-center flex justify-center items-center">
+          <Link to={"/admin/register"} className="mx-4 md:mx-28 text-center flex justify-center items-center">
             <div className="bg-[#FF7900] text-white font-bold text-lg md:text-xl py-3 px-8 rounded-lg shadow-lg w-48 md:w-60 h-12 md:h-14 flex justify-center items-center">
               Register
             </div>
