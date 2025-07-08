@@ -7,15 +7,18 @@ import { createServer, Server } from 'http';
 import mongoose from 'mongoose';
 import cookieParser from 'cookie-parser';
 
+// Load environment variables
+dotenv.config({ path: __dirname + '/../.env' });
+
 // Import routes
 import pingRoutes from './routes/ping';
+import adminRoutes from './routes/adminRoutes';
+import apiRoutes from './routes/otpRoutes';
 
 // Import Socket.IO
 import { SocketHandler } from './socket/socketHandler';
 import socketService from './socket/socketService';
 
-// Load environment variables
-dotenv.config();
 
 class App {
     public app: Application;
@@ -69,6 +72,10 @@ class App {
     private initializeRoutes(): void {
         // route to check weather the backend is running
         this.app.use('/api/ping', pingRoutes);
+        // Admin routes
+        this.app.use("/api/admin", adminRoutes);
+        this.app.use("/api/otp", apiRoutes);
+        // Test routes for debugging
 
         // Socket.IO status endpoint
         this.app.get('/api/socket/status', async (req: Request, res: Response) => {

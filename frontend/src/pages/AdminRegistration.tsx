@@ -2,9 +2,13 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
-import type { RootState } from '../store/store';
 import InputComponent from '../components/InputComponent';
-import { setEmail } from '../store/authSlice';
+import OtpPopup from '../components/OtpPopup';
+import { setAuthenticated, setEmail } from '../store/authSlice';
+import { postData } from "../api/requests";
+import { validateRegistrationData } from '../utils/registrationUtils';
+
+import type { RootState } from '../store/store';
 
 const AdminRegistration = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
@@ -12,6 +16,8 @@ const AdminRegistration = () => {
   const navigate = useNavigate();
   const gradientClasses = "bg-[radial-gradient(circle,_rgba(255,255,255,0.3)_0%,_rgba(219,178,255,0.3)_55%,_rgba(219,178,255,0.3)_100%)]"
   const transparentClasses = "bg-transparent"
+
+  const [showOtpPopup, setShowOtpPopup] = useState(false);
 
   const [formData, setFormData] = useState({
     collegeName: '',
@@ -22,15 +28,61 @@ const AdminRegistration = () => {
     confirmPassword: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const register = async (otp: string): Promise<void> => {
+    // preparing form data for registration by removing confirmPassword
+    const { confirmPassword, ...registrationData } = formData;
+    // sending registration data to backend
+    try {      
+      const response = await postData('/admin/register', { 
+        ...registrationData,
+        otp
+      });
+
+      // If registration is successful, navigate to dashboard
+      if (response && response.status === true) {
+        dispatch(setAuthenticated(true));
+        navigate('/admin/dashboard');
+      } else {
+        alert(response.message || 'Registration failed. Please try again.');
+      }
+    }catch (error) {
+      console.error('Error during registration:', error);
+      alert('An error occurred during registration. Please try again.');
+      return;
+    }
+    setShowOtpPopup(false);
+    console.log('Registration completed with OTP:', otp);
+    return;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Form submitted:', formData);
     
     // Store email in Redux
     dispatch(setEmail(formData.emailId));
     
-    // Navigate to OTP verification page
-    navigate('/otp-verification', { state: { nextPage: '/admin/dashboard' } });
+    // Validate the form data
+    const validation = validateRegistrationData(formData);
+    if (!validation.status) {
+      alert(validation.message);
+      return;
+    }
+    
+    try {
+      //request backend to send OTP
+      //TODO: remove debugging log in production
+      console.log('Requesting OTP for email:', formData.emailId);
+      const response = await postData('/otp', { emailID: formData.emailId });
+      if (!response || !response.status) {
+        alert(response.message || 'Failed to send OTP. Please try again.');
+        return;
+      }
+      // Show OTP popup for verification
+      setShowOtpPopup(true);
+    } catch (error) {
+      alert('An error occurred while sending otp. Please try again.');
+    }
   };
 
   return (
@@ -111,7 +163,7 @@ const AdminRegistration = () => {
                         : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A]'
                     }`}
                   >
-                    Get Otp
+                    Get OTP
                   </button>
                 </div>
               </form>
@@ -119,6 +171,15 @@ const AdminRegistration = () => {
           </div>
         </div>
       </div>
+
+      {/* OTP Verification Popup */}
+      <OtpPopup
+        isOpen={showOtpPopup}
+        onClose={() => setShowOtpPopup(false)}
+        onSubmit={register}
+        email={formData.emailId}
+        title="Verify Your Email"
+      />
     </>
   );
 };

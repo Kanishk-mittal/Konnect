@@ -6,6 +6,8 @@ import StudentLogin from './pages/StudentLogin'
 import ClubLogin from './pages/ClubLogin'
 import AdminRegistration from './pages/AdminRegistration'
 import AdminDashboard from './pages/AdminDashboard'
+import NotFound from './pages/NotFound'
+
 
 const App = () => {
   return (
@@ -25,13 +27,10 @@ const App = () => {
       <Route path="/admin/register"
         element={<AdminRegistration />}
       />
-      <Route path="/otp-verification"
-        element={<div>OTP Verification Page</div>} // Placeholder for OTP Verification component
-      />
       <Route path="/admin/dashboard"
-        element={<AdminDashboard/>} // Placeholder for Admin Dashboard component
+        element={<AdminDashboard/>} 
       />
-      <Route path="*" element={<div>404 - Page Not Found</div>} />
+      <Route path="*" element={<NotFound/>} />
     </Routes>
   )
 }
