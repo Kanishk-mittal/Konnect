@@ -1,8 +1,6 @@
 import nodemailer, { SentMessageInfo } from 'nodemailer';
 import { OTP } from './otp';
 
-console.log('Loading mailer module...');
-
 // Create nodemailer transport
 const transporter = nodemailer.createTransport({
   service: "gmail",

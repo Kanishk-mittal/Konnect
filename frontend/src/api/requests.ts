@@ -16,3 +16,13 @@ export const postData = async (endpoint: string, data: any) => {
         throw error;
     }
 }
+
+export const getData = async (endpoint: string, data: any) => {
+    try {
+        const response = await instance.get(endpoint, { data });
+        return response.data;
+    } catch (error) {
+        console.error(`Error getting data from ${endpoint}:`, error);
+        throw error;
+    }
+}

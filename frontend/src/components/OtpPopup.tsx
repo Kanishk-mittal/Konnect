@@ -9,6 +9,9 @@ interface OtpPopupProps {
     onClose: () => void;
     onSubmit: (otp: string) => Promise<void> | void;
     title?: string;
+    isLoading?: boolean;
+    errorMessage?: string;
+    successMessage?: string;
 }
 
 const OtpPopup = ({
@@ -16,28 +19,28 @@ const OtpPopup = ({
     isOpen,
     onClose,
     onSubmit,
-    title = "OTP Verification"
+    title = "OTP Verification",
+    isLoading = false,
+    errorMessage = '',
+    successMessage = ''
 }: OtpPopupProps) => {
     const theme = useSelector((state: RootState) => state.theme.theme);
 
     const [formData, setFormData] = useState({
         otp: '',
     });
-    const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError(null);
         setIsSubmitting(true);
         
         try {
             await onSubmit(formData.otp);
-            // If we reach here without throwing, assume success
-            // The parent component should handle closing the popup if needed
+            // Parent component handles success/error states
         } catch (err) {
             console.error('Error during OTP verification:', err);
-            setError('Verification failed. Please try again.');
+            // Parent component handles error display
         } finally {
             setIsSubmitting(false);
         }
@@ -87,24 +90,36 @@ const OtpPopup = ({
                         </div>
                     </div>
 
-                    {error && (
-                        <div className="mt-2 text-red-500 text-sm text-center">
-                            {error}
+                    {(errorMessage || successMessage) && (
+                        <div className={`mt-2 text-sm text-center p-3 rounded-lg ${
+                            errorMessage 
+                                ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
+                                : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
+                        }`}>
+                            {errorMessage || successMessage}
                         </div>
                     )}
 
                     <div className="flex justify-center items-center mt-6">
                         <button
                             type="submit"
-                            disabled={isSubmitting}
-                            className={`px-8 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 ${isSubmitting
+                            disabled={isSubmitting || isLoading}
+                            className={`px-8 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 ${
+                                (isSubmitting || isLoading)
                                     ? 'bg-gray-500 cursor-not-allowed'
                                     : theme === 'dark'
                                         ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900]'
                                         : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A]'
                                 }`}
                         >
-                            {isSubmitting ? 'Verifying...' : 'Verify OTP'}
+                            {(isSubmitting || isLoading) ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    {isLoading ? 'Processing...' : 'Verifying...'}
+                                </div>
+                            ) : (
+                                'Verify OTP'
+                            )}
                         </button>
                     </div>
                 </form>

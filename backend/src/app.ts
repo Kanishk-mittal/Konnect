@@ -14,10 +14,14 @@ dotenv.config({ path: __dirname + '/../.env' });
 import pingRoutes from './routes/ping';
 import adminRoutes from './routes/adminRoutes';
 import apiRoutes from './routes/otpRoutes';
+import encryptionRoutes from './routes/encryptionRoutes';
 
 // Import Socket.IO
 import { SocketHandler } from './socket/socketHandler';
 import socketService from './socket/socketService';
+
+// Import KeyManager
+import { KeyManager } from './encryption/keyManager';
 
 
 class App {
@@ -32,6 +36,7 @@ class App {
         this.port = process.env.PORT || 3001;
 
         this.connectDatabase();
+        this.initializeKeyManager();
         this.initializeMiddlewares();
         this.initializeRoutes();
         this.initializeSocket();
@@ -46,6 +51,16 @@ class App {
             console.log('✅ Connected to MongoDB');
         } catch (error) {
             console.error('❌ MongoDB connection error:', error);
+            process.exit(1);
+        }
+    }
+
+    private initializeKeyManager(): void {
+        try {
+            KeyManager.initialize();
+            console.log('🔐 KeyManager initialized successfully');
+        } catch (error) {
+            console.error('❌ KeyManager initialization failed:', error);
             process.exit(1);
         }
     }
@@ -75,6 +90,8 @@ class App {
         // Admin routes
         this.app.use("/api/admin", adminRoutes);
         this.app.use("/api/otp", apiRoutes);
+        // Encryption routes
+        this.app.use("/api/encryption", encryptionRoutes);
         // Test routes for debugging
 
         // Socket.IO status endpoint

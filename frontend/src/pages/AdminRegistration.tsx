@@ -5,10 +5,12 @@ import Header from '../components/Header';
 import InputComponent from '../components/InputComponent';
 import OtpPopup from '../components/OtpPopup';
 import { setAuthenticated, setEmail } from '../store/authSlice';
-import { postData } from "../api/requests";
+import { postData, getData } from "../api/requests";
 import { validateRegistrationData } from '../utils/registrationUtils';
 
 import type { RootState } from '../store/store';
+import { encryptAES, generateAESKey } from '../encryption/AES_utils';
+import { encryptRSA } from '../encryption/RSA_utils';
 
 const AdminRegistration = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
@@ -18,6 +20,9 @@ const AdminRegistration = () => {
   const transparentClasses = "bg-transparent"
 
   const [showOtpPopup, setShowOtpPopup] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
     collegeName: '',
@@ -29,59 +34,119 @@ const AdminRegistration = () => {
   });
 
   const register = async (otp: string): Promise<void> => {
-    // preparing form data for registration by removing confirmPassword
-    const { confirmPassword, ...registrationData } = formData;
-    // sending registration data to backend
-    try {      
-      const response = await postData('/admin/register', { 
-        ...registrationData,
-        otp
-      });
+    setIsLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
 
-      // If registration is successful, navigate to dashboard
-      if (response && response.status === true) {
-        dispatch(setAuthenticated(true));
-        navigate('/admin/dashboard');
-      } else {
-        alert(response.message || 'Registration failed. Please try again.');
+    try {
+      // Prepare form data for registration by removing confirmPassword
+      const { confirmPassword, ...registrationData } = formData;
+
+      // Get public key from backend
+      const publicKeyResponse = await getData('/encryption/rsa/publicKey', {});
+      
+      if (!publicKeyResponse || !publicKeyResponse.status) {
+        throw new Error('Failed to get encryption key from server');
       }
-    }catch (error) {
+
+      const publicKey = publicKeyResponse.publicKey;
+      const keyId = publicKeyResponse.keyId;
+
+      // Generate AES key and encrypt data
+      const aesKey = generateAESKey();
+      const encryptedData = {
+        collegeName: encryptAES(registrationData.collegeName, aesKey),
+        adminUsername: encryptAES(registrationData.adminUsername, aesKey),
+        collegeCode: encryptAES(registrationData.collegeCode, aesKey),
+        emailId: encryptAES(registrationData.emailId, aesKey),
+        password: encryptAES(registrationData.password, aesKey),
+        otp: encryptAES(otp, aesKey),
+        key: encryptRSA(aesKey, publicKey),
+        keyId: keyId,
+      };
+
+      // Send registration data to backend
+      const response = await postData('/admin/register', encryptedData);
+
+      // Handle response
+      if (response && response.status === true) {
+        setSuccessMessage(response.message || 'Registration successful!');
+        dispatch(setAuthenticated(true));
+        
+        // Close popup and navigate after a brief delay to show success message
+        setTimeout(() => {
+          setShowOtpPopup(false);
+          navigate('/admin/dashboard');
+        }, 1500);
+      } else {
+        // Handle backend error responses
+        const errorMsg = response?.message || 'Registration failed. Please try again.';
+        setErrorMessage(errorMsg);
+      }
+    } catch (error: any) {
       console.error('Error during registration:', error);
-      alert('An error occurred during registration. Please try again.');
-      return;
+      
+      // Handle different types of errors
+      let errorMsg = 'An unexpected error occurred during registration.';
+      
+      if (error?.response?.data?.message) {
+        // API error with specific message
+        errorMsg = error.response.data.message;
+      } else if (error?.message) {
+        // General error with message
+        errorMsg = error.message;
+      }
+      
+      setErrorMessage(errorMsg);
+    } finally {
+      setIsLoading(false);
     }
-    setShowOtpPopup(false);
-    console.log('Registration completed with OTP:', otp);
-    return;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
     
-    // Store email in Redux
-    dispatch(setEmail(formData.emailId));
-    
-    // Validate the form data
-    const validation = validateRegistrationData(formData);
-    if (!validation.status) {
-      alert(validation.message);
-      return;
-    }
+    setIsLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
     
     try {
-      //request backend to send OTP
-      //TODO: remove debugging log in production
-      console.log('Requesting OTP for email:', formData.emailId);
-      const response = await postData('/otp', { emailID: formData.emailId });
-      if (!response || !response.status) {
-        alert(response.message || 'Failed to send OTP. Please try again.');
+      // Store email in Redux
+      dispatch(setEmail(formData.emailId));
+      
+      // Validate the form data
+      const validation = validateRegistrationData(formData);
+      if (!validation.status) {
+        setErrorMessage(validation.message);
         return;
       }
-      // Show OTP popup for verification
-      setShowOtpPopup(true);
-    } catch (error) {
-      alert('An error occurred while sending otp. Please try again.');
+      
+      // Request backend to send OTP
+      const response = await postData('/otp', { emailId: formData.emailId });
+      
+      if (response && response.status === true) {
+        setSuccessMessage(response.message || 'OTP sent successfully!');
+        // Show OTP popup for verification
+        setTimeout(() => {
+          setShowOtpPopup(true);
+        }, 1000);
+      } else {
+        const errorMsg = response?.message || 'Failed to send OTP. Please try again.';
+        setErrorMessage(errorMsg);
+      }
+    } catch (error: any) {
+      console.error('Error sending OTP:', error);
+      
+      let errorMsg = 'An error occurred while sending OTP.';
+      if (error?.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error?.message) {
+        errorMsg = error.message;
+      }
+      
+      setErrorMessage(errorMsg);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -90,11 +155,21 @@ const AdminRegistration = () => {
       <div className={`min-h-[100vh] w-[100vw] ${theme === 'dark' ? 'bg-[#0E001B]' : 'bg-gradient-to-b from-[#FFC362] to-[#9653D0]'}`}>
         <div className={` h-[100%] w-[100%] ${theme === 'dark' ? transparentClasses : gradientClasses}`}>
           <Header />
-          <div className="flex justify-center">
-            <div className={`flex flex-col gap-6 w-[80%] min-h-[200px] ${theme === 'dark' ? "bg-[#240046]" : "bg-[#FFDEA8]/45"}  rounded-lg p-8`}>
-              <div className={`heading ${theme==="dark" ? "text-[#FF9E00]" : "text-[#421271]"} text-2xl text-center font-bold mb-4`}>
-                Welcome to the world of organized communication
+          <div className="flex justify-center">          <div className={`flex flex-col gap-6 w-[80%] min-h-[200px] ${theme === 'dark' ? "bg-[#240046]" : "bg-[#FFDEA8]/45"}  rounded-lg p-8`}>
+            {/* Message Display */}
+            {(errorMessage || successMessage) && (
+              <div className={`p-4 rounded-lg text-center font-medium ${
+                errorMessage 
+                  ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
+                  : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
+              }`}>
+                {errorMessage || successMessage}
               </div>
+            )}
+            
+            <div className={`heading ${theme==="dark" ? "text-[#FF9E00]" : "text-[#421271]"} text-2xl text-center font-bold mb-4`}>
+              Welcome to the world of organized communication
+            </div>
               
               <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[100%] p-8">
                 <div className="flex flex-col justify-between md:flex-row gap-28">
@@ -157,13 +232,21 @@ const AdminRegistration = () => {
                 <div className='flex justify-center items-center'>
                   <button
                     type="submit"
-                    className={`mt-4 px-6 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 ${
+                    disabled={isLoading}
+                    className={`mt-4 px-6 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                       theme === 'dark' 
-                        ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900]' 
-                        : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A]'
+                        ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900] disabled:hover:bg-[#FF7900]' 
+                        : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A] disabled:hover:bg-[#5A189A]'
                     }`}
                   >
-                    Get OTP
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Sending OTP...
+                      </div>
+                    ) : (
+                      'Get OTP'
+                    )}
                   </button>
                 </div>
               </form>
@@ -175,10 +258,17 @@ const AdminRegistration = () => {
       {/* OTP Verification Popup */}
       <OtpPopup
         isOpen={showOtpPopup}
-        onClose={() => setShowOtpPopup(false)}
+        onClose={() => {
+          setShowOtpPopup(false);
+          setErrorMessage('');
+          setSuccessMessage('');
+        }}
         onSubmit={register}
         email={formData.emailId}
         title="Verify Your Email"
+        isLoading={isLoading}
+        errorMessage={errorMessage}
+        successMessage={successMessage}
       />
     </>
   );
