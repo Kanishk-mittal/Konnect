@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { createHash } from '../../utils/encryption/hash.utils';
 import { decryptRSA, encryptRSA } from '../../utils/encryption/rsa.utils';
 import { decryptAES, encryptAES, generateAESKey } from '../../utils/encryption/aes.utils';
-import UserModel from '../../models/user.model';
+import studentModel from '../../models/Student.model';
 import { KeyManager } from '../../utils/encryption/key-manager.utils';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 
@@ -66,7 +66,7 @@ export const studentLoginController = async (req: Request, res: Response): Promi
         }
 
         // Find student by college code and roll
-        const student = await UserModel.findOne({ 
+        const student = await studentModel.findOne({ 
             college_code: loginData.collegeCode,
             roll: loginData.rollNumber
         });

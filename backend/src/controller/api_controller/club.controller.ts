@@ -5,9 +5,6 @@ import { encryptAES, generateAESKeyFromString, decryptAES, generateAESKey } from
 import ClubModel from '../../models/club.model';
 import { KeyManager } from '../../utils/encryption/key-manager.utils';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
-import { OTP } from '../../utils/otp';
-import { sendOTPEmail } from '../../utils/mailer';
-import { internalAesKey } from '../../constants/keys';
 
 // Types
 type ClubLoginData = {
