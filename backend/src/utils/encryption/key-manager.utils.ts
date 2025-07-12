@@ -1,4 +1,4 @@
-import { generateRSAKeyPair } from './RSA_utils';
+import { generateRSAKeyPair } from './rsa.utils';
 
 interface KeyPair {
     id: string;

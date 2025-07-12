@@ -1,16 +1,25 @@
+// React and Redux imports
 import { useSelector, useDispatch } from 'react-redux';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { RootState } from '../store/store';
+
+// Components
 import Header from '../components/Header';
 import InputComponent from '../components/InputComponent';
 import OtpPopup from '../components/OtpPopup';
-import { setAuthenticated, setEmail } from '../store/authSlice';
-import { postData, getData } from "../api/requests";
-import { validateRegistrationData } from '../utils/registrationUtils';
+import RecoveryKeyPopup from '../components/RecoveryKeyPopup';
 
-import type { RootState } from '../store/store';
+// Redux actions
+import { setAuthenticated, setEmail, setPrivateKey, setUserId, setUserType } from '../store/authSlice';
+
+// API and utilities
+import { postData, getData } from "../api/requests";
+import { validateRegistrationData, decryptServerResponse } from '../utils/registrationUtils';
+
+// Encryption utilities
 import { encryptAES, generateAESKey } from '../encryption/AES_utils';
-import { encryptRSA } from '../encryption/RSA_utils';
+import { encryptRSA, generateRSAKeyPair } from '../encryption/RSA_utils';
 
 const AdminRegistration = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
@@ -20,9 +29,11 @@ const AdminRegistration = () => {
   const transparentClasses = "bg-transparent"
 
   const [showOtpPopup, setShowOtpPopup] = useState(false);
+  const [showRecoveryPopup, setShowRecoveryPopup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [recoveryKey, setRecoveryKey] = useState('');
 
   const [formData, setFormData] = useState({
     collegeName: '',
@@ -52,6 +63,9 @@ const AdminRegistration = () => {
       const publicKey = publicKeyResponse.publicKey;
       const keyId = publicKeyResponse.keyId;
 
+      // Generate client-side RSA key pair
+      const [clientPrivateKey, clientPublicKey] = generateRSAKeyPair();
+
       // Generate AES key and encrypt data
       const aesKey = generateAESKey();
       const encryptedData = {
@@ -63,6 +77,7 @@ const AdminRegistration = () => {
         otp: encryptAES(otp, aesKey),
         key: encryptRSA(aesKey, publicKey),
         keyId: keyId,
+        publicKey: clientPublicKey, // Send client's public key for response encryption
       };
 
       // Send registration data to backend
@@ -71,13 +86,46 @@ const AdminRegistration = () => {
       // Handle response
       if (response && response.status === true) {
         setSuccessMessage(response.message || 'Registration successful!');
-        dispatch(setAuthenticated(true));
         
-        // Close popup and navigate after a brief delay to show success message
-        setTimeout(() => {
-          setShowOtpPopup(false);
-          navigate('/admin/dashboard');
-        }, 1500);
+        if (response.data && response.key) {
+          // Decrypt the response data
+          try {
+            const decryptedData = decryptServerResponse(
+              response.data,
+              response.key,
+              clientPrivateKey
+            );
+            
+            // Store privateKey in Redux
+            dispatch(setPrivateKey(decryptedData.privateKey));
+            dispatch(setUserId(decryptedData.id));
+            dispatch(setUserType('admin'));
+            
+            // Set recovery key for popup
+            setRecoveryKey(decryptedData.recoveryKey || '');
+            
+            dispatch(setAuthenticated(true));
+            
+            // Close OTP popup
+            setShowOtpPopup(false);
+            
+            // Show recovery key popup
+            setShowRecoveryPopup(true);
+          } catch (error) {
+            console.error('Failed to decrypt response:', error);
+            setErrorMessage('Failed to process secure data. Please try again.');
+            return;
+          }
+        } else {
+          // No encrypted data in response, just proceed
+          dispatch(setAuthenticated(true));
+          
+          // Close popup and navigate after a brief delay to show success message
+          setTimeout(() => {
+            setShowOtpPopup(false);
+            navigate('/admin/dashboard');
+          }, 1500);
+        }
       } else {
         // Handle backend error responses
         const errorMsg = response?.message || 'Registration failed. Please try again.';
@@ -269,6 +317,15 @@ const AdminRegistration = () => {
         isLoading={isLoading}
         errorMessage={errorMessage}
         successMessage={successMessage}
+      />
+      
+      <RecoveryKeyPopup
+        isOpen={showRecoveryPopup}
+        recoveryKey={recoveryKey}
+        onClose={() => {
+          setShowRecoveryPopup(false);
+          navigate('/admin/dashboard');
+        }}
       />
     </>
   );

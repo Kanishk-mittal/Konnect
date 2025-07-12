@@ -11,17 +11,18 @@ import cookieParser from 'cookie-parser';
 dotenv.config({ path: __dirname + '/../.env' });
 
 // Import routes
-import pingRoutes from './routes/ping';
-import adminRoutes from './routes/adminRoutes';
-import apiRoutes from './routes/otpRoutes';
-import encryptionRoutes from './routes/encryptionRoutes';
+import adminRoutes from './routes/admin.routes';
+import studentRoutes from './routes/student.routes';
+import clubRoutes from './routes/club.routes';
+import apiRoutes from './routes/otp.routes';
+import encryptionRoutes from './routes/encryption.routes';
 
 // Import Socket.IO
 import { SocketHandler } from './socket/socketHandler';
 import socketService from './socket/socketService';
 
 // Import KeyManager
-import { KeyManager } from './encryption/keyManager';
+import { KeyManager } from './utils/encryption/key-manager.utils';
 
 
 class App {
@@ -85,10 +86,10 @@ class App {
     }
 
     private initializeRoutes(): void {
-        // route to check weather the backend is running
-        this.app.use('/api/ping', pingRoutes);
-        // Admin routes
+        // Authentication and user routes
         this.app.use("/api/admin", adminRoutes);
+        this.app.use("/api/student", studentRoutes);
+        this.app.use("/api/club", clubRoutes);
         this.app.use("/api/otp", apiRoutes);
         // Encryption routes
         this.app.use("/api/encryption", encryptionRoutes);

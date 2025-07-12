@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getExternalAESKey, getRSAPublicKey } from "../controller/api_controller/encryptionController";
+import { getExternalAESKey, getRSAPublicKey } from "../controller/api_controller/encryption.controller";
 
 const encryptionRoutes = Router();
 

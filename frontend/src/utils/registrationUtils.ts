@@ -7,6 +7,39 @@ export type AdminRegistrationData = {
     confirmPassword: string; // Optional for confirmation, not used in validation
 }
 
+import { decryptAES } from '../encryption/AES_utils';
+import { decryptRSA } from '../encryption/RSA_utils';
+
+// Function to decrypt response from server
+export const decryptServerResponse = (
+  data: { 
+    recoveryKey?: string; 
+    privateKey: string; 
+    id: string;
+  }, 
+  encryptedKey: string, 
+  privateKey: string
+): { 
+  recoveryKey?: string; 
+  privateKey: string; 
+  id: string; 
+} => {
+  try {
+    // Decrypt the AES key using client's private key
+    const aesKey = decryptRSA(encryptedKey, privateKey);
+    
+    // Decrypt the data using the AES key
+    return {
+      ...(data.recoveryKey && { recoveryKey: decryptAES(data.recoveryKey, aesKey) }),
+      privateKey: decryptAES(data.privateKey, aesKey),
+      id: decryptAES(data.id, aesKey),
+    };
+  } catch (error) {
+    console.error('Error decrypting server response:', error);
+    throw new Error('Failed to decrypt server response');
+  }
+};
+
 export const validateRegistrationData = (data: AdminRegistrationData): { status: boolean, message: string } => {
     // Validate the incoming data
     if (!data.collegeName || !data.collegeCode || !data.emailId || !data.adminUsername || !data.password) {

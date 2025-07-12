@@ -1,5 +1,5 @@
 import nodemailer, { SentMessageInfo } from 'nodemailer';
-import { OTP } from './otp';
+import { OTP } from './otp.utils';
 
 // Create nodemailer transport
 const transporter = nodemailer.createTransport({

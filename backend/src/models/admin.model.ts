@@ -9,6 +9,7 @@ const adminSchema = new Schema({
   recovery_password: { type: String, required: true },
   private_key: { type: String, required: true },
   public_key: { type: String, required: true },
+  recovery_key_hash: { type: String, required: true },
 });
 
 export default model('Admin', adminSchema);
@@ -22,4 +23,5 @@ export type AdminDocument = {
   recovery_password: string;
   private_key: string;
   public_key: string;
+  recovery_key_hash: string;
 };

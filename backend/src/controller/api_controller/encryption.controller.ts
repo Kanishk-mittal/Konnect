@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { externalAesKey } from '../../constants/keys';
-import { encryptRSA } from '../../encryption/RSA_utils';
-import { KeyManager } from '../../encryption/keyManager';
+import { encryptRSA } from '../../utils/encryption/rsa.utils';
+import { KeyManager } from '../../utils/encryption/key-manager.utils';
 
 /**
  * Controller to handle AES external key encryption
