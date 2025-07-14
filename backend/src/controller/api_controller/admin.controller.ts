@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { OTP } from '../../utils/otp.utils';
 import { ADMIN_REGISTRATION_RULES as validationRules } from '../../constants/rules';
-import { createHash } from '../../utils/encryption/hash.utils';
+import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { decryptRSA, encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
 import { encryptAES, generateAESKeyFromString, decryptAES, generateAESKey } from '../../utils/encryption/aes.utils';
 import { sendOTPEmail } from '../../utils/mailer.utils';
@@ -190,6 +190,8 @@ export const registerController = async (req: Request, res: Response): Promise<v
 
         // Decrypt registration data
         const data = decryptRegistrationData(encryptedData, userKey);
+        //TODO:remove debug log
+        console.log('Decrypted registration data:', data);
 
         // Validate registration data
         const validationResult = validateRegistrationData(data);
@@ -345,6 +347,7 @@ export const adminLoginController = async (req: Request, res: Response): Promise
             username: decryptAES(encryptedData.username, userAESKey),
             password: decryptAES(encryptedData.password, userAESKey)
         };
+        console.log('Decrypted login data:', loginData); //TODO:remove debug log
 
         // Validate input
         if (!loginData.collegeCode || !loginData.username || !loginData.password) {
@@ -376,8 +379,8 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         }
 
         // Verify password
-        const hashedPassword = await createHash(loginData.password);
-        if (hashedPassword !== admin.password_hash) {
+        const isPasswordValid = await verifyHash(loginData.password, admin.password_hash);
+        if (!isPasswordValid) {
             res.status(401).json({
                 status: false,
                 message: 'Invalid password.'

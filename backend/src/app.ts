@@ -14,7 +14,6 @@ dotenv.config({ path: __dirname + '/../.env' });
 import adminRoutes from './routes/admin.routes';
 import studentRoutes from './routes/student.routes';
 import clubRoutes from './routes/club.routes';
-import apiRoutes from './routes/otp.routes';
 import encryptionRoutes from './routes/encryption.routes';
 
 // Import Socket.IO
@@ -44,7 +43,7 @@ class App {
     }
 
     private async connectDatabase(): Promise<void> {
-        const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/konnect';
+        const mongoUri = process.env.DATABASE_URL || 'mongodb://localhost:27017/konnect';
         try {
             await mongoose.connect(mongoUri, {
                 // useNewUrlParser and useUnifiedTopology are default in mongoose >=6
@@ -90,7 +89,6 @@ class App {
         this.app.use("/api/admin", adminRoutes);
         this.app.use("/api/student", studentRoutes);
         this.app.use("/api/club", clubRoutes);
-        this.app.use("/api/otp", apiRoutes);
         // Encryption routes
         this.app.use("/api/encryption", encryptionRoutes);
         // Test routes for debugging

@@ -19,7 +19,7 @@ export function getJwtSecret(): string {
  */
 export function setJwtCookie(
     res: Response,
-    payload: object, // TODO: Define payload type/interface
+    payload: object, 
     cookieName: string,
     expiresIn: number // expiresIn should be a number (in seconds)
 ): void {
@@ -69,7 +69,7 @@ export const refreshJwt = (
     const secret = getJwtSecret();
     const oldToken = req.cookies?.[cookieName];
     try {
-        const payload = jwt.verify(oldToken, secret) as object; // TODO: Define payload type/interface
+        const payload = jwt.verify(oldToken, secret) as object; 
         // Remove iat, exp from payload if present
         const { iat, exp, ...rest } = payload as any;
         const newToken = jwt.sign(rest, secret, { expiresIn });

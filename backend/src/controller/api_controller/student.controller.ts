@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { createHash } from '../../utils/encryption/hash.utils';
+import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { decryptRSA, encryptRSA } from '../../utils/encryption/rsa.utils';
 import { decryptAES, encryptAES, generateAESKey } from '../../utils/encryption/aes.utils';
 import studentModel from '../../models/Student.model';
@@ -80,8 +80,8 @@ export const studentLoginController = async (req: Request, res: Response): Promi
         }
 
         // Verify password
-        const hashedPassword = await createHash(loginData.password);
-        if (hashedPassword !== student.password_hash) {
+        const isPasswordValid = await verifyHash(loginData.password, student.password_hash as string);
+        if (!isPasswordValid) {
             res.status(401).json({ 
                 status: false, 
                 message: 'Invalid password.' 

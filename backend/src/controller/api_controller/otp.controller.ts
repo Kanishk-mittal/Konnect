@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
-import { sendOTPEmail as sendOTP } from '../../utils/mailer';
+import { sendOTPEmail as sendOTP } from "../../utils/mailer.utils";
 
 export const sendOTPEmail = async (req: Request, res: Response) => { 
     const email: string = req.body.emailID;
-    //TODO: remove debugging log in production
-    console.log('Received email for OTP:', email);  
     
     if (!email) {
         return res.status(400).json({

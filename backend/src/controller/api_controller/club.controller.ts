@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { createHash } from '../../utils/encryption/hash.utils';
+import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { decryptRSA, encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
 import { encryptAES, generateAESKeyFromString, decryptAES, generateAESKey } from '../../utils/encryption/aes.utils';
 import ClubModel from '../../models/club.model';
@@ -98,8 +98,8 @@ export const clubLoginController = async (req: Request, res: Response): Promise<
         }
 
         // Verify password
-        const hashedPassword = await createHash(loginData.password);
-        if (hashedPassword !== club.password_hash) {
+        const isPasswordValid = await verifyHash(loginData.password, club.password_hash);
+        if (!isPasswordValid) {
             res.status(401).json({ 
                 status: false, 
                 message: 'Invalid password.' 

@@ -52,6 +52,8 @@ const AdminRegistration = () => {
     try {
       // Prepare form data for registration by removing confirmPassword
       const { confirmPassword, ...registrationData } = formData;
+      //TODO: remove this comment in production
+      console.log('Registration Data:', registrationData);
 
       // Get public key from backend
       const publicKeyResponse = await getData('/encryption/rsa/publicKey', {});
@@ -168,9 +170,11 @@ const AdminRegistration = () => {
         setErrorMessage(validation.message);
         return;
       }
+      //TODO: remove this comment in production
+      console.log("Form Data Validated:", formData);
       
       // Request backend to send OTP
-      const response = await postData('/otp', { emailId: formData.emailId });
+      const response = await postData('/admin/otp', { emailId: formData.emailId });
       
       if (response && response.status === true) {
         setSuccessMessage(response.message || 'OTP sent successfully!');
