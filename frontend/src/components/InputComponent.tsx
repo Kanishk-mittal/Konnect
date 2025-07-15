@@ -72,7 +72,7 @@ const InputComponent: React.FC<InputProps> = ({ width, state, setState, keyName,
                         aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                         <img 
-                            src={showPassword ? closeEyeIcon : openEyeIcon} 
+                            src={showPassword ? openEyeIcon : closeEyeIcon} 
                             alt={showPassword ? "Hide password" : "Show password"}
                             className="w-6 h-6 opacity-70 hover:opacity-100"
                         />

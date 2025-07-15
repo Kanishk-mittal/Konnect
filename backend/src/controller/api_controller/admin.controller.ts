@@ -152,6 +152,7 @@ const createAdminDocument = async (data: AdminRegistrationData): Promise<{
             college_code: data.collegeCode,
             college_name: encryptAES(data.collegeName, internalAesKey),
             username: data.adminUsername,
+            profile_picture: null, // Default to null, can be updated later
             email_id: encryptAES(data.emailId, internalAesKey),
             password_hash: passwordHash,
             recovery_password: recoveryPassword,
@@ -427,6 +428,40 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred.'
+        });
+    }
+};
+
+export const sendAdminProfilePicture = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { adminId } = req.params; // Get admin ID from URL parameters
+        if (!adminId) {
+            res.status(400).json({
+                status: false,
+                message: 'Admin ID is required.'
+            });
+            return;
+        }
+
+        const admin = await AdminModel.findById(adminId);
+        if (!admin) {
+            res.status(404).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Send profile picture URL or null if not set
+        res.status(200).json({
+            status: true,
+            profilePicture: admin.profile_picture
+        });
+    } catch (error) {
+        console.error('Error fetching admin profile picture:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching profile picture.'
         });
     }
 };

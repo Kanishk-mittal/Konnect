@@ -1,8 +1,13 @@
 
+import Header from "../components/Header"
+
 const AdminDashboard = () => {
   return (
     <div>
-      This is admin Dashboard
+      <Header />
+      <div className="p-4">
+        This is admin Dashboard
+      </div>
     </div>
   )
 }

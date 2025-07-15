@@ -17,9 +17,9 @@ export const postData = async (endpoint: string, data: any) => {
     }
 }
 
-export const getData = async (endpoint: string, data: any) => {
+export const getData = async (endpoint: string, params?: any) => {
     try {
-        const response = await instance.get(endpoint, { data });
+        const response = await instance.get(endpoint, { params });
         return response.data;
     } catch (error) {
         console.error(`Error getting data from ${endpoint}:`, error);
