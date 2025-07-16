@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import { clearAllPrivateKeys } from '../utils/privateKeyManager';
 
 interface AuthState {
   email: string | null;
@@ -42,6 +43,9 @@ export const authSlice = createSlice({
       state.privateKey = null;
       state.userId = null;
       state.userType = null;
+      
+      // Clear private keys from localStorage
+      clearAllPrivateKeys();
     },
   },
 });
@@ -52,7 +56,7 @@ export const {
   setPrivateKey, 
   setUserId, 
   setUserType, 
-  clearAuth 
+  clearAuth
 } = authSlice.actions;
 
 export default authSlice.reducer;

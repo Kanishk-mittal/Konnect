@@ -16,6 +16,7 @@ import { setAuthenticated, setEmail, setPrivateKey, setUserId, setUserType } fro
 // API and utilities
 import { postData, getData } from "../api/requests";
 import { validateRegistrationData, decryptServerResponse } from '../utils/registrationUtils';
+import { savePrivateKey } from '../utils/privateKeyManager';
 
 // Encryption utilities
 import { encryptAES, generateAESKey } from '../encryption/AES_utils';
@@ -98,10 +99,14 @@ const AdminRegistration = () => {
               clientPrivateKey
             );
             
-            // Store privateKey in Redux
+            // Save to Redux store (primary storage)
             dispatch(setPrivateKey(decryptedData.privateKey));
             dispatch(setUserId(decryptedData.id));
             dispatch(setUserType('admin'));
+            dispatch(setEmail(formData.emailId));
+            
+            // Save to localStorage as backup
+            await savePrivateKey(decryptedData.privateKey, 'admin', decryptedData.id);
             
             // Set recovery key for popup
             setRecoveryKey(decryptedData.recoveryKey || '');

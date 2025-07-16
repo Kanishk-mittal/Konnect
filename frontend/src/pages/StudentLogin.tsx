@@ -14,6 +14,7 @@ import { setAuthenticated, setPrivateKey, setUserId, setUserType } from '../stor
 // API and utilities
 import { postData, getData } from '../api/requests';
 import { decryptServerResponse } from '../utils/registrationUtils';
+import { savePrivateKey } from '../utils/privateKeyManager';
 
 // Encryption utilities
 import { encryptAES, generateAESKey } from '../encryption/AES_utils';
@@ -83,10 +84,14 @@ const StudentLogin = () => {
               clientPrivateKey
             );
             
-            // Store privateKey and userId in Redux
+            // Save to Redux store (primary storage)
             dispatch(setPrivateKey(decryptedData.privateKey));
             dispatch(setUserId(decryptedData.id));
             dispatch(setUserType('student'));
+            
+            // Save to localStorage as backup
+            await savePrivateKey(decryptedData.privateKey, 'student', decryptedData.id);
+            
           } catch (error) {
             console.error('Failed to decrypt response:', error);
             // Continue with login even if decryption fails
