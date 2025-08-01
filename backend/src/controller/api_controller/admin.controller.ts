@@ -465,3 +465,44 @@ export const sendAdminProfilePicture = async (req: Request, res: Response): Prom
         });
     }
 };
+
+/**
+ * Get admin public details (username, email, college code)
+ * No authentication required as this is public data
+ */
+export const getAdminDetails = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { adminId } = req.params;
+
+        // Find admin by ID and select only public fields
+        const admin = await AdminModel.findById(adminId).select('username email_id college_code');
+
+        if (!admin) {
+            res.status(404).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Decrypt the email since it's stored encrypted
+        const decryptedEmail = decryptAES(admin.email_id, internalAesKey);
+
+        res.status(200).json({
+            status: true,
+            message: 'Admin details retrieved successfully.',
+            data: {
+                username: admin.username,
+                email: decryptedEmail,
+                collegeCode: admin.college_code
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching admin details:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching admin details.'
+        });
+    }
+};

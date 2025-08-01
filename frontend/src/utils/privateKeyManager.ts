@@ -11,7 +11,7 @@ const getExternalAESKey = async (): Promise<string> => {
         const [clientPrivateKey, clientPublicKey] = generateRSAKeyPair();
 
         // Request the encrypted AES key from the server
-        const response = await postData('/api/encryption/aes/external-key', {
+        const response = await postData('/encryption/aes/external-key', {
             publicKey: clientPublicKey
         });
 
