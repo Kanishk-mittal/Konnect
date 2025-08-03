@@ -8,6 +8,11 @@ interface AuthState {
   privateKey: string | null;
   userId: string | null;
   userType: string | null;
+  adminDetails: {
+    username: string;
+    email: string;
+    collegeCode: string;
+  } | null;
 }
 
 const initialState: AuthState = {
@@ -16,6 +21,7 @@ const initialState: AuthState = {
   privateKey: null,
   userId: null,
   userType: null,
+  adminDetails: null,
 };
 
 export const authSlice = createSlice({
@@ -37,12 +43,16 @@ export const authSlice = createSlice({
     setUserType: (state, action: PayloadAction<string>) => {
       state.userType = action.payload;
     },
+    setAdminDetails: (state, action: PayloadAction<{username: string; email: string; collegeCode: string}>) => {
+      state.adminDetails = action.payload;
+    },
     clearAuth: (state) => {
       state.email = null;
       state.isAuthenticated = false;
       state.privateKey = null;
       state.userId = null;
       state.userType = null;
+      state.adminDetails = null;
       
       // Clear private keys from localStorage
       clearAllPrivateKeys();
@@ -55,7 +65,8 @@ export const {
   setAuthenticated, 
   setPrivateKey, 
   setUserId, 
-  setUserType, 
+  setUserType,
+  setAdminDetails, 
   clearAuth
 } = authSlice.actions;
 

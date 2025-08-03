@@ -1,88 +1,111 @@
 
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useEffect, useState } from 'react';
 import type { RootState } from '../store/store';
 import { getData } from '../api/requests';
+import { setUserId, setAdminDetails } from '../store/authSlice';
 import Header from "../components/Header"
 
-interface AdminDetails {
-  username: string;
-  email: string;
-  collegeCode: string;
-}
-
 const AdminDashboard = () => {
+  const dispatch = useDispatch();
   const authState = useSelector((state: RootState) => state.auth);
-  const { userId } = authState;
-  const [adminDetails, setAdminDetails] = useState<AdminDetails | null>(null);
+  const theme = useSelector((state: RootState) => state.theme.theme);
+  const { userId, adminDetails } = authState;
   const [loading, setLoading] = useState(true);
+
+  // Define theme-specific colors
+  const backgroundGradient = theme === 'dark' 
+    ? 'linear-gradient(180deg, #000000 0%, #0E001B 8%)'
+    : 'linear-gradient(180deg, #9435E5 0%, #FFD795 8%)';
+    
+  const textColor = theme === 'dark' ? 'text-white' : 'text-black';
+  
+  const headerBackground = theme === 'dark' 
+    ? {} // No background for dark theme
+    : { background: 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%)' };
+
+  // Section colors based on theme
+  const leftSectionColor = theme === 'dark' ? '#240046' : '#FFC362';
+  const topRightSectionColor = theme === 'dark' ? '#BE190A' : '#FFA162';
+  const bottomRightSectionColor = theme === 'dark' ? '#240046' : '#FFC362';
 
   useEffect(() => {
     const fetchAdminDetails = async () => {
-      console.log('Full auth state:', authState); // Debug log
-      console.log('userId from Redux:', userId); // Debug log
-      if (userId) {
-        try {
-          console.log('Fetching admin details for userId:', userId); // Debug log
-          const response = await getData(`/admin/details/${userId}`);
-          console.log('API response:', response); // Debug log
-          if (response.status) {
-            setAdminDetails(response.data);
-            console.log('Admin details set:', response.data); // Debug log
-          } else {
-            console.log('API returned false status:', response); // Debug log
-          }
-        } catch (error) {
-          console.error('Error fetching admin details:', error);
-        } finally {
-          setLoading(false);
+      // If adminDetails already exist in Redux, no need to fetch
+      if (adminDetails) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        let response;
+        
+        if (userId) {
+          // If userId is available, use the existing endpoint
+          response = await getData(`/admin/details/${userId}`);
+        } else {
+          // If userId is not available, get admin details from JWT
+          response = await getData(`/admin/details`);
         }
-      } else {
-        console.log('No userId found in Redux state'); // Debug log
+        
+        if (response.status) {
+          // Store admin details in Redux
+          dispatch(setAdminDetails({
+            username: response.data.username,
+            email: response.data.email,
+            collegeCode: response.data.collegeCode
+          }));
+          
+          // If userId wasn't available but we got it from JWT, store it too
+          if (!userId && response.data.userId) {
+            dispatch(setUserId(response.data.userId));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching admin details:', error);
+      } finally {
         setLoading(false);
       }
     };
 
     fetchAdminDetails();
-  }, [userId]);
+  }, [userId, adminDetails, dispatch]);
 
   return (
-    <div className="min-h-screen" style={{
-      background: 'linear-gradient(180deg, #9435E5 0%, #FFD795 8%)'
+    <div className="flex flex-col h-screen" style={{
+      background: backgroundGradient
     }}>
-      <div style={{ background: 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%)' }}>
+      <div style={headerBackground}>
         <Header editProfileUrl="/admin/edit-profile" />
       </div>
-      <div className="p-4">
+      
         {loading ? (
-          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+          <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading...</h1>
         ) : adminDetails ? (
-          <div>
-            <h1 className="text-2xl font-bold mb-4">
+            <div className="flex-grow flex flex-col">
+            <h1 className={`text-2xl font-bold mt-3 h-[7vh] ${textColor}`}>
               Welcome {adminDetails.username}, {adminDetails.collegeCode}
             </h1>
-            {/* Debug info - remove this later */}
-            <div className="text-sm text-gray-600 mt-4">
-              <p>Debug - Username: {adminDetails.username}</p>
-              <p>Debug - College Code: {adminDetails.collegeCode}</p>
-              <p>Debug - Email: {adminDetails.email}</p>
+            
+            {/* Three-section layout */}
+            <div className='flex-grow flex gap-2 p-3'>
+              <div className="left flex-grow rounded-lg p-4" style={{ backgroundColor: leftSectionColor }}>
+
+              </div>
+              <div className="right flex-grow flex flex-col gap-2">
+                <div className="topRight flex-grow rounded-lg p-4" style={{ backgroundColor: topRightSectionColor }}>
+
+                </div>
+                <div className="bottomRight flex-grow rounded-lg p-4" style={{ backgroundColor: bottomRightSectionColor }}>
+
+                </div>
+              </div>
             </div>
+            
           </div>
         ) : (
-          <div>
-            <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
-            {/* Debug info - remove this later */}
-            <div className="text-sm text-red-600 mt-4">
-              <p>Debug - userId: {userId || 'No userId'}</p>
-              <p>Debug - isAuthenticated: {authState.isAuthenticated ? 'true' : 'false'}</p>
-              <p>Debug - userType: {authState.userType || 'No userType'}</p>
-              <p>Debug - email: {authState.email || 'No email'}</p>
-              <p>Debug - adminDetails: {adminDetails ? 'Has data' : 'No data'}</p>
-              <p>Debug - loading: {loading ? 'true' : 'false'}</p>
-            </div>
-          </div>
+          <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Admin Dashboard</h1>
         )}
-      </div>
     </div>
   )
 }

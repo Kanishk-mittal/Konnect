@@ -191,8 +191,6 @@ export const registerController = async (req: Request, res: Response): Promise<v
 
         // Decrypt registration data
         const data = decryptRegistrationData(encryptedData, userKey);
-        //TODO:remove debug log
-        console.log('Decrypted registration data:', data);
 
         // Validate registration data
         const validationResult = validateRegistrationData(data);
@@ -348,7 +346,6 @@ export const adminLoginController = async (req: Request, res: Response): Promise
             username: decryptAES(encryptedData.username, userAESKey),
             password: decryptAES(encryptedData.password, userAESKey)
         };
-        console.log('Decrypted login data:', loginData); //TODO:remove debug log
 
         // Validate input
         if (!loginData.collegeCode || !loginData.username || !loginData.password) {
@@ -500,6 +497,54 @@ export const getAdminDetails = async (req: Request, res: Response): Promise<void
 
     } catch (error) {
         console.error('Error fetching admin details:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching admin details.'
+        });
+    }
+};
+
+/**
+ * Get admin details from JWT token
+ * Requires authentication
+ */
+export const getAdminDetailsFromJWT = async (req: Request, res: Response): Promise<void> => {
+    try {
+        if (!req.user) {
+            res.status(401).json({ 
+                status: false, 
+                message: 'User not authenticated' 
+            });
+            return;
+        }
+
+        // Find admin by ID from JWT token and select only public fields
+        const admin = await AdminModel.findById(req.user.id).select('username email_id college_code');
+
+        if (!admin) {
+            res.status(404).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Decrypt the email since it's stored encrypted
+        const decryptedEmail = decryptAES(admin.email_id, internalAesKey);
+
+        res.status(200).json({
+            status: true,
+            message: 'Admin details retrieved successfully.',
+            data: {
+                userId: req.user.id,
+                username: admin.username,
+                email: decryptedEmail,
+                collegeCode: admin.college_code
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching admin details from JWT:', error);
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred while fetching admin details.'
