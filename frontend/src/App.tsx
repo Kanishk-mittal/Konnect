@@ -6,6 +6,7 @@ import StudentLogin from './pages/StudentLogin'
 import ClubLogin from './pages/ClubLogin'
 import AdminRegistration from './pages/AdminRegistration'
 import AdminDashboard from './pages/AdminDashboard'
+import AddStudent from './pages/AddStudent'
 import NotFound from './pages/NotFound'
 
 
@@ -29,6 +30,9 @@ const App = () => {
       />
       <Route path="/admin/dashboard"
         element={<AdminDashboard/>} 
+      />
+      <Route path="/admin/add-student"
+        element={<AddStudent/>} 
       />
       <Route path="*" element={<NotFound/>} />
     </Routes>

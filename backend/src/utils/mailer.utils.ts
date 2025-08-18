@@ -156,3 +156,105 @@ export const sendOTPEmail = async (
     };
   }
 };
+
+/**
+ * Sends credentials email to a single student
+ * @param studentEmail - Student's email address
+ * @param studentName - Student's display name
+ * @param collegeCode - College code
+ * @param rollNumber - Student's roll number
+ * @param password - Generated password
+ * @returns Promise that resolves when email is sent
+ */
+export const sendStudentCredentialsEmail = async (
+  studentEmail: string,
+  studentName: string,
+  collegeCode: string,
+  rollNumber: string,
+  password: string
+): Promise<void> => {
+  const subject = 'Welcome to Konnect - Your Account Credentials';
+  
+  const message = `
+    <h2>Welcome to Konnect!</h2>
+    <p>Dear ${studentName},</p>
+    <p>Your student account has been successfully created and activated. Here are your login credentials:</p>
+    
+    <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #4a7aff;">
+      <h3>Your Login Credentials:</h3>
+      <p><strong>College Code:</strong> ${collegeCode}</p>
+      <p><strong>Roll Number:</strong> ${rollNumber}</p>
+      <p><strong>Temporary Password:</strong> <code style="background-color: #e0e0e0; padding: 2px 5px; border-radius: 3px;">${password}</code></p>
+    </div>
+    
+    <div style="background-color: #d4edda; padding: 15px; margin: 20px 0; border: 1px solid #c3e6cb; border-radius: 5px;">
+      <h4 style="color: #155724; margin: 0 0 10px 0;">✅ Account Status: Successfully Created</h4>
+      <p style="color: #155724; margin: 0;">Your account is now active and ready to use. You can log in immediately using the credentials above.</p>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border: 1px solid #ffeaa7; border-radius: 5px;">
+      <h4 style="color: #856404; margin: 0 0 10px 0;">⚠️ Important Security Instructions:</h4>
+      <ul style="color: #856404; margin: 0;">
+        <li><strong>Change your password immediately</strong> after your first login</li>
+        <li><strong>Create recovery keys</strong> to secure your account</li>
+        <li><strong>Keep your credentials safe</strong> and do not share them with anyone</li>
+        <li><strong>Log in as soon as possible</strong> to secure your account</li>
+      </ul>
+    </div>
+    
+    <p>You can log in to Konnect using the credentials provided above. Make sure to follow the security instructions for the safety of your account.</p>
+    
+    <p>If you have any questions or need assistance, please contact your system administrator.</p>
+    
+    <p>Best regards,<br>The Konnect Team</p>
+  `;
+
+  await sendTemplatedEmail(subject, message, studentEmail);
+};
+
+/**
+ * Sends credentials emails to multiple students in bulk
+ * @param emailData - Array of student email data objects
+ * @returns Promise that resolves when all emails are sent
+ */
+export const sendBulkStudentEmails = async (
+  emailData: Array<{
+    email: string;
+    name: string;
+    collegeCode: string;
+    rollNumber: string;
+    password: string;
+  }>
+): Promise<{ successful: number; failed: number; errors: string[] }> => {
+  const emailPromises: Promise<void>[] = [];
+  const errors: string[] = [];
+  let successful = 0;
+  let failed = 0;
+
+  // Create array of email sending promises
+  for (const student of emailData) {
+    const emailPromise = sendStudentCredentialsEmail(
+      student.email,
+      student.name,
+      student.collegeCode,
+      student.rollNumber,
+      student.password
+    ).then(() => {
+      successful++;
+    }).catch((error) => {
+      failed++;
+      errors.push(`Failed to send email to ${student.email}: ${error.message}`);
+    });
+
+    emailPromises.push(emailPromise);
+  }
+
+  // Wait for all email promises to resolve
+  await Promise.allSettled(emailPromises);
+
+  return {
+    successful,
+    failed,
+    errors
+  };
+};

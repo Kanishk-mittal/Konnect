@@ -19,3 +19,17 @@ export async function createHash(input: string): Promise<string> {
 export async function verifyHash(input: string, hash: string): Promise<boolean> {
     return await bcrypt.compare(input, hash);
 }
+
+/**
+ * Generates a random password for users
+ * @param {number} length - Length of the password (default: 12)
+ * @returns {string} - Random password string
+ */
+export function generateRandomPassword(length: number = 12): string {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+}

@@ -1,6 +1,7 @@
 import { Schema, model, Types } from 'mongoose';
 
 const studentSchema = new Schema({
+  profile_picture: { type: String||null, default: null },
   roll: { type: String, required: true }, 
   display_name: { type: String, required: true },
   college_code: { type: String, required: true },
@@ -13,4 +14,4 @@ const studentSchema = new Schema({
   blocked_user: [{ type: Types.ObjectId, ref: 'User' }],
 });
 
-export default model('Stdent', studentSchema);
+export default model('Student', studentSchema);
