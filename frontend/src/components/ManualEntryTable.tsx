@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Student } from '../pages/AddStudent';
+import type { Student, WrongValue } from '../pages/AddStudent';
 
 interface TableColumn {
   key: keyof Student;
@@ -12,10 +12,12 @@ interface ManualEntryTableProps {
   columns: TableColumn[];
   students: Student[];
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
+  wrongValues: WrongValue[];
+  setWrongValues: React.Dispatch<React.SetStateAction<WrongValue[]>>;
 }
 
 const ManualEntryTable = ({ 
-  theme = 'light', columns, students, setStudents
+  theme = 'light', columns, students, setStudents, wrongValues, setWrongValues
 }: ManualEntryTableProps) => {
   // Create initial row with empty values for all columns
   // Create initial row with empty values for all columns
@@ -45,15 +47,35 @@ const ManualEntryTable = ({
     }
   };
 
-  const updateCell = (rowIndex: number, columnKey: string, value: string) => {
+  const updateCell = (rowIndex: number, columnKey: keyof Student, value: string) => {
     const updatedData = [...students];
     updatedData[rowIndex] = { ...updatedData[rowIndex], [columnKey]: value };
     setStudents(updatedData);
+
+    // Clear error for this cell
+    const newWrongValues = wrongValues.map(wv => {
+      if (wv.row === rowIndex) {
+        const newWv = { ...wv };
+        if (newWv.emptyColumns) {
+          newWv.emptyColumns = newWv.emptyColumns.filter(c => c !== columnKey);
+        }
+        if (newWv.invalidColumns) {
+          newWv.invalidColumns = newWv.invalidColumns.filter(c => c !== columnKey);
+        }
+        if (!newWv.emptyColumns?.length && !newWv.invalidColumns?.length) {
+          return null;
+        }
+        return newWv;
+      }
+      return wv;
+    }).filter(Boolean) as WrongValue[];
+    setWrongValues(newWrongValues);
   };
 
   const clearAllRows = () => {
   // Clear all rows
   setStudents([createEmptyRow()]);
+  setWrongValues([]);
   };
 
   // Always show at least one empty row
@@ -101,7 +123,9 @@ const ManualEntryTable = ({
             </tr>
           </thead>
           <tbody>
-            {displayRows.map((row, rowIndex) => (
+            {displayRows.map((row, rowIndex) => {
+              const error = wrongValues.find(wv => wv.row === rowIndex);
+              return (
               <tr key={rowIndex}>
                 <td className={`border-2 px-2 py-1 text-center ${
                   theme === 'dark' ? 'border-gray-600' : 'border-amber-600'
@@ -114,10 +138,12 @@ const ManualEntryTable = ({
                     {rowIndex + 1}
                   </span>
                 </td>
-                {columns.map((column) => (
+                {columns.map((column) => {
+                  const isInvalid = error && (error.invalidColumns?.includes(column.key) || error.emptyColumns?.includes(column.key));
+                  return (
                   <td key={column.key} className={`border-2 px-2 py-1 ${
                     theme === 'dark' ? 'border-gray-600' : 'border-amber-600'
-                  }`}>
+                  }`} style={{ backgroundColor: isInvalid ? 'rgba(255, 0, 0, 0.3)' : '' }}>
                     <input 
                       type={column.type || 'text'} 
                       value={row[column.key] || ''}
@@ -129,7 +155,7 @@ const ManualEntryTable = ({
                       }`}
                     />
                   </td>
-                ))}
+                )})}
                 <td className={`border-2 px-2 py-1 text-center ${
                   theme === 'dark' ? 'border-gray-600' : 'border-amber-600'
                 }`}>
@@ -144,7 +170,7 @@ const ManualEntryTable = ({
                   </button>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

@@ -1,15 +1,23 @@
 import { Request, Response } from 'express';
-import { createHash, verifyHash, generateRandomPassword } from '../../utils/encryption/hash.utils';
-import { decryptRSA, encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
-import { decryptAES, encryptAES, generateAESKey, generateAESKeyFromString } from '../../utils/encryption/aes.utils';
+import mongoose from 'mongoose';
+
+// Models
 import studentModel from '../../models/Student.model';
 import AdminModel from '../../models/admin.model';
+
+// Utils - Encryption
 import { KeyManager } from '../../utils/encryption/key-manager.utils';
+import { decryptRSA, encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
+import { decryptAES, encryptAES, generateAESKey, generateAESKeyFromString } from '../../utils/encryption/aes.utils';
+import { verifyHash, createHash } from '../../utils/encryption/hash.utils';
+
+// Utils - Other
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { sendStudentCredentialsEmail, sendBulkStudentEmails } from '../../utils/mailer.utils';
 import { sendBulkStudentEmailsSmart } from '../../utils/emailProcessor.utils';
+
+// Constants
 import { internalAesKey } from '../../constants/keys';
-import mongoose from 'mongoose';
 
 // Types
 type StudentLoginData = {
@@ -35,6 +43,12 @@ type StudentData = {
 
 type BulkStudentRegistrationRequest = {
     students: StudentData[];
+};
+
+type EncryptedBulkStudentRegistrationRequest = {
+    key: string;
+    keyId: string;
+    data: string; // Encrypted BulkStudentRegistrationRequest
 };
 
 // Validation functions
@@ -314,7 +328,7 @@ const createStudentDocumentsParallel = async (
     // Process all students in parallel for much better performance
     const studentPromises = students.map(async (studentData) => {
         // Generate random password
-        const password = generateRandomPassword(12);
+        const password = generateAESKey();
         
         // Hash the password
         const passwordHash = await createHash(password);
@@ -357,143 +371,60 @@ const createStudentDocumentsParallel = async (
 };
 
 /**
- * Bulk student registration controller with transaction support and parallel processing
- * Accepts a list of student objects and creates accounts for all of them
+ * Bulk student registration controller - Currently only decrypts and displays data
+ * for testing encryption/decryption flow
  */
 export const bulkStudentRegistration = async (req: Request, res: Response): Promise<void> => {
-    const session = await mongoose.startSession();
-    
     try {
-        const { students }: BulkStudentRegistrationRequest = req.body;
-        
-        // Validate input
-        if (!students || !Array.isArray(students) || students.length === 0) {
-            res.status(400).json({
-                status: false,
-                message: 'Students array is required and must contain at least one student.'
-            });
+        const encryptedPayload: EncryptedBulkStudentRegistrationRequest = req.body;
+
+        // 1. Validate encryption payload
+        if (!encryptedPayload.key || !encryptedPayload.keyId || !encryptedPayload.data) {
+            res.status(400).json({ status: false, message: 'Invalid encrypted payload.' });
             return;
         }
-        
-        // Validate each student object
-        const validationErrors = validateStudentData(students);
-        if (validationErrors.length > 0) {
-            res.status(400).json({
-                status: false,
-                message: 'Validation failed',
-                errors: validationErrors
-            });
+
+        // 2. Get server's private key
+        const serverPrivateKey = KeyManager.getPrivateKey(encryptedPayload.keyId);
+        if (!serverPrivateKey) {
+            res.status(400).json({ status: false, message: 'Invalid key identifier.' });
             return;
         }
-        
-        // Get admin ID from JWT token (set by auth middleware)
-        const adminId = req.user?.id;
-        if (!adminId) {
-            res.status(401).json({
-                status: false,
-                message: 'Admin authentication required.'
-            });
-            return;
-        }
-        
-        // Get admin's college code from database
-        const admin = await AdminModel.findById(adminId);
-        if (!admin) {
-            res.status(404).json({
-                status: false,
-                message: 'Admin not found.'
-            });
-            return;
-        }
-        
-        const collegeCode = admin.college_code; // college_code is stored unencrypted
-        
-        // Check for duplicates
-        const duplicateErrors = await checkForDuplicates(students, collegeCode);
-        if (duplicateErrors.length > 0) {
-            res.status(400).json({
-                status: false,
-                message: 'Duplicate entries found',
-                errors: duplicateErrors
-            });
-            return;
-        }
-        
-        // Use transaction for all database operations
-        const result = await session.withTransaction(async () => {
-            console.log(`Starting parallel processing of ${students.length} students...`);
-            
-            // Create all student documents in parallel (MUCH FASTER)
-            const processedStudents = await createStudentDocumentsParallel(students, collegeCode);
-            const studentDocuments = processedStudents.map(p => p.studentDoc);
-            
-            console.log(`Parallel processing completed. Inserting ${studentDocuments.length} students to database...`);
-            
-            // Bulk insert students into database within transaction
-            const insertedStudents = await studentModel.insertMany(studentDocuments, { session });
-            
-            console.log(`Successfully inserted ${insertedStudents.length} students to database.`);
-            
-            // Prepare email data for successfully inserted students
-            const emailData = insertedStudents.map((student, index) => {
-                const processedStudent = processedStudents[index];
-                if (!processedStudent) {
-                    throw new Error(`Missing processed student data at index ${index}`);
-                }
-                
-                return {
-                    email: processedStudent.email,
-                    name: processedStudent.name,
-                    collegeCode: collegeCode,
-                    rollNumber: student.roll as string,
-                    password: processedStudent.password
-                };
-            });
-            
-            return {
-                insertedStudents,
-                emailData
-            };
-        });
-        
-        console.log(`Transaction completed successfully. Sending emails to ${result.emailData.length} students...`);
-        
-        // Send emails in parallel after successful database transaction
-        let emailResults;
+
+        // 3. Decrypt the data
         try {
-            emailResults = await sendBulkStudentEmailsSmart(result.emailData);
-            console.log(`Email sending completed. Sent: ${emailResults.successful}, Failed: ${emailResults.failed}`);
-        } catch (emailError) {
-            console.error('Error sending emails (but students were registered successfully):', emailError);
-            emailResults = {
-                successful: 0,
-                failed: result.emailData.length,
-                errors: [`Failed to send emails: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`]
-            };
+            const aesKey = decryptRSA(encryptedPayload.key, serverPrivateKey);
+            const decryptedData = decryptAES(encryptedPayload.data, aesKey);
+            const parsedData: BulkStudentRegistrationRequest = JSON.parse(decryptedData);
+            
+            // For testing: Just log the decrypted data and send success response
+            console.log('Decrypted student data:', parsedData);
+
+            const studentData = parsedData.students;
+
+            //getting the college code from jwt and admin model
+
+            res.status(200).json({
+                status: true,
+                message: 'Data decrypted successfully',
+                data: parsedData
+            });
+            
+        } catch (e) {
+            console.error('Decryption error:', e);
+            res.status(400).json({ 
+                status: false, 
+                message: 'Failed to decrypt or parse data.',
+                error: e instanceof Error ? e.message : 'Unknown error'
+            });
+            return;
         }
-        
-        // Prepare response
-        const response = {
-            status: true,
-            message: `Successfully registered ${result.insertedStudents.length} students`,
-            data: {
-                studentsRegistered: result.insertedStudents.length,
-                emailsSent: emailResults.successful,
-                emailsFailed: emailResults.failed,
-                ...(emailResults.errors.length > 0 && { emailErrors: emailResults.errors })
-            }
-        };
-        
-        res.status(201).json(response);
-        
     } catch (error) {
         console.error('Error in bulk student registration:', error);
         res.status(500).json({
             status: false,
-            message: 'An unexpected error occurred during student registration.',
+            message: 'An unexpected error occurred.',
             error: error instanceof Error ? error.message : 'Unknown error'
         });
-    } finally {
-        await session.endSession();
     }
 };

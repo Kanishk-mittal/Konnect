@@ -5,8 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import Header from "../components/Header";
 import CsvUploader from "../components/CsvUploader";
 import ManualEntryTable from "../components/ManualEntryTable";
+import { checkEmptyValues, filterCharacters } from '../utils/validator/studentDataValidator';
+import { postData, getData } from '../api/requests';
+import { encryptAES, generateAESKey } from '../encryption/AES_utils';
+import { encryptRSA } from '../encryption/RSA_utils';
+
 // Unified Student type for all components
 export type Student = { name: string; rollNumber: string; emailId: string };
+export type WrongValue = { row: number; invalidColumns?: string[]; emptyColumns?: string[] };
 
 const AddStudent = () => {
   // Navigation and theme
@@ -22,11 +28,94 @@ const AddStudent = () => {
 
   // Student data state
   const [students, setStudents] = useState<Student[]>([]);
+  const [wrongValues, setWrongValues] = useState<WrongValue[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Submit handler: display students in console
-  const handleSubmit = () => {
-    // TODO: Connect to backend API here
-    
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    const emptyErrors = checkEmptyValues(students);
+    const charErrors = filterCharacters(students);
+
+    const allErrors: WrongValue[] = [];
+
+    emptyErrors.forEach(err => {
+      const existing = allErrors.find(e => e.row === err.row);
+      if (existing) {
+        existing.emptyColumns = err.emptyColumns;
+      } else {
+        allErrors.push(err);
+      }
+    });
+
+    charErrors.forEach(err => {
+      const existing = allErrors.find(e => e.row === err.row);
+      if (existing) {
+        existing.invalidColumns = err.invalidColumns;
+      } else {
+        allErrors.push(err);
+      }
+    });
+
+    setWrongValues(allErrors);
+
+    if (allErrors.length > 0) {
+      alert('Please fix the errors before submitting.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Map frontend student data to backend format
+      const studentsForBackend = students.map(s => ({
+        name: s.name,
+        roll: s.rollNumber,
+        email: s.emailId,
+      }));
+
+      // 2. Get server's public key for encryption
+      const publicKeyResponse = await getData('/encryption/rsa/publicKey', {});
+      if (!publicKeyResponse || !publicKeyResponse.status) {
+        throw new Error('Failed to get encryption key from server');
+      }
+      const { publicKey, keyId } = publicKeyResponse;
+
+      // 3. Encrypt the data payload
+      const aesKey = generateAESKey();
+      const encryptedStudents = encryptAES(JSON.stringify({ students: studentsForBackend }), aesKey);
+
+      // 4. Encrypt the AES key with the server's public key
+      const encryptedKey = encryptRSA(aesKey, publicKey);
+
+      // 5. Prepare the final payload
+      const payload = {
+        key: encryptedKey,
+        keyId: keyId,
+        data: encryptedStudents,
+      };
+
+      // 6. Send the encrypted data to the backend
+      const response = await postData('/student/addMultiple', payload);
+
+      if (response && response.status === true) {
+        setSuccessMessage(response.message || 'Students registered successfully!');
+        setStudents([]); // Clear the table on success
+        setWrongValues([]);
+      } else {
+        setErrorMessage(response?.message || 'An error occurred.');
+      }
+    } catch (error: any) {
+      console.error('Error during student registration:', error);
+      const errorMsg = error?.response?.data?.message || error?.message || 'An unexpected error occurred.';
+      setErrorMessage(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Define theme-specific colors (match AdminDashboard)
@@ -60,6 +149,16 @@ const AddStudent = () => {
             Back to Dashboard
           </button>
         </div>
+        {/* Message Display */}
+        {(errorMessage || successMessage) && (
+          <div className={`p-4 rounded-lg text-center font-medium mb-4 ${
+            errorMessage 
+              ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
+              : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
+          }`}>
+            {errorMessage || successMessage}
+          </div>
+        )}
         <div className="max-w-2xl mx-auto">
           {/* CSV Uploader */}
           <CsvUploader 
@@ -75,13 +174,16 @@ const AddStudent = () => {
               columns={tableColumns}
               students={students}
               setStudents={setStudents}
+              wrongValues={wrongValues}
+              setWrongValues={setWrongValues}
             />
             <div className="mt-6 flex justify-center">
               <button
                 onClick={handleSubmit}
-                className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                disabled={isLoading}
+                className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:bg-gray-400"
               >
-                Submit
+                {isLoading ? 'Submitting...' : 'Submit'}
               </button>
             </div>
           </div>
