@@ -69,15 +69,21 @@ const AdminRegistration = () => {
 
       // Generate AES key and encrypt data
       const aesKey = generateAESKey();
+      
+      // Create the data object and stringify it
+      const dataToEncrypt = {
+        collegeName: registrationData.collegeName,
+        adminUsername: registrationData.adminUsername,
+        collegeCode: registrationData.collegeCode,
+        emailId: registrationData.emailId,
+        password: registrationData.password,
+        otp: otp,
+      };
+      
       const encryptedData = {
-        collegeName: encryptAES(registrationData.collegeName, aesKey),
-        adminUsername: encryptAES(registrationData.adminUsername, aesKey),
-        collegeCode: encryptAES(registrationData.collegeCode, aesKey),
-        emailId: encryptAES(registrationData.emailId, aesKey),
-        password: encryptAES(registrationData.password, aesKey),
-        otp: encryptAES(otp, aesKey),
         key: encryptRSA(aesKey, publicKey),
         keyId: keyId,
+        data: encryptAES(JSON.stringify(dataToEncrypt), aesKey),
         publicKey: clientPublicKey, // Send client's public key for response encryption
       };
 

@@ -30,7 +30,7 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
                         setProfilePicture(response.profilePicture)
                     }
                 } catch (error) {
-                    console.error('Error fetching profile picture:', error)
+                    // Error fetching profile picture
                 } finally {
                     setLoading(false)
                 }
@@ -73,7 +73,6 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
 
     const handleLogout = () => {
         // TODO: Complete logout implementation - clear Redux state, localStorage, etc.
-        console.log('Logout clicked - TODO: Complete logout implementation')
         setShowTooltip(false)
         navigate('/')
     }

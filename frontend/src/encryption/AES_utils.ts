@@ -119,7 +119,6 @@ export const decryptObject = (encryptedObj: Record<string, string>, key: string)
         try {
             decryptedObj[objKey] = decryptAES(encryptedValue, key);
         } catch (error) {
-            console.error(`Failed to decrypt value for key "${objKey}":`, error);
             throw new Error(`Decryption failed for key "${objKey}". ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }

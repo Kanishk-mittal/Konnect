@@ -24,13 +24,8 @@ type AdminRegistrationData = {
 type EncryptedRegistrationData = {
     key: string;
     keyId: string;
-    collegeName: string;
-    adminUsername: string;
-    collegeCode: string;
-    emailId: string;
-    password: string;
-    otp: string;
-    publicKey: string; // will be used for encrypting the data we are sening back to user
+    data: string; // Encrypted JSON string containing all registration data
+    publicKey: string; // will be used for encrypting the data we are sending back to user
 };
 
 type AdminLoginData = {
@@ -42,9 +37,7 @@ type AdminLoginData = {
 type EncryptedLoginData = {
     key: string;
     keyId: string;
-    collegeCode: string;
-    username: string;
-    password: string;
+    data: string; // Encrypted JSON string containing login data
     publicKey?: string; // Optional public key for encrypted response
 };
 
@@ -102,15 +95,18 @@ const validateRegistrationData = (data: AdminRegistrationData): { status: boolea
 const decryptRegistrationData = (encryptedData: EncryptedRegistrationData, userKey: string): AdminRegistrationData => {
     // Decrypt the AES key using RSA private key
     const userAESKey = decryptRSA(encryptedData.key, userKey);
-
-    // Decrypt all registration fields using the AES key
+    
+    // Decrypt the JSON string and parse it
+    const decryptedDataString = decryptAES(encryptedData.data, userAESKey);
+    const parsedData = JSON.parse(decryptedDataString);
+    
     return {
-        collegeName: decryptAES(encryptedData.collegeName, userAESKey),
-        adminUsername: decryptAES(encryptedData.adminUsername, userAESKey),
-        collegeCode: decryptAES(encryptedData.collegeCode, userAESKey),
-        emailId: decryptAES(encryptedData.emailId, userAESKey),
-        password: decryptAES(encryptedData.password, userAESKey),
-        otp: decryptAES(encryptedData.otp, userAESKey),
+        collegeName: parsedData.collegeName,
+        adminUsername: parsedData.adminUsername,
+        collegeCode: parsedData.collegeCode,
+        emailId: parsedData.emailId,
+        password: parsedData.password,
+        otp: parsedData.otp,
     };
 };
 
@@ -171,10 +167,10 @@ export const registerController = async (req: Request, res: Response): Promise<v
         const encryptedData: EncryptedRegistrationData = req.body;
 
         // Validate encryption requirements
-        if (!encryptedData.key || !encryptedData.keyId) {
+        if (!encryptedData.key || !encryptedData.keyId || !encryptedData.data) {
             res.status(400).json({
                 status: false,
-                message: 'Encryption key and key ID are required.'
+                message: 'Encryption key, key ID, and data are required.'
             });
             return;
         }
@@ -190,7 +186,16 @@ export const registerController = async (req: Request, res: Response): Promise<v
         }
 
         // Decrypt registration data
-        const data = decryptRegistrationData(encryptedData, userKey);
+        let data: AdminRegistrationData;
+        try {
+            data = decryptRegistrationData(encryptedData, userKey);
+        } catch (e) {
+            res.status(400).json({
+                status: false,
+                message: 'Failed to decrypt or parse registration data.'
+            });
+            return;
+        }
 
         // Validate registration data
         const validationResult = validateRegistrationData(data);
@@ -319,10 +324,10 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         const encryptedData: EncryptedLoginData = req.body;
 
         // Validate encryption requirements
-        if (!encryptedData.key || !encryptedData.keyId) {
+        if (!encryptedData.key || !encryptedData.keyId || !encryptedData.data) {
             res.status(400).json({
                 status: false,
-                message: 'Encryption key and key ID are required.'
+                message: 'Encryption key, key ID, and data are required.'
             });
             return;
         }
@@ -341,11 +346,22 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         const userAESKey = decryptRSA(encryptedData.key, userKey);
 
         // Decrypt login data
-        const loginData: AdminLoginData = {
-            collegeCode: decryptAES(encryptedData.collegeCode, userAESKey),
-            username: decryptAES(encryptedData.username, userAESKey),
-            password: decryptAES(encryptedData.password, userAESKey)
-        };
+        let loginData: AdminLoginData;
+        try {
+            const decryptedDataString = decryptAES(encryptedData.data, userAESKey);
+            const parsedData = JSON.parse(decryptedDataString);
+            loginData = {
+                collegeCode: parsedData.collegeCode,
+                username: parsedData.username,
+                password: parsedData.password
+            };
+        } catch (e) {
+            res.status(400).json({
+                status: false,
+                message: 'Failed to decrypt or parse login data.'
+            });
+            return;
+        }
 
         // Validate input
         if (!loginData.collegeCode || !loginData.username || !loginData.password) {

@@ -109,7 +109,6 @@ const checkForDuplicates = async (students: StudentData[], collegeCode: string):
         } else {
             rollCounts.set(rollKey, index);
         }
-        
         if (emailCounts.has(emailKey)) {
             errors.push(`Duplicate email '${emailKey}' found at indexes ${emailCounts.get(emailKey)} and ${index}`);
         } else {
@@ -327,8 +326,8 @@ const createStudentDocumentsParallel = async (
 ): Promise<Array<{ studentDoc: any; password: string; email: string; name: string; roll: string }>> => {
     // Process all students in parallel for much better performance
     const studentPromises = students.map(async (studentData) => {
-        // Generate random password
-        const password = generateAESKey();
+        // Generate random 8-character password
+        const password = generateRandomPassword();
         
         // Hash the password
         const passwordHash = await createHash(password);
@@ -370,6 +369,28 @@ const createStudentDocumentsParallel = async (
     return await Promise.all(studentPromises);
 };
 
+// Split students into batches of given size
+const splitIntoBatches = (students: StudentData[], batchSize: number): StudentData[][] => {
+    const batches: StudentData[][] = [];
+    for (let i = 0; i < students.length; i += batchSize) {
+        batches.push(students.slice(i, i + batchSize));
+    }
+    return batches;
+};
+
+// Generate random 8-character password
+const generateRandomPassword = (): string => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+};
+
+// ...previous batch-processing helper removed per request. The controller
+// will now simply decrypt and display the whole payload for inspection.
+
 /**
  * Bulk student registration controller - Currently only decrypts and displays data
  * for testing encryption/decryption flow
@@ -397,18 +418,124 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
             const decryptedData = decryptAES(encryptedPayload.data, aesKey);
             const parsedData: BulkStudentRegistrationRequest = JSON.parse(decryptedData);
             
-            // For testing: Just log the decrypted data and send success response
-            console.log('Decrypted student data:', parsedData);
+            // Strict payload: require parsedData to be an object with a `students` array
+            if (!parsedData || typeof parsedData !== 'object' || !Array.isArray((parsedData as any).students)) {
+                res.status(400).json({ status: false, message: 'Invalid payload shape. Expected { students: [...] }' });
+                return;
+            }
 
-            const studentData = parsedData.students;
+            // Map directly using exact keys expected from AddStudent.tsx
+            const studentsArray: StudentData[] = (parsedData as any).students.map((s: any) => ({
+                name: s.name,
+                roll: s.roll,
+                email: s.email
+            }));
 
-            //getting the college code from jwt and admin model
+            // Use existing validation function for content checks
+            const validationErrors = validateStudentData(studentsArray);
+            if (validationErrors.length > 0) {
+                res.status(400).json({
+                    status: false,
+                    message: 'Validation failed for one or more students.',
+                    errors: validationErrors
+                });
+                return;
+            }
 
-            res.status(200).json({
-                status: true,
-                message: 'Data decrypted successfully',
-                data: parsedData
-            });
+            // Retrieve admin college code from authenticated user to check DB duplicates
+            const adminId = (req as any).user?.id;
+            if (!adminId) {
+                res.status(401).json({ status: false, message: 'Admin authentication required.' });
+                return;
+            }
+
+            let collegeCode: string;
+            try {
+                const admin = await AdminModel.findById(adminId);
+                if (!admin) {
+                    res.status(404).json({ status: false, message: 'Admin not found.' });
+                    return;
+                }
+                collegeCode = admin.college_code;
+            } catch (e) {
+                console.error('Error fetching admin for duplicate check:', e);
+                res.status(500).json({ status: false, message: 'Failed to validate admin.' });
+                return;
+            }
+
+            // Check for duplicates using existing function
+            try {
+                const duplicateErrors = await checkForDuplicates(studentsArray, collegeCode);
+                if (duplicateErrors.length > 0) {
+                    res.status(400).json({ status: false, message: 'Duplicate entries found', errors: duplicateErrors });
+                    return;
+                }
+            } catch (e) {
+                console.error('Error during duplicate check:', e);
+                res.status(500).json({ status: false, message: 'Error while checking duplicates.' });
+                return;
+            }
+
+            // All validations passed — process students in batches
+            const BATCH_SIZE = 100;
+            const batches = splitIntoBatches(studentsArray, BATCH_SIZE);
+            const allInserted: any[] = [];
+
+            try {
+                for (let b = 0; b < batches.length; b++) {
+                    const batch = batches[b]!; // non-null assertion: batches created from students array
+
+                    // 1) Prepare documents for this batch
+                    const prepared = await createStudentDocumentsParallel(batch, collegeCode);
+
+                    // Extract raw student documents for DB insertion
+                    const docsToInsert = prepared.map(p => p.studentDoc);
+
+                    // 2) Insert this batch into DB
+                    let inserted: any[] = [];
+                    try {
+                        inserted = await studentModel.insertMany(docsToInsert, { ordered: false });
+                        allInserted.push(...inserted);
+                    } catch (insertErr) {
+                        // insertMany may throw for duplicates or other errors; capture inserted docs if any
+                        console.error(`Error inserting batch ${b}:`, insertErr);
+                        
+                        if ((insertErr as any).insertedDocs && Array.isArray((insertErr as any).insertedDocs)) {
+                            inserted = (insertErr as any).insertedDocs;
+                            allInserted.push(...inserted);
+                        }
+                        // Continue to sending emails for successfully inserted docs in this batch
+                    }
+
+                    // 3) Send credential emails for this batch in parallel for those that were inserted
+                    try {
+                        const emailPromises = prepared
+                            .filter(p => inserted.find(i => i.roll === p.roll || i.email_id === p.email))
+                            .map(p => sendStudentCredentialsEmail(
+                                p.email,
+                                p.name,
+                                collegeCode,
+                                p.roll,
+                                p.password
+                            ).then(() => ({ email: p.email, status: 'sent' })).catch(err => ({ email: p.email, status: 'failed', error: err instanceof Error ? err.message : String(err) })));
+
+                        const emailResults = await Promise.allSettled(emailPromises);
+                    } catch (emailErr) {
+                        console.error(`Error sending emails for batch ${b}:`, emailErr);
+                        // Continue to next batch despite email errors
+                    }
+                }
+
+                // After all batches processed, return summary
+                res.status(200).json({
+                    status: true,
+                    message: `Processed ${studentsArray.length} students in ${batches.length} batches. Inserted: ${allInserted.length}`,
+                    insertedCount: allInserted.length
+                });
+            } catch (e) {
+                console.error('Error processing batches:', e);
+                res.status(500).json({ status: false, message: 'Failed while processing student batches.', error: e instanceof Error ? e.message : String(e) });
+            }
             
         } catch (e) {
             console.error('Decryption error:', e);

@@ -85,32 +85,106 @@ const AddStudent = () => {
       }
       const { publicKey, keyId } = publicKeyResponse;
 
-      // 3. Encrypt the data payload
-      const aesKey = generateAESKey();
-      const encryptedStudents = encryptAES(JSON.stringify({ students: studentsForBackend }), aesKey);
+      // 3. Check if we need to split into batches (for > 1000 students)
+      const BATCH_SIZE = 1000;
+      
+      if (studentsForBackend.length <= BATCH_SIZE) {
+        // Single request for 1000 or fewer students
+        const aesKey = generateAESKey();
+        const encryptedStudents = encryptAES(JSON.stringify({ students: studentsForBackend }), aesKey);
+        const encryptedKey = encryptRSA(aesKey, publicKey);
 
-      // 4. Encrypt the AES key with the server's public key
-      const encryptedKey = encryptRSA(aesKey, publicKey);
+        const payload = {
+          key: encryptedKey,
+          keyId: keyId,
+          data: encryptedStudents,
+        };
 
-      // 5. Prepare the final payload
-      const payload = {
-        key: encryptedKey,
-        keyId: keyId,
-        data: encryptedStudents,
-      };
+        const response = await postData('/student/addMultiple', payload);
 
-      // 6. Send the encrypted data to the backend
-      const response = await postData('/student/addMultiple', payload);
-
-      if (response && response.status === true) {
-        setSuccessMessage(response.message || 'Students registered successfully!');
-        setStudents([]); // Clear the table on success
-        setWrongValues([]);
+        if (response && response.status === true) {
+          setSuccessMessage(response.message || 'Students registered successfully!');
+          setStudents([]);
+          setWrongValues([]);
+        } else {
+          setErrorMessage(response?.message || 'An error occurred.');
+        }
       } else {
-        setErrorMessage(response?.message || 'An error occurred.');
+        // Multiple parallel requests for > 1000 students
+        const batches: typeof studentsForBackend[] = [];
+        for (let i = 0; i < studentsForBackend.length; i += BATCH_SIZE) {
+          batches.push(studentsForBackend.slice(i, i + BATCH_SIZE));
+        }
+
+        // Create all request promises in parallel (don't wait for previous response)
+        const requestPromises = batches.map(async (batch, index) => {
+          const aesKey = generateAESKey();
+          const encryptedStudents = encryptAES(JSON.stringify({ students: batch }), aesKey);
+          const encryptedKey = encryptRSA(aesKey, publicKey);
+
+          const payload = {
+            key: encryptedKey,
+            keyId: keyId,
+            data: encryptedStudents,
+          };
+
+          try {
+            const response = await postData('/student/addMultiple', payload);
+            return { 
+              batchIndex: index, 
+              batchSize: batch.length, 
+              success: response?.status === true, 
+              message: response?.message,
+              insertedCount: response?.insertedCount || 0
+            };
+          } catch (error: any) {
+            return { 
+              batchIndex: index, 
+              batchSize: batch.length, 
+              success: false, 
+              error: error?.response?.data?.message || error?.message || 'Request failed'
+            };
+          }
+        });
+
+        // Wait for all requests to complete
+        const results = await Promise.allSettled(requestPromises);
+
+        // Process results
+        let totalSuccessful = 0;
+        let totalFailed = 0;
+        let errorMessages: string[] = [];
+        let successfulBatches = 0;
+
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            const batchResult = result.value;
+            if (batchResult.success) {
+              successfulBatches++;
+              totalSuccessful += batchResult.insertedCount || batchResult.batchSize;
+            } else {
+              totalFailed += batchResult.batchSize;
+              errorMessages.push(`Batch ${index + 1}: ${batchResult.message || batchResult.error}`);
+            }
+          } else {
+            totalFailed += batches[index].length;
+            errorMessages.push(`Batch ${index + 1}: ${result.reason}`);
+          }
+        });
+
+        // Display results
+        if (successfulBatches === batches.length) {
+          setSuccessMessage(`All ${batches.length} batches processed successfully! Total students registered: ${totalSuccessful}`);
+          setStudents([]);
+          setWrongValues([]);
+        } else if (successfulBatches > 0) {
+          setSuccessMessage(`Partial success: ${successfulBatches}/${batches.length} batches completed. ${totalSuccessful} students registered successfully.`);
+          setErrorMessage(`Failed batches: ${errorMessages.join('; ')}`);
+        } else {
+          setErrorMessage(`All batches failed: ${errorMessages.join('; ')}`);
+        }
       }
     } catch (error: any) {
-      console.error('Error during student registration:', error);
       const errorMsg = error?.response?.data?.message || error?.message || 'An unexpected error occurred.';
       setErrorMessage(errorMsg);
     } finally {
@@ -128,9 +202,6 @@ const AddStudent = () => {
   const headerBackground = theme === 'dark' 
     ? {} 
     : { background: 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%)' };
-
-  // Check admin authentication
-  // TODO: Add authentication logic if needed
 
   return (
     <div className="flex flex-col" style={{ background: backgroundGradient }}>

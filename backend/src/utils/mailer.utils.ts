@@ -32,10 +32,12 @@ export const sendEmail = async (
       html: message,
     };
 
+    console.log(`📧 Attempting to send email to: ${receiver} | Subject: ${title}`);
     const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent successfully to: ${receiver} | Message ID: ${info.messageId}`);
     return info;
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error(`❌ Failed to send email to: ${receiver} | Subject: ${title} | Error:`, error);
     throw error;
   }
 };
@@ -121,6 +123,7 @@ export const sendOTPEmail = async (
   subject: string = "Your OTP Code"
 ): Promise<OTPEmailResponse> => {
   try {
+    console.log(`🔐 Generating OTP for email: ${email}`);
     // Generate a new OTP
     const otp = OTP.generateOTP(email);
     
@@ -135,11 +138,9 @@ export const sendOTPEmail = async (
       <p>If you didn't request this OTP, please ignore this email.</p>
     `;
 
-    // debug log
-    console.log(process.env.MAIL_USER, process.env.MAIL_PASSWORD);
-    
     // Send the templated email with the OTP
     await sendTemplatedEmail(subject, message, email);
+    console.log(`✅ OTP email sent successfully to: ${email}`);
     
     // Return success status and the OTP
     return {
@@ -147,7 +148,7 @@ export const sendOTPEmail = async (
       otp
     };
   } catch (error) {
-    console.error('Error sending OTP email:', error);
+    console.error(`❌ Failed to send OTP email to: ${email} | Error:`, error);
     
     // Return failure status and empty OTP
     return {
@@ -173,43 +174,50 @@ export const sendStudentCredentialsEmail = async (
   rollNumber: string,
   password: string
 ): Promise<void> => {
-  const subject = 'Welcome to Konnect - Your Account Credentials';
-  
-  const message = `
-    <h2>Welcome to Konnect!</h2>
-    <p>Dear ${studentName},</p>
-    <p>Your student account has been successfully created and activated. Here are your login credentials:</p>
+  try {
+    console.log(`🎓 Sending student credentials email to: ${studentEmail} | Student: ${studentName} (${rollNumber})`);
+    const subject = 'Welcome to Konnect - Your Account Credentials';
     
-    <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #4a7aff;">
-      <h3>Your Login Credentials:</h3>
-      <p><strong>College Code:</strong> ${collegeCode}</p>
-      <p><strong>Roll Number:</strong> ${rollNumber}</p>
-      <p><strong>Temporary Password:</strong> <code style="background-color: #e0e0e0; padding: 2px 5px; border-radius: 3px;">${password}</code></p>
-    </div>
-    
-    <div style="background-color: #d4edda; padding: 15px; margin: 20px 0; border: 1px solid #c3e6cb; border-radius: 5px;">
-      <h4 style="color: #155724; margin: 0 0 10px 0;">✅ Account Status: Successfully Created</h4>
-      <p style="color: #155724; margin: 0;">Your account is now active and ready to use. You can log in immediately using the credentials above.</p>
-    </div>
-    
-    <div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border: 1px solid #ffeaa7; border-radius: 5px;">
-      <h4 style="color: #856404; margin: 0 0 10px 0;">⚠️ Important Security Instructions:</h4>
-      <ul style="color: #856404; margin: 0;">
-        <li><strong>Change your password immediately</strong> after your first login</li>
-        <li><strong>Create recovery keys</strong> to secure your account</li>
-        <li><strong>Keep your credentials safe</strong> and do not share them with anyone</li>
-        <li><strong>Log in as soon as possible</strong> to secure your account</li>
-      </ul>
-    </div>
-    
-    <p>You can log in to Konnect using the credentials provided above. Make sure to follow the security instructions for the safety of your account.</p>
-    
-    <p>If you have any questions or need assistance, please contact your system administrator.</p>
-    
-    <p>Best regards,<br>The Konnect Team</p>
-  `;
+    const message = `
+      <h2>Welcome to Konnect!</h2>
+      <p>Dear ${studentName},</p>
+      <p>Your student account has been successfully created and activated. Here are your login credentials:</p>
+      
+      <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #4a7aff;">
+        <h3>Your Login Credentials:</h3>
+        <p><strong>College Code:</strong> ${collegeCode}</p>
+        <p><strong>Roll Number:</strong> ${rollNumber}</p>
+        <p><strong>Temporary Password:</strong> <code style="background-color: #e0e0e0; padding: 2px 5px; border-radius: 3px;">${password}</code></p>
+      </div>
+      
+      <div style="background-color: #d4edda; padding: 15px; margin: 20px 0; border: 1px solid #c3e6cb; border-radius: 5px;">
+        <h4 style="color: #155724; margin: 0 0 10px 0;">✅ Account Status: Successfully Created</h4>
+        <p style="color: #155724; margin: 0;">Your account is now active and ready to use. You can log in immediately using the credentials above.</p>
+      </div>
+      
+      <div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border: 1px solid #ffeaa7; border-radius: 5px;">
+        <h4 style="color: #856404; margin: 0 0 10px 0;">⚠️ Important Security Instructions:</h4>
+        <ul style="color: #856404; margin: 0;">
+          <li><strong>Change your password immediately</strong> after your first login</li>
+          <li><strong>Create recovery keys</strong> to secure your account</li>
+          <li><strong>Keep your credentials safe</strong> and do not share them with anyone</li>
+          <li><strong>Log in as soon as possible</strong> to secure your account</li>
+        </ul>
+      </div>
+      
+      <p>You can log in to Konnect using the credentials provided above. Make sure to follow the security instructions for the safety of your account.</p>
+      
+      <p>If you have any questions or need assistance, please contact your system administrator.</p>
+      
+      <p>Best regards,<br>The Konnect Team</p>
+    `;
 
-  await sendTemplatedEmail(subject, message, studentEmail);
+    await sendTemplatedEmail(subject, message, studentEmail);
+    console.log(`✅ Student credentials email sent successfully to: ${studentEmail} | Student: ${studentName} (${rollNumber})`);
+  } catch (error) {
+    console.error(`❌ Failed to send student credentials email to: ${studentEmail} | Student: ${studentName} (${rollNumber}) | Error:`, error);
+    throw error;
+  }
 };
 
 /**
@@ -226,6 +234,7 @@ export const sendBulkStudentEmails = async (
     password: string;
   }>
 ): Promise<{ successful: number; failed: number; errors: string[] }> => {
+  console.log(`📬 Starting bulk email send for ${emailData.length} students`);
   const emailPromises: Promise<void>[] = [];
   const errors: string[] = [];
   let successful = 0;
@@ -243,7 +252,9 @@ export const sendBulkStudentEmails = async (
       successful++;
     }).catch((error) => {
       failed++;
-      errors.push(`Failed to send email to ${student.email}: ${error.message}`);
+      const errorMsg = `Failed to send email to ${student.email}: ${error.message}`;
+      errors.push(errorMsg);
+      console.error(`❌ Bulk email error: ${errorMsg}`);
     });
 
     emailPromises.push(emailPromise);
@@ -252,6 +263,7 @@ export const sendBulkStudentEmails = async (
   // Wait for all email promises to resolve
   await Promise.allSettled(emailPromises);
 
+  console.log(`📊 Bulk email summary: ${successful} successful, ${failed} failed out of ${emailData.length} total`);
   return {
     successful,
     failed,

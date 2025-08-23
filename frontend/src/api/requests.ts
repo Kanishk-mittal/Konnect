@@ -12,7 +12,6 @@ export const postData = async (endpoint: string, data: any) => {
         const response = await instance.post(endpoint, data);
         return response.data;
     } catch (error) {
-        console.error(`Error posting data to ${endpoint}:`, error);
         throw error;
     }
 }
@@ -22,7 +21,6 @@ export const getData = async (endpoint: string, params?: any) => {
         const response = await instance.get(endpoint, { params });
         return response.data;
     } catch (error) {
-        console.error(`Error getting data from ${endpoint}:`, error);
         throw error;
     }
 }

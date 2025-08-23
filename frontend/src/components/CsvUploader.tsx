@@ -56,8 +56,7 @@ const CsvUploader: React.FC<CsvUploaderProps> = ({
       setStudents(allStudents);
       setFiles([]);
     } catch (error) {
-      console.error('Error processing CSV files:', error);
-      alert('Error processing CSV files. Please check the console for details.');
+      alert('Error processing CSV files. Please check the file format and try again.');
     }
   };
 
@@ -82,35 +81,18 @@ const CsvUploader: React.FC<CsvUploaderProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-
     const droppedFiles = Array.from(e.dataTransfer.files);
     const csvFiles = droppedFiles.filter(file => file.type === 'text/csv' || file.name.endsWith('.csv'));
-    
     if (csvFiles.length > 0) {
       setFiles(csvFiles);
-      console.log('CSV files selected via drag and drop:', csvFiles.map(file => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: new Date(file.lastModified)
-      })));
-    } else {
-      console.warn('Only CSV files are accepted');
     }
-  };
-
+    }
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     const csvFiles = selectedFiles.filter(file => file.type === 'text/csv' || file.name.endsWith('.csv'));
     
     if (csvFiles.length > 0) {
       setFiles(csvFiles);
-      console.log('CSV files selected via click:', csvFiles.map(file => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: new Date(file.lastModified)
-      })));
     }
   };
 
