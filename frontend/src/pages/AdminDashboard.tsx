@@ -120,16 +120,21 @@ const AdminDashboard = () => {
       try {
         const response = await getData('/admin/userID');
         // If successful, user is authenticated as admin
-        console.log('Admin authentication verified:', response);
+        if (response && response.userId) {
+          // Set authenticated to true in Redux
+          dispatch({ type: 'auth/setAuthenticated', payload: true });
+          // Optionally set userId if not already set
+          if (!authState.userId) {
+            dispatch({ type: 'auth/setUserId', payload: response.userId });
+          }
+        }
       } catch (error) {
-        // If failed, user is not authenticated as admin, show alert and redirect
-        alert('Access denied: You are not authorized to access the admin dashboard');
-        navigate('/');
+        // If failed, user is not authenticated as admin, show alert and redirect        navigate('/');
       }
     };
 
     checkAdminAuth();
-  }, [navigate]);
+  }, [navigate, dispatch, authState.userId]);
 
   return (
     <div className="flex flex-col h-screen" style={{
@@ -142,11 +147,7 @@ const AdminDashboard = () => {
         {loading ? (
           <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading...</h1>
         ) : adminDetails ? (
-            <div className="flex-grow flex flex-col">
-            <h1 className={`text-2xl font-bold mt-3 h-[7vh] ${textColor}`}>
-              Welcome {adminDetails.username}, {adminDetails.collegeCode}
-            </h1>
-            
+            <div className="flex-grow flex flex-col">            
             {/* Three-section layout */}
             <div className='flex-grow flex gap-2 p-3'>
               <div className="left rounded-lg p-4 w-[49%] flex flex-col gap-1" style={{ backgroundColor: leftSectionColor }}>

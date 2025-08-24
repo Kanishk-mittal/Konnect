@@ -2,9 +2,10 @@ import Title from "./Title"
 import Logo from "../assets/Logo.png"
 import ProfileIcon from "../assets/profile_icon.png"
 import ThemeButton from "./ThemeButton"
+import { postData } from "../api/requests"
 import { useNavigate } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import type { RootState } from "../store/store"
 import { getData } from "../api/requests"
 
@@ -14,7 +15,13 @@ interface HeaderProps {
 
 const Header = ({ editProfileUrl }: HeaderProps) => {
     const navigate = useNavigate()
+    const dispatch = useDispatch();
     const { isAuthenticated, userId } = useSelector((state: RootState) => state.auth)
+
+    // Debug: Log authentication state
+    useEffect(() => {
+        console.log('isAuthenticated:', isAuthenticated, 'userId:', userId)
+    }, [isAuthenticated, userId])
     const [profilePicture, setProfilePicture] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [showTooltip, setShowTooltip] = useState(false)
@@ -58,6 +65,11 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
         setShowTooltip(!showTooltip)
     }
 
+    // Debug: Log profilePicture value
+    useEffect(() => {
+        console.log('Profile picture value:', profilePicture)
+    }, [profilePicture])
+
     const handleEditProfile = () => {
         if (editProfileUrl) {
             navigate(editProfileUrl)
@@ -72,13 +84,17 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
     }
 
     const handleLogout = () => {
-        // TODO: Complete logout implementation - clear Redux state, localStorage, etc.
-        setShowTooltip(false)
-        navigate('/')
+        // Call backend to clear JWT token using postData helper
+        postData('/admin/logout', {})
+            .finally(() => {
+                // Always clear Redux state and navigate even if logout fails
+                navigate('/');
+                dispatch({ type: 'auth/clearAuth' });
+            });
     }
 
     return (
-        <header className="flex justify-center items-center select-none">
+        <header className="flex justify-center items-center select-none pt-1">
             <div className="flex justify-between items-center h-[10vh] w-[90%]">
                 <div onClick={()=>navigate("/")} className="flex items-center cursor-pointer">
                     <img src={Logo} alt="Logo" className="h-18 object-contain" />

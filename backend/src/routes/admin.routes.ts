@@ -5,7 +5,8 @@ import {
     sendRegistrationOTP, 
     sendAdminProfilePicture, 
     getAdminDetails,
-    getAdminDetailsFromJWT 
+    getAdminDetailsFromJWT,
+    adminLogoutController
 } from '../controller/api_controller/admin.controller';
 import {
     adminAuthMiddleware,
@@ -30,5 +31,8 @@ router.get("/userID", authMiddleware, adminAuthMiddleware, (req: Request, res: R
     }
     res.json({ userId: req.user.id });
 }); // Endpoint to check if admin is logged in
+
+// Logout endpoint to clear JWT cookie
+router.post("/logout", adminLogoutController);
 
 export default router;

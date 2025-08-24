@@ -444,6 +444,27 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         });
     }
 };
+// Admin Logout Controller
+export const adminLogoutController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Clear the auth_token cookie
+        res.clearCookie('auth_token', {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+        });
+        res.status(200).json({
+            status: true,
+            message: 'Logged out successfully.'
+        });
+    } catch (error) {
+        console.error('Error during admin logout:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An error occurred during logout.'
+        });
+    }
+};
 
 export const sendAdminProfilePicture = async (req: Request, res: Response): Promise<void> => {
     try {
