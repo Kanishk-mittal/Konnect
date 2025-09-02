@@ -12,6 +12,7 @@ const studentSchema = new Schema({
   private_key: { type: String, required: true }, // rsa private key encrypted with user's password
   public_key: { type: String, required: true }, // rsa public key encrypted with server private key
   blocked_user: [{ type: Types.ObjectId, ref: 'User' }],
+  is_blocked: { type: Boolean, default: false },
 });
 
 export default model('Student', studentSchema);

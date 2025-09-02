@@ -56,27 +56,27 @@ const validateStudentData = (students: StudentData[]): string[] => {
     const errors: string[] = [];
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const rollRegex = /^[A-Za-z0-9]{1,20}$/; // Alphanumeric, max 20 chars
-    
+
     students.forEach((student, index) => {
         if (!student || typeof student !== 'object') {
             errors.push(`Student at index ${index} is invalid`);
             return;
         }
-        
+
         // Name validation
         if (!student.name || typeof student.name !== 'string' || student.name.trim().length < 2) {
             errors.push(`Student at index ${index}: Name must be at least 2 characters`);
         } else if (student.name.trim().length > 100) {
             errors.push(`Student at index ${index}: Name must not exceed 100 characters`);
         }
-        
+
         // Roll validation
         if (!student.roll || typeof student.roll !== 'string') {
             errors.push(`Student at index ${index}: Roll number is required`);
         } else if (!rollRegex.test(student.roll.trim())) {
             errors.push(`Student at index ${index}: Roll number must be alphanumeric (max 20 chars)`);
         }
-        
+
         // Email validation
         if (!student.email || typeof student.email !== 'string') {
             errors.push(`Student at index ${index}: Email is required`);
@@ -84,26 +84,26 @@ const validateStudentData = (students: StudentData[]): string[] => {
             errors.push(`Student at index ${index}: Invalid email format`);
         }
     });
-    
+
     return errors;
 };
 
 // Check for duplicates efficiently
 const checkForDuplicates = async (students: StudentData[], collegeCode: string): Promise<string[]> => {
     const errors: string[] = [];
-    
+
     // Extract unique rolls and emails for efficient querying
     const rolls = [...new Set(students.map(s => s.roll))];
     const emails = [...new Set(students.map(s => s.email))];
-    
+
     // Check internal duplicates first
     const rollCounts = new Map();
     const emailCounts = new Map();
-    
+
     students.forEach((student, index) => {
         const rollKey = student.roll;
         const emailKey = student.email;
-        
+
         if (rollCounts.has(rollKey)) {
             errors.push(`Duplicate roll number '${rollKey}' found at indexes ${rollCounts.get(rollKey)} and ${index}`);
         } else {
@@ -115,31 +115,31 @@ const checkForDuplicates = async (students: StudentData[], collegeCode: string):
             emailCounts.set(emailKey, index);
         }
     });
-    
+
     if (errors.length > 0) return errors;
-    
+
     // Check database duplicates in parallel
     const [existingRolls, existingEmails] = await Promise.all([
         studentModel.find({
             college_code: collegeCode,
             roll: { $in: rolls }
         }).select('roll').lean(),
-        
+
         studentModel.find({
             email_id: { $in: emails }
         }).select('email_id').lean()
     ]);
-    
+
     if (existingRolls.length > 0) {
         const duplicateRolls = existingRolls.map(s => s.roll);
         errors.push(`Roll numbers already exist in college: ${duplicateRolls.join(', ')}`);
     }
-    
+
     if (existingEmails.length > 0) {
         const duplicateEmails = existingEmails.map(s => s.email_id);
         errors.push(`Email addresses already exist: ${duplicateEmails.join(', ')}`);
     }
-    
+
     return errors;
 };
 
@@ -150,9 +150,9 @@ export const studentLoginController = async (req: Request, res: Response): Promi
 
         // Validate encryption requirements
         if (!encryptedData.key || !encryptedData.keyId) {
-            res.status(400).json({ 
-                status: false, 
-                message: 'Encryption key and key ID are required.' 
+            res.status(400).json({
+                status: false,
+                message: 'Encryption key and key ID are required.'
             });
             return;
         }
@@ -161,7 +161,7 @@ export const studentLoginController = async (req: Request, res: Response): Promi
         const serverKey = KeyManager.getPrivateKey(encryptedData.keyId);
         if (!serverKey) {
             res.status(400).json({
-                status: false, 
+                status: false,
                 message: 'Invalid key ID.'
             });
             return;
@@ -169,7 +169,7 @@ export const studentLoginController = async (req: Request, res: Response): Promi
 
         // Decrypt AES key
         const clientAESKey = decryptRSA(encryptedData.key, serverKey);
-        
+
         // Decrypt login data
         const loginData: StudentLoginData = {
             collegeCode: decryptAES(encryptedData.collegeCode, clientAESKey),
@@ -179,23 +179,23 @@ export const studentLoginController = async (req: Request, res: Response): Promi
 
         // Validate input
         if (!loginData.collegeCode || !loginData.rollNumber || !loginData.password) {
-            res.status(400).json({ 
-                status: false, 
-                message: 'College code, roll number, and password are required.' 
+            res.status(400).json({
+                status: false,
+                message: 'College code, roll number, and password are required.'
             });
             return;
         }
 
         // Find student by college code and roll
-        const student = await studentModel.findOne({ 
+        const student = await studentModel.findOne({
             college_code: loginData.collegeCode,
             roll: loginData.rollNumber
         });
 
         if (!student) {
-            res.status(404).json({ 
-                status: false, 
-                message: 'Student not found.' 
+            res.status(404).json({
+                status: false,
+                message: 'Student not found.'
             });
             return;
         }
@@ -203,9 +203,9 @@ export const studentLoginController = async (req: Request, res: Response): Promi
         // Verify password
         const isPasswordValid = await verifyHash(loginData.password, student.password_hash as string);
         if (!isPasswordValid) {
-            res.status(401).json({ 
-                status: false, 
-                message: 'Invalid password.' 
+            res.status(401).json({
+                status: false,
+                message: 'Invalid password.'
             });
             return;
         }
@@ -220,20 +220,20 @@ export const studentLoginController = async (req: Request, res: Response): Promi
                 // Get student's private key from database
                 const studentPrivateKey = student.private_key as string;
                 const studentId = student._id.toString();
-                
+
                 // Generate a new AES key for response encryption
                 const responseAesKey = generateAESKey();
-                
+
                 // Encrypt sensitive data with AES key
                 const encryptedPrivateKey = encryptAES(studentPrivateKey, responseAesKey);
                 const encryptedId = encryptAES(studentId, responseAesKey);
-                
+
                 // Encrypt the AES key with client's public key
                 const encryptedKey = encryptRSA(responseAesKey, encryptedData.publicKey);
-                
+
                 // Return encrypted data to client
-                res.status(200).json({ 
-                    status: true, 
+                res.status(200).json({
+                    status: true,
                     message: 'Login successful!',
                     data: {
                         privateKey: encryptedPrivateKey,
@@ -244,24 +244,24 @@ export const studentLoginController = async (req: Request, res: Response): Promi
             } catch (error) {
                 console.error('Error encrypting response data:', error);
                 // Fall back to simple response if encryption fails
-                res.status(200).json({ 
-                    status: true, 
-                    message: 'Login successful!' 
+                res.status(200).json({
+                    status: true,
+                    message: 'Login successful!'
                 });
             }
             return;
         }
-        
+
         // Standard response if no public key was provided
-        res.status(200).json({ 
-            status: true, 
-            message: 'Login successful!' 
+        res.status(200).json({
+            status: true,
+            message: 'Login successful!'
         });
     } catch (error) {
         console.error('Error in student login:', error);
-        res.status(500).json({ 
-            status: false, 
-            message: 'An unexpected error occurred.' 
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred.'
         });
     }
 };
@@ -283,24 +283,25 @@ export const getStudentByCollegeCode = async (req: Request, res: Response): Prom
             return;
         }
 
-        // Find all students by college code and select only required fields
-        const students = await studentModel.find({ 
-            college_code: collegeCode 
-        }).select('_id roll display_name profile_picture');
+        // Find all students by college code and select required fields including is_blocked
+        const students = await studentModel.find({
+            college_code: collegeCode
+        }).select('_id roll display_name profile_picture is_blocked');
 
         // Map students to the desired format
         const studentData = students.map(student => ({
             id: student._id.toString(),
             rollNumber: student.roll,
             name: student.display_name,
-            profilePicture: student.profile_picture || null // Return null if empty, frontend will handle
+            profilePicture: student.profile_picture || null, // Return null if empty, frontend will handle
+            isBlocked: student.is_blocked === true // Ensure boolean
         }));
 
         // Return student details (empty array if no students found)
         res.status(200).json({
             status: true,
-            message: studentData.length > 0 
-                ? 'Student details retrieved successfully.' 
+            message: studentData.length > 0
+                ? 'Student details retrieved successfully.'
                 : 'No students found with the provided college code.',
             data: studentData
         });
@@ -321,26 +322,26 @@ export const getStudentByCollegeCode = async (req: Request, res: Response): Prom
  * @returns Promise with array of student documents and passwords
  */
 const createStudentDocumentsParallel = async (
-    students: StudentData[], 
+    students: StudentData[],
     collegeCode: string
 ): Promise<Array<{ studentDoc: any; password: string; email: string; name: string; roll: string }>> => {
     // Process all students in parallel for much better performance
     const studentPromises = students.map(async (studentData) => {
         // Generate random 8-character password
         const password = generateRandomPassword();
-        
+
         // Hash the password
         const passwordHash = await createHash(password);
-        
+
         // Generate RSA key pair for the student
         const [privateKey, publicKey] = generateRSAKeyPair();
-        
+
         // Encrypt private key with user's password
         const encryptedPrivateKey = encryptAES(privateKey, generateAESKeyFromString(password));
-        
+
         // Encrypt public key with server's internal key
         const encryptedPublicKey = encryptAES(publicKey, internalAesKey);
-        
+
         // Create student document
         const studentDoc = {
             profile_picture: null,
@@ -355,16 +356,16 @@ const createStudentDocumentsParallel = async (
             public_key: encryptedPublicKey,
             blocked_user: [] // Empty array as specified
         };
-        
-        return { 
-            studentDoc, 
-            password, 
-            email: studentData.email, 
-            name: studentData.name, 
-            roll: studentData.roll 
+
+        return {
+            studentDoc,
+            password,
+            email: studentData.email,
+            name: studentData.name,
+            roll: studentData.roll
         };
     });
-    
+
     // Wait for all student documents to be created in parallel
     return await Promise.all(studentPromises);
 };
@@ -417,7 +418,7 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
             const aesKey = decryptRSA(encryptedPayload.key, serverPrivateKey);
             const decryptedData = decryptAES(encryptedPayload.data, aesKey);
             const parsedData: BulkStudentRegistrationRequest = JSON.parse(decryptedData);
-            
+
             // Strict payload: require parsedData to be an object with a `students` array
             if (!parsedData || typeof parsedData !== 'object' || !Array.isArray((parsedData as any).students)) {
                 res.status(400).json({ status: false, message: 'Invalid payload shape. Expected { students: [...] }' });
@@ -499,7 +500,7 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
                     } catch (insertErr) {
                         // insertMany may throw for duplicates or other errors; capture inserted docs if any
                         console.error(`Error inserting batch ${b}:`, insertErr);
-                        
+
                         if ((insertErr as any).insertedDocs && Array.isArray((insertErr as any).insertedDocs)) {
                             inserted = (insertErr as any).insertedDocs;
                             allInserted.push(...inserted);
@@ -536,11 +537,11 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
                 console.error('Error processing batches:', e);
                 res.status(500).json({ status: false, message: 'Failed while processing student batches.', error: e instanceof Error ? e.message : String(e) });
             }
-            
+
         } catch (e) {
             console.error('Decryption error:', e);
-            res.status(400).json({ 
-                status: false, 
+            res.status(400).json({
+                status: false,
                 message: 'Failed to decrypt or parse data.',
                 error: e instanceof Error ? e.message : 'Unknown error'
             });
@@ -555,3 +556,8 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
         });
     }
 };
+
+
+export const blockStudent = async (req: Request, res: Response): Promise<void> => {
+
+}
