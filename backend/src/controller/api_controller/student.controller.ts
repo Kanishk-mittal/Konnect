@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
 
 // Models
 import studentModel from '../../models/Student.model';
