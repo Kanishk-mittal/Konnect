@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { 
-    registerController, 
-    adminLoginController, 
-    sendRegistrationOTP, 
-    sendAdminProfilePicture, 
+import {
+    registerController,
+    adminLoginController,
+    sendRegistrationOTP,
+    sendAdminProfilePicture,
     getAdminDetails,
     getAdminDetailsFromJWT,
     adminLogoutController
@@ -18,14 +18,14 @@ import { resolvePublicKey, encryptResponse } from '../middleware/responseEncrypt
 const router = Router();
 
 // Routes with encryption middleware
-router.post('/register', 
+router.post('/register',
     decryptRequest,        // Decrypt incoming encrypted request
     registerController,    // Controller logic
     resolvePublicKey,      // Resolve public key for response encryption
     encryptResponse        // Encrypt sensitive response data
 );
 
-router.post('/login', 
+router.post('/login',
     decryptRequest,        // Decrypt incoming encrypted request
     adminLoginController,  // Controller logic
     resolvePublicKey,      // Resolve public key for response encryption
@@ -37,9 +37,9 @@ router.get("/details/:adminId", getAdminDetails); // New endpoint for admin deta
 router.get("/details", authMiddleware, adminAuthMiddleware, getAdminDetailsFromJWT); // Get admin details from JWT
 router.get("/userID", authMiddleware, adminAuthMiddleware, (req: Request, res: Response): void => {
     if (!req.user) {
-        res.status(401).json({ 
-            status: false, 
-            message: 'User not authenticated' 
+        res.status(401).json({
+            status: false,
+            message: 'User not authenticated'
         });
         return;
     }

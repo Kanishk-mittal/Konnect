@@ -92,10 +92,10 @@ const checkExistingAdmin = async (data: AdminRegistrationData): Promise<{ exists
 };
 
 // Helper function to create admin document
-const createAdminDocument = async (data: AdminRegistrationData): Promise<{ 
-    adminDoc: AdminDocument, 
-    recoveryKey: string, 
-    privateKey: string 
+const createAdminDocument = async (data: AdminRegistrationData): Promise<{
+    adminDoc: AdminDocument,
+    recoveryKey: string,
+    privateKey: string
 }> => {
     // Hash password
     const passwordHash = await createHash(data.password);
@@ -135,7 +135,7 @@ export const registerController = async (req: Request, res: Response): Promise<v
     try {
         // The middleware has already decrypted the request data
         const data: AdminRegistrationData = req.body;
-        
+
         // Client's public key (if provided) is stored by decryptRequest middleware
         const clientPublicKey = (req as any).clientPublicKey;
 
@@ -179,7 +179,7 @@ export const registerController = async (req: Request, res: Response): Promise<v
             id: newAdmin._id.toString()
         };
         setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
-        
+
         // Return success response with sensitive data
         // The encryptResponse middleware will automatically encrypt this if a public key is available
         res.status(201).json({
@@ -257,7 +257,7 @@ export const adminLoginController = async (req: Request, res: Response): Promise
     try {
         // The middleware has already decrypted the request data
         const loginData: AdminLoginData = req.body;
-        
+
         // Client's public key (if provided) is stored by decryptRequest middleware
         const clientPublicKey = (req as any).clientPublicKey;
 
@@ -271,7 +271,7 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         }
 
         // Find admin by college code
-        const admin = await AdminModel.findOne({ 
+        const admin = await AdminModel.findOne({
             college_code: loginData.collegeCode,
         });
         if (!admin) {
@@ -303,10 +303,10 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         // Set JWT token
         const jwtPayload = { type: 'admin', id: admin._id.toString() };
         setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
-        
+
         // Decrypt private key from database
         const privateKey = decryptAES(admin.private_key, generateAESKeyFromString(loginData.password));
-        
+
         // Return success response with sensitive data
         // The encryptResponse middleware will automatically encrypt this if a public key is available
         res.status(200).json({
@@ -431,9 +431,9 @@ export const getAdminDetails = async (req: Request, res: Response): Promise<void
 export const getAdminDetailsFromJWT = async (req: Request, res: Response): Promise<void> => {
     try {
         if (!req.user) {
-            res.status(401).json({ 
-                status: false, 
-                message: 'User not authenticated' 
+            res.status(401).json({
+                status: false,
+                message: 'User not authenticated'
             });
             return;
         }
