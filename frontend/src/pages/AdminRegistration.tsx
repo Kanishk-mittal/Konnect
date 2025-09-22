@@ -14,7 +14,7 @@ import RecoveryKeyPopup from '../components/RecoveryKeyPopup';
 import { setAuthenticated, setEmail, setPrivateKey, setUserId, setUserType } from '../store/authSlice';
 
 // API and utilities
-import { postData, getData, postEncryptedData } from "../api/requests";
+import { postData, postEncryptedData } from "../api/requests";
 import { validateRegistrationData } from '../utils/registrationUtils';
 import { savePrivateKey } from '../utils/privateKeyManager';
 

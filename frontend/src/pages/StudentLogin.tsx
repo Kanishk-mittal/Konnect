@@ -12,13 +12,8 @@ import InputComponent from '../components/InputComponent';
 import { setAuthenticated, setPrivateKey, setUserId, setUserType } from '../store/authSlice';
 
 // API and utilities
-import { postData, getData } from '../api/requests';
-import { decryptServerResponse } from '../utils/registrationUtils';
+import { postEncryptedData } from '../api/requests';
 import { savePrivateKey } from '../utils/privateKeyManager';
-
-// Encryption utilities
-import { encryptAES, generateAESKey } from '../encryption/AES_utils';
-import { encryptRSA, generateRSAKeyPair } from '../encryption/RSA_utils';
 
 const StudentLogin = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
@@ -44,58 +39,36 @@ const StudentLogin = () => {
     setSuccessMessage('');
 
     try {
-      // Get public key from backend
-      const publicKeyResponse = await getData('/encryption/rsa/publicKey', {});
-
-      if (!publicKeyResponse || !publicKeyResponse.status) {
-        throw new Error('Failed to get encryption key from server');
+      // Validate required fields
+      if (!formData.collegeCode || !formData.rollNumber || !formData.password) {
+        setErrorMessage('All fields are required');
+        setIsLoading(false);
+        return;
       }
 
-      const publicKey = publicKeyResponse.publicKey;
-      const keyId = publicKeyResponse.keyId;
-
-      // Generate client-side RSA key pair for secure response
-      const [clientPrivateKey, clientPublicKey] = generateRSAKeyPair();
-
-      // Generate AES key and encrypt data
-      const aesKey = generateAESKey();
-      const encryptedData = {
-        collegeCode: encryptAES(formData.collegeCode, aesKey),
-        rollNumber: encryptAES(formData.rollNumber, aesKey),
-        password: encryptAES(formData.password, aesKey),
-        key: encryptRSA(aesKey, publicKey),
-        keyId: keyId,
-        publicKey: clientPublicKey // Send client's public key for response encryption
-      };
-
-      // Send login data to backend
-      const response = await postData('/student/login', encryptedData);
+      // Use postEncryptedData for simplified encryption handling
+      const response = await postEncryptedData(
+        '/student/login',
+        {
+          collegeCode: formData.collegeCode,
+          rollNumber: formData.rollNumber,
+          password: formData.password
+        },
+        { expectEncryptedResponse: true }
+      );
 
       if (response && response.status === true) {
         setSuccessMessage(response.message || 'Login successful!');
 
-        // Check if we received encrypted data in the response
-        if (response.data && response.key) {
-          try {
-            // Decrypt the response data
-            const decryptedData = decryptServerResponse(
-              response.data,
-              response.key,
-              clientPrivateKey
-            );
+        // Handle response (now automatically decrypted)
+        if (response.privateKey && response.id) {
+          // Save to Redux store (primary storage)
+          dispatch(setPrivateKey(response.privateKey));
+          dispatch(setUserId(response.id));
+          dispatch(setUserType('student'));
 
-            // Save to Redux store (primary storage)
-            dispatch(setPrivateKey(decryptedData.privateKey));
-            dispatch(setUserId(decryptedData.id));
-            dispatch(setUserType('student'));
-
-            // Save to localStorage as backup
-            await savePrivateKey(decryptedData.privateKey, 'student', decryptedData.id);
-
-          } catch (error) {
-            console.error('Failed to decrypt response:', error);
-            // Continue with login even if decryption fails
-          }
+          // Save to localStorage as backup
+          await savePrivateKey(response.privateKey, 'student', response.id);
         }
 
         dispatch(setAuthenticated(true));
@@ -137,8 +110,8 @@ const StudentLogin = () => {
             {/* Message Display */}
             {(errorMessage || successMessage) && (
               <div className={`p-4 rounded-lg text-center font-medium ${errorMessage
-                  ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
-                  : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
+                ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
+                : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
                 }`}>
                 {errorMessage || successMessage}
               </div>
@@ -179,8 +152,8 @@ const StudentLogin = () => {
                   type="submit"
                   disabled={isLoading}
                   className={`mt-4 px-6 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
-                      ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900] disabled:hover:bg-[#FF7900]'
-                      : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A] disabled:hover:bg-[#5A189A]'
+                    ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900] disabled:hover:bg-[#FF7900]'
+                    : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A] disabled:hover:bg-[#5A189A]'
                     }`}
                 >
                   {isLoading ? (
