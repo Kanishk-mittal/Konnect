@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store/store';
 import profileIcon from '../assets/profile_icon.png';
 import sendIcon from '../assets/send.png';
 import editIcon from '../assets/edit.png';
 import deleteIcon from '../assets/delete.png';
+import { deleteEncryptedData } from '../api/requests';
 
 interface StudentTabProps {
   id: string;
@@ -22,6 +23,7 @@ const StudentTab: React.FC<StudentTabProps> = ({
   isBlocked
 }) => {
   const theme = useSelector((state: RootState) => state.theme.theme);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Define theme-specific styles with red tint for blocked students
   let backgroundColor, borderColor;
@@ -104,7 +106,30 @@ const StudentTab: React.FC<StudentTabProps> = ({
 
         {/* Delete Button */}
         <button
-          onClick={() => console.log('Delete clicked for', name, 'ID:', id)}
+          onClick={() => {
+            if (window.confirm(`Are you sure you want to delete ${name} (${rollNumber})?`)) {
+              setIsDeleting(true);
+
+              // Use encrypted delete request
+              deleteEncryptedData('/student/delete', {
+                studentId: id
+              })
+                .then(() => {
+                  alert(`Student ${name} deleted successfully!`);
+                  // We could add a callback prop to refresh the student list after deletion
+                  // For now, just reload the page to reflect the changes
+                  window.location.reload();
+                })
+                .catch((error: any) => {
+                  console.error('Error deleting student:', error);
+                  alert(`Failed to delete student: ${error.response?.data?.message || 'Unknown error'}`);
+                })
+                .finally(() => {
+                  setIsDeleting(false);
+                });
+            }
+          }}
+          disabled={isDeleting}
           className="p-2 rounded-md hover:opacity-80 transition-opacity"
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
         >

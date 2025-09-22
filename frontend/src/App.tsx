@@ -7,6 +7,7 @@ import ClubLogin from './pages/ClubLogin'
 import AdminRegistration from './pages/AdminRegistration'
 import AdminDashboard from './pages/AdminDashboard'
 import AddStudent from './pages/AddStudent'
+import RemoveStudent from './pages/RemoveStudent'
 import NotFound from './pages/NotFound'
 
 
@@ -29,12 +30,15 @@ const App = () => {
         element={<AdminRegistration />}
       />
       <Route path="/admin/dashboard"
-        element={<AdminDashboard/>} 
+        element={<AdminDashboard />}
       />
       <Route path="/admin/add-student"
-        element={<AddStudent/>} 
+        element={<AddStudent />}
       />
-      <Route path="*" element={<NotFound/>} />
+      <Route path="/admin/remove-student"
+        element={<RemoveStudent />}
+      />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
