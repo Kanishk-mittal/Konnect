@@ -21,24 +21,10 @@ type AdminRegistrationData = {
     otp: string;
 };
 
-type EncryptedRegistrationData = {
-    key: string;
-    keyId: string;
-    data: string; // Encrypted JSON string containing all registration data
-    publicKey: string; // will be used for encrypting the data we are sending back to user
-};
-
 type AdminLoginData = {
     collegeCode: string;
     username: string;
     password: string;
-};
-
-type EncryptedLoginData = {
-    key: string;
-    keyId: string;
-    data: string; // Encrypted JSON string containing login data
-    publicKey?: string; // Optional public key for encrypted response
 };
 
 // Validation helper function
@@ -91,24 +77,7 @@ const validateRegistrationData = (data: AdminRegistrationData): { status: boolea
     return { status: true, message: 'Validation successful' };
 };
 
-// Helper function to decrypt registration data
-const decryptRegistrationData = (encryptedData: EncryptedRegistrationData, userKey: string): AdminRegistrationData => {
-    // Decrypt the AES key using RSA private key
-    const userAESKey = decryptRSA(encryptedData.key, userKey);
-    
-    // Decrypt the JSON string and parse it
-    const decryptedDataString = decryptAES(encryptedData.data, userAESKey);
-    const parsedData = JSON.parse(decryptedDataString);
-    
-    return {
-        collegeName: parsedData.collegeName,
-        adminUsername: parsedData.adminUsername,
-        collegeCode: parsedData.collegeCode,
-        emailId: parsedData.emailId,
-        password: parsedData.password,
-        otp: parsedData.otp,
-    };
-};
+
 
 // Helper function to check for existing admin
 const checkExistingAdmin = async (data: AdminRegistrationData): Promise<{ exists: boolean; message?: string }> => {
@@ -123,10 +92,10 @@ const checkExistingAdmin = async (data: AdminRegistrationData): Promise<{ exists
 };
 
 // Helper function to create admin document
-const createAdminDocument = async (data: AdminRegistrationData): Promise<{ 
-    adminDoc: AdminDocument, 
-    recoveryKey: string, 
-    privateKey: string 
+const createAdminDocument = async (data: AdminRegistrationData): Promise<{
+    adminDoc: AdminDocument,
+    recoveryKey: string,
+    privateKey: string
 }> => {
     // Hash password
     const passwordHash = await createHash(data.password);
@@ -164,38 +133,11 @@ const createAdminDocument = async (data: AdminRegistrationData): Promise<{
 // Main registration controller
 export const registerController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const encryptedData: EncryptedRegistrationData = req.body;
+        // The middleware has already decrypted the request data
+        const data: AdminRegistrationData = req.body;
 
-        // Validate encryption requirements
-        if (!encryptedData.key || !encryptedData.keyId || !encryptedData.data) {
-            res.status(400).json({
-                status: false,
-                message: 'Encryption key, key ID, and data are required.'
-            });
-            return;
-        }
-
-        // Get private key from KeyManager
-        const userKey = KeyManager.getPrivateKey(encryptedData.keyId);
-        if (!userKey) {
-            res.status(400).json({
-                status: false,
-                message: 'Invalid key ID.'
-            });
-            return;
-        }
-
-        // Decrypt registration data
-        let data: AdminRegistrationData;
-        try {
-            data = decryptRegistrationData(encryptedData, userKey);
-        } catch (e) {
-            res.status(400).json({
-                status: false,
-                message: 'Failed to decrypt or parse registration data.'
-            });
-            return;
-        }
+        // Client's public key (if provided) is stored by decryptRequest middleware
+        const clientPublicKey = (req as any).clientPublicKey;
 
         // Validate registration data
         const validationResult = validateRegistrationData(data);
@@ -237,27 +179,19 @@ export const registerController = async (req: Request, res: Response): Promise<v
             id: newAdmin._id.toString()
         };
         setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
-        
-        // Encrypt sensitive data to send back to user
-        // Generate a random AES key for encrypting the response
-        const responseAesKey = generateAESKey();
-        
-        // Encrypt sensitive data with the AES key
-        const encryptedResponseData = {
-            recoveryKey: encryptAES(credential.recoveryKey, responseAesKey),
-            privateKey: encryptAES(credential.privateKey, responseAesKey),
-            id: encryptAES(newAdmin._id.toString(), responseAesKey)
-        };
-        
-        // Encrypt the AES key with user's public key
-        const encryptedResponseKey = encryptRSA(responseAesKey, encryptedData.publicKey);
-        
-        // Return success response with encrypted data
+
+        // Return success response with sensitive data
+        // The encryptResponse middleware will automatically encrypt this if a public key is available
         res.status(201).json({
             status: true,
             message: 'Registration successful! Welcome to Konnect.',
-            data: encryptedResponseData,
-            key: encryptedResponseKey
+            data: {
+                recoveryKey: credential.recoveryKey,
+                privateKey: credential.privateKey,
+                id: newAdmin._id.toString()
+            },
+            // Include public key in response so resolvePublicKey middleware can use it
+            publicKey: clientPublicKey
         });
 
     } catch (error) {
@@ -321,47 +255,11 @@ export const sendRegistrationOTP = async (req: Request, res: Response): Promise<
 // Admin Login Controller
 export const adminLoginController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const encryptedData: EncryptedLoginData = req.body;
+        // The middleware has already decrypted the request data
+        const loginData: AdminLoginData = req.body;
 
-        // Validate encryption requirements
-        if (!encryptedData.key || !encryptedData.keyId || !encryptedData.data) {
-            res.status(400).json({
-                status: false,
-                message: 'Encryption key, key ID, and data are required.'
-            });
-            return;
-        }
-
-        // Get private key from KeyManager
-        const userKey = KeyManager.getPrivateKey(encryptedData.keyId);
-        if (!userKey) {
-            res.status(400).json({
-                status: false,
-                message: 'Invalid key ID.'
-            });
-            return;
-        }
-
-        // Decrypt AES key
-        const userAESKey = decryptRSA(encryptedData.key, userKey);
-
-        // Decrypt login data
-        let loginData: AdminLoginData;
-        try {
-            const decryptedDataString = decryptAES(encryptedData.data, userAESKey);
-            const parsedData = JSON.parse(decryptedDataString);
-            loginData = {
-                collegeCode: parsedData.collegeCode,
-                username: parsedData.username,
-                password: parsedData.password
-            };
-        } catch (e) {
-            res.status(400).json({
-                status: false,
-                message: 'Failed to decrypt or parse login data.'
-            });
-            return;
-        }
+        // Client's public key (if provided) is stored by decryptRequest middleware
+        const clientPublicKey = (req as any).clientPublicKey;
 
         // Validate input
         if (!loginData.collegeCode || !loginData.username || !loginData.password) {
@@ -373,7 +271,7 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         }
 
         // Find admin by college code
-        const admin = await AdminModel.findOne({ 
+        const admin = await AdminModel.findOne({
             college_code: loginData.collegeCode,
         });
         if (!admin) {
@@ -405,37 +303,22 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         // Set JWT token
         const jwtPayload = { type: 'admin', id: admin._id.toString() };
         setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
-        
+
         // Decrypt private key from database
         const privateKey = decryptAES(admin.private_key, generateAESKeyFromString(loginData.password));
-        
-        // For login, we'll check if the request includes a public key for encrypting the response
-        if (encryptedData.publicKey) {
-            // Generate a random AES key for encrypting the response
-            const responseAesKey = generateAESKey();
-            
-            // Encrypt sensitive data with the AES key
-            const encryptedResponseData = {
-                id: encryptAES(admin._id.toString(), responseAesKey),
-                privateKey: encryptAES(privateKey, responseAesKey)
-            };
-            
-            // Encrypt the AES key with user's public key
-            const encryptedResponseKey = encryptRSA(responseAesKey, encryptedData.publicKey);
-            
-            res.status(200).json({
-                status: true,
-                message: 'Login successful!',
-                data: encryptedResponseData,
-                key: encryptedResponseKey
-            });
-        } else {
-            // Fallback if no public key is provided
-            res.status(200).json({
-                status: true,
-                message: 'Login successful!'
-            });
-        }
+
+        // Return success response with sensitive data
+        // The encryptResponse middleware will automatically encrypt this if a public key is available
+        res.status(200).json({
+            status: true,
+            message: 'Login successful!',
+            data: {
+                id: admin._id.toString(),
+                privateKey: privateKey
+            },
+            // Include public key in response so resolvePublicKey middleware can use it
+            publicKey: clientPublicKey
+        });
     } catch (error) {
         console.error('Error in admin login:', error);
         res.status(500).json({
@@ -548,9 +431,9 @@ export const getAdminDetails = async (req: Request, res: Response): Promise<void
 export const getAdminDetailsFromJWT = async (req: Request, res: Response): Promise<void> => {
     try {
         if (!req.user) {
-            res.status(401).json({ 
-                status: false, 
-                message: 'User not authenticated' 
+            res.status(401).json({
+                status: false,
+                message: 'User not authenticated'
             });
             return;
         }

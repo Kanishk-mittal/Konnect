@@ -6,9 +6,7 @@ import Header from "../components/Header";
 import CsvUploader from "../components/CsvUploader";
 import ManualEntryTable from "../components/ManualEntryTable";
 import { checkEmptyValues, filterCharacters } from '../utils/validator/studentDataValidator';
-import { postData, getData } from '../api/requests';
-import { encryptAES, generateAESKey } from '../encryption/AES_utils';
-import { encryptRSA } from '../encryption/RSA_utils';
+import { postEncryptedData } from '../api/requests';
 
 // Unified Student type for all components
 export type Student = { name: string; rollNumber: string; emailId: string };
@@ -78,29 +76,16 @@ const AddStudent = () => {
         email: s.emailId,
       }));
 
-      // 2. Get server's public key for encryption
-      const publicKeyResponse = await getData('/encryption/rsa/publicKey', {});
-      if (!publicKeyResponse || !publicKeyResponse.status) {
-        throw new Error('Failed to get encryption key from server');
-      }
-      const { publicKey, keyId } = publicKeyResponse;
-
-      // 3. Check if we need to split into batches (for > 1000 students)
+      // 2. Check if we need to split into batches (for > 1000 students)
       const BATCH_SIZE = 1000;
-      
+
       if (studentsForBackend.length <= BATCH_SIZE) {
         // Single request for 1000 or fewer students
-        const aesKey = generateAESKey();
-        const encryptedStudents = encryptAES(JSON.stringify({ students: studentsForBackend }), aesKey);
-        const encryptedKey = encryptRSA(aesKey, publicKey);
-
-        const payload = {
-          key: encryptedKey,
-          keyId: keyId,
-          data: encryptedStudents,
-        };
-
-        const response = await postData('/student/addMultiple', payload);
+        const response = await postEncryptedData(
+          '/student/addMultiple',
+          { students: studentsForBackend },
+          { expectEncryptedResponse: false }
+        );
 
         if (response && response.status === true) {
           setSuccessMessage(response.message || 'Students registered successfully!');
@@ -118,30 +103,25 @@ const AddStudent = () => {
 
         // Create all request promises in parallel (don't wait for previous response)
         const requestPromises = batches.map(async (batch, index) => {
-          const aesKey = generateAESKey();
-          const encryptedStudents = encryptAES(JSON.stringify({ students: batch }), aesKey);
-          const encryptedKey = encryptRSA(aesKey, publicKey);
-
-          const payload = {
-            key: encryptedKey,
-            keyId: keyId,
-            data: encryptedStudents,
-          };
-
           try {
-            const response = await postData('/student/addMultiple', payload);
-            return { 
-              batchIndex: index, 
-              batchSize: batch.length, 
-              success: response?.status === true, 
+            const response = await postEncryptedData(
+              '/student/addMultiple',
+              { students: batch },
+              { expectEncryptedResponse: false }
+            );
+
+            return {
+              batchIndex: index,
+              batchSize: batch.length,
+              success: response?.status === true,
               message: response?.message,
               insertedCount: response?.insertedCount || 0
             };
           } catch (error: any) {
-            return { 
-              batchIndex: index, 
-              batchSize: batch.length, 
-              success: false, 
+            return {
+              batchIndex: index,
+              batchSize: batch.length,
+              success: false,
               error: error?.response?.data?.message || error?.message || 'Request failed'
             };
           }
@@ -193,14 +173,14 @@ const AddStudent = () => {
   };
 
   // Define theme-specific colors (match AdminDashboard)
-  const backgroundGradient = theme === 'dark' 
+  const backgroundGradient = theme === 'dark'
     ? 'linear-gradient(180deg, #000000 0%, #0E001B 8%)'
     : 'linear-gradient(180deg, #9435E5 0%, #FFD795 8%)';
 
   const textColor = theme === 'dark' ? 'text-white' : 'text-black';
 
-  const headerBackground = theme === 'dark' 
-    ? {} 
+  const headerBackground = theme === 'dark'
+    ? {}
     : { background: 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%)' };
 
   return (
@@ -213,7 +193,7 @@ const AddStudent = () => {
       <div className="flex-grow flex flex-col p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className={`text-3xl font-bold ${textColor}`}>Add New Student</h1>
-          <button 
+          <button
             className="px-4 py-2 flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
             onClick={() => navigate('/admin/dashboard')}
           >
@@ -222,17 +202,16 @@ const AddStudent = () => {
         </div>
         {/* Message Display */}
         {(errorMessage || successMessage) && (
-          <div className={`p-4 rounded-lg text-center font-medium mb-4 ${
-            errorMessage 
+          <div className={`p-4 rounded-lg text-center font-medium mb-4 ${errorMessage
               ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
               : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
-          }`}>
+            }`}>
             {errorMessage || successMessage}
           </div>
         )}
         <div className="max-w-2xl mx-auto">
           {/* CSV Uploader */}
-          <CsvUploader 
+          <CsvUploader
             columns={tableColumns.map(col => col.label)}
             setStudents={setStudents}
             message="Upload a CSV file with columns: 'Name', 'Roll Number', 'Email ID' (column headers must match exactly)"
@@ -240,7 +219,7 @@ const AddStudent = () => {
           />
           {/* Manual Entry Table */}
           <div className="mt-8">
-            <ManualEntryTable 
+            <ManualEntryTable
               theme={theme as 'light' | 'dark'}
               columns={tableColumns}
               students={students}

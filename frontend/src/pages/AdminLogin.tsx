@@ -12,19 +12,14 @@ import InputComponent from '../components/InputComponent';
 import { setAuthenticated, setPrivateKey, setUserId, setUserType } from '../store/authSlice';
 
 // API and utilities
-import { postData, getData } from '../api/requests';
-import { decryptServerResponse } from '../utils/registrationUtils';
+import { postEncryptedData } from '../api/requests';
 import { savePrivateKey } from '../utils/privateKeyManager';
-
-// Encryption utilities
-import { encryptAES, generateAESKey } from '../encryption/AES_utils';
-import { encryptRSA, generateRSAKeyPair } from '../encryption/RSA_utils';
 
 const AdminLogin = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  
+
   const gradientClasses = "bg-[radial-gradient(circle,_rgba(255,255,255,0.3)_0%,_rgba(219,178,255,0.3)_55%,_rgba(219,178,255,0.3)_100%)]";
   const transparentClasses = "bg-transparent";
 
@@ -44,68 +39,36 @@ const AdminLogin = () => {
     setSuccessMessage('');
 
     try {
-      // Get public key from backend
-      const publicKeyResponse = await getData('/encryption/rsa/publicKey', {});
-
-      if (!publicKeyResponse || !publicKeyResponse.status) {
-        throw new Error('Failed to get encryption key from server');
-      }
-
-      const publicKey = publicKeyResponse.publicKey;
-      const keyId = publicKeyResponse.keyId;
-
-      // Generate client-side RSA key pair for secure response
-      const [clientPrivateKey, clientPublicKey] = generateRSAKeyPair();
-
-      // Generate AES key and encrypt data
-      const aesKey = generateAESKey();
-      
-      // Create the data object and stringify it
-      const dataToEncrypt = {
+      // Create the data object to send
+      const dataToSend = {
         collegeCode: formData.collegeCode,
         username: formData.username,
         password: formData.password,
       };
-      
-      const encryptedData = {
-        key: encryptRSA(aesKey, publicKey),
-        keyId: keyId,
-        data: encryptAES(JSON.stringify(dataToEncrypt), aesKey),
-        publicKey: clientPublicKey // Send client's public key for response encryption
-      };
 
-      // Send login data to backend
-      const response = await postData('/admin/login', encryptedData);
+      // Use postEncryptedData to handle encryption automatically
+      const response = await postEncryptedData(
+        '/admin/login',
+        dataToSend,
+        { expectEncryptedResponse: true }
+      );
 
       if (response && response.status === true) {
         setSuccessMessage(response.message || 'Login successful!');
-        
-        // Check if we received encrypted data in the response
-        if (response.data && response.key) {
-          try {
-            // Decrypt the response data
-            const decryptedData = decryptServerResponse(
-              response.data,
-              response.key,
-              clientPrivateKey
-            );
-            
-            // Save to Redux store (primary storage)
-            dispatch(setPrivateKey(decryptedData.privateKey));
-            dispatch(setUserId(decryptedData.id));
-            dispatch(setUserType('admin'));
-            
-            // Save to localStorage as backup
-            await savePrivateKey(decryptedData.privateKey, 'admin', decryptedData.id);
-            
-          } catch (error) {
-            console.error('Failed to decrypt response:', error);
-            // Continue with login even if decryption fails
-          }
+
+        // The response is already decrypted by postEncryptedData
+        if (response.privateKey && response.id) {
+          // Save to Redux store (primary storage)
+          dispatch(setPrivateKey(response.privateKey));
+          dispatch(setUserId(response.id));
+          dispatch(setUserType('admin'));
+
+          // Save to localStorage as backup
+          await savePrivateKey(response.privateKey, 'admin', response.id);
         }
-        
+
         dispatch(setAuthenticated(true));
-        
+
         // Navigate after a brief delay to show success message
         setTimeout(() => {
           navigate('/admin/dashboard');
@@ -116,10 +79,10 @@ const AdminLogin = () => {
       }
     } catch (error: any) {
       console.error('Error during login:', error);
-      
+
       // Handle different types of errors
       let errorMsg = 'An unexpected error occurred during login.';
-      
+
       if (error?.response?.data?.message) {
         // API error with specific message
         errorMsg = error.response.data.message;
@@ -127,7 +90,7 @@ const AdminLogin = () => {
         // General error with message
         errorMsg = error.message;
       }
-      
+
       setErrorMessage(errorMsg);
     } finally {
       setIsLoading(false);
@@ -142,19 +105,18 @@ const AdminLogin = () => {
           <div className={`flex flex-col gap-6 w-[90%] h-[100%] md:w-[40%] ${theme === 'dark' ? "bg-[#240046]" : "bg-[#FFDEA8]/45"}  rounded-lg p-8`}>
             {/* Message Display */}
             {(errorMessage || successMessage) && (
-              <div className={`p-4 rounded-lg text-center font-medium ${
-                errorMessage 
-                  ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
-                  : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
-              }`}>
+              <div className={`p-4 rounded-lg text-center font-medium ${errorMessage
+                ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
+                : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
+                }`}>
                 {errorMessage || successMessage}
               </div>
             )}
-            
-            <div className={`heading ${theme==="dark" ? "text-[#FF9E00]" : "text-[#421271]"} text-2xl text-center font-bold mb-4`}>
+
+            <div className={`heading ${theme === "dark" ? "text-[#FF9E00]" : "text-[#421271]"} text-2xl text-center font-bold mb-4`}>
               Admin Login
             </div>
-              
+
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-[100%] p-8 mx-auto">
               <InputComponent
                 width={100}
@@ -185,11 +147,10 @@ const AdminLogin = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className={`mt-4 px-6 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    theme === 'dark' 
-                      ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900] disabled:hover:bg-[#FF7900]' 
-                      : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A] disabled:hover:bg-[#5A189A]'
-                  }`}
+                  className={`mt-4 px-6 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
+                    ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900] disabled:hover:bg-[#FF7900]'
+                    : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A] disabled:hover:bg-[#5A189A]'
+                    }`}
                 >
                   {isLoading ? (
                     <div className="flex items-center gap-2">
