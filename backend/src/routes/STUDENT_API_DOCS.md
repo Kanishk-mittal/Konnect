@@ -421,6 +421,136 @@ async function makeStudentRequest(endpoint, data, maxRetries = 1) {
 }
 ```
 
+### `GET /student/details/:collegeCode`
+
+Retrieve a list of all students for the given college code.
+
+#### Purpose
+Get information about all students in a college. Used by admin dashboard to display student list.
+
+#### Middleware Chain
+```
+authMiddleware → getStudentByCollegeCode
+```
+
+#### Request Format
+```
+GET /student/details/:collegeCode
+Authorization: Bearer <jwt-token>
+```
+
+#### Response Format
+```json
+{
+  "status": true,
+  "message": "Student details retrieved successfully.",
+  "data": [
+    {
+      "id": "64f8b2c1a4b6d8e9f0123456",
+      "rollNumber": "CSE001",
+      "name": "John Doe",
+      "profilePicture": "https://example.com/profile.jpg",
+      "isBlocked": false
+    },
+    {
+      "id": "64f8b2c1a4b6d8e9f0123457",
+      "rollNumber": "CSE002",
+      "name": "Jane Smith",
+      "profilePicture": null,
+      "isBlocked": true
+    }
+  ]
+}
+```
+
+### `GET /student/blocked/:collegeCode`
+
+Retrieve a list of all blocked students for the given college code.
+
+#### Purpose
+Get information about blocked students in a college. Used by admin dashboard to display blocked student list.
+
+#### Middleware Chain
+```
+authMiddleware → getBlockedStudentsByCollegeCode
+```
+
+#### Request Format
+```
+GET /student/blocked/:collegeCode
+Authorization: Bearer <jwt-token>
+```
+
+#### Response Format
+```json
+{
+  "status": true,
+  "message": "Blocked student details retrieved successfully.",
+  "data": [
+    {
+      "id": "64f8b2c1a4b6d8e9f0123457",
+      "rollNumber": "CSE002",
+      "name": "Jane Smith",
+      "profilePicture": null,
+      "isBlocked": true
+    }
+  ]
+}
+```
+
+### `POST /student/toggle-block`
+
+Toggle the blocked status of a student.
+
+#### Purpose
+Block or unblock a student. Used by admins to control student access to the platform.
+
+#### Middleware Chain
+```
+authMiddleware → adminAuthMiddleware → decryptRequest → toggleStudentBlockStatus
+```
+
+#### Request Format
+```
+POST /student/toggle-block
+Content-Type: application/json
+Authorization: Bearer <jwt-token>
+```
+
+**Encrypted Request Body:**
+```json
+{
+  "key": "base64-encrypted-aes-key",
+  "keyId": "server-key-identifier",
+  "studentId": "aes-encrypted-student-id"
+}
+```
+
+#### Response Format
+```json
+{
+  "status": true,
+  "message": "Student blocked successfully.",
+  "data": {
+    "id": "64f8b2c1a4b6d8e9f0123457",
+    "isBlocked": true
+  }
+}
+```
+
+or
+
+```json
+{
+  "status": true,
+  "message": "Student unblocked successfully.",
+  "data": {
+    "id": "64f8b2c1a4b6d8e9f0123457",
+    "isBlocked": false
+  }
+}
+```
+
 ---
 
 **Last Updated:** September 19, 2025  

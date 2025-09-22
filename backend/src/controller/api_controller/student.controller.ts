@@ -237,6 +237,106 @@ export const getStudentByCollegeCode = async (req: Request, res: Response): Prom
 };
 
 /**
+ * Get blocked student details by college code
+ * Returns roll number, display name, and profile picture for all blocked students in the given college
+ */
+export const getBlockedStudentsByCollegeCode = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { collegeCode } = req.params;
+
+        // Validate college code parameter
+        if (!collegeCode) {
+            res.status(400).json({
+                status: false,
+                message: 'College code is required.'
+            });
+            return;
+        }
+
+        // Find all blocked students by college code
+        const blockedStudents = await studentModel.find({
+            college_code: collegeCode,
+            is_blocked: true
+        }).select('_id roll display_name profile_picture is_blocked');
+
+        // Map students to the desired format (same format as getStudentByCollegeCode)
+        const studentData = blockedStudents.map(student => ({
+            id: student._id.toString(),
+            rollNumber: student.roll,
+            name: student.display_name,
+            profilePicture: student.profile_picture || null,
+            isBlocked: student.is_blocked === true // Will always be true for this endpoint
+        }));
+
+        // Return blocked student details
+        res.status(200).json({
+            status: true,
+            message: studentData.length > 0
+                ? 'Blocked student details retrieved successfully.'
+                : 'No blocked students found with the provided college code.',
+            data: studentData
+        });
+
+    } catch (error) {
+        console.error('Error fetching blocked students by college code:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching blocked student details.'
+        });
+    }
+};
+
+/**
+ * Toggle a student's blocked status
+ * @param req Request with studentId in body
+ * @param res Response with success/failure message
+ */
+export const toggleStudentBlockStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { studentId } = req.body;
+
+        // Validate student ID
+        if (!studentId) {
+            res.status(400).json({
+                status: false,
+                message: 'Student ID is required.'
+            });
+            return;
+        }
+
+        // Find student by ID
+        const student = await studentModel.findById(studentId);
+        if (!student) {
+            res.status(404).json({
+                status: false,
+                message: 'Student not found.'
+            });
+            return;
+        }
+
+        // Toggle the blocked status
+        const newBlockedStatus = !student.is_blocked;
+        student.is_blocked = newBlockedStatus;
+        await student.save();
+
+        res.status(200).json({
+            status: true,
+            message: `Student ${newBlockedStatus ? 'blocked' : 'unblocked'} successfully.`,
+            data: {
+                id: student._id.toString(),
+                isBlocked: newBlockedStatus
+            }
+        });
+    } catch (error) {
+        console.error('Error toggling student block status:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating student block status.'
+        });
+    }
+};
+
+/**
  * Helper function to create multiple student documents in parallel
  * @param students - Array of student data
  * @param collegeCode - College code from admin

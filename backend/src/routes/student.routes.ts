@@ -2,9 +2,11 @@ import { Router } from 'express';
 import {
     studentLoginController,
     getStudentByCollegeCode,
+    getBlockedStudentsByCollegeCode,
     bulkStudentRegistration,
     deleteStudent,
-    deleteMultipleStudents
+    deleteMultipleStudents,
+    toggleStudentBlockStatus
 } from '../controller/api_controller/student.controller';
 import { adminAuthMiddleware, authMiddleware } from '../middleware/auth.middleware';
 import { decryptRequest } from '../middleware/encryption.middleware';
@@ -15,8 +17,10 @@ const router = Router();
 // Routes with encryption middleware
 router.post('/login', decryptRequest, studentLoginController, resolvePublicKey, encryptResponse);
 router.get('/details/:collegeCode', authMiddleware, getStudentByCollegeCode);
+router.get('/blocked/:collegeCode', authMiddleware, getBlockedStudentsByCollegeCode);
 router.post('/addMultiple', authMiddleware, adminAuthMiddleware, decryptRequest, bulkStudentRegistration, encryptResponse);
 router.delete('/delete', authMiddleware, adminAuthMiddleware, decryptRequest, deleteStudent);
 router.delete('/delete-multiple', authMiddleware, adminAuthMiddleware, decryptRequest, deleteMultipleStudents);
+router.post('/toggle-block', authMiddleware, adminAuthMiddleware, decryptRequest, toggleStudentBlockStatus);
 
 export default router;

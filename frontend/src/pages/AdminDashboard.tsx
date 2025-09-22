@@ -27,6 +27,8 @@ const AdminDashboard = () => {
   const [studentSearchText, setStudentSearchText] = useState('');
   const [students, setStudents] = useState<Student[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [blockedStudents, setBlockedStudents] = useState<Student[]>([]);
+  const [blockedStudentsLoading, setBlockedStudentsLoading] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'Groups' | 'Clubs'>('Groups');
 
   // Define theme-specific colors
@@ -112,7 +114,25 @@ const AdminDashboard = () => {
       }
     };
 
+    const fetchBlockedStudents = async () => {
+      if (!adminDetails?.collegeCode) return;
+
+      setBlockedStudentsLoading(true);
+      try {
+        const response = await getData(`/student/blocked/${adminDetails.collegeCode}`);
+        if (response.status) {
+          setBlockedStudents(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching blocked students:', error);
+        setBlockedStudents([]);
+      } finally {
+        setBlockedStudentsLoading(false);
+      }
+    };
+
     fetchStudents();
+    fetchBlockedStudents();
   }, [adminDetails]);
 
   // Check admin authentication
@@ -204,6 +224,30 @@ const AdminDashboard = () => {
             <div className="right flex-grow flex flex-col gap-2">
               <div className="topRight flex-grow rounded-lg p-4" style={{ backgroundColor: topRightSectionColor }}>
                 <h2 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-[#FFA4A4]' : 'text-[#FF0404]'}`}>Blocked Students</h2>
+
+                {/* Blocked Students List */}
+                <div className="flex-grow overflow-y-auto">
+                  {blockedStudentsLoading ? (
+                    <div className="text-center py-4">
+                      <span className={textColor}>Loading blocked students...</span>
+                    </div>
+                  ) : blockedStudents.length > 0 ? (
+                    blockedStudents.map(student => (
+                      <StudentTab
+                        key={student.id}
+                        id={student.id}
+                        profilePicture={student.profilePicture}
+                        rollNumber={student.rollNumber}
+                        name={student.name}
+                        isBlocked={student.isBlocked}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-4">
+                      <span className={textColor}>No blocked students found</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="bottomRight flex-grow rounded-lg p-4 flex flex-col" style={{ backgroundColor: bottomRightSectionColor }}>
                 {/* Sliding Tab Selector */}

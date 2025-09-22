@@ -5,7 +5,7 @@ import profileIcon from '../assets/profile_icon.png';
 import sendIcon from '../assets/send.png';
 import editIcon from '../assets/edit.png';
 import deleteIcon from '../assets/delete.png';
-import { deleteEncryptedData } from '../api/requests';
+import { deleteEncryptedData, postEncryptedData } from '../api/requests';
 
 interface StudentTabProps {
   id: string;
@@ -77,7 +77,21 @@ const StudentTab: React.FC<StudentTabProps> = ({
 
       {/* Block/Unblock Button */}
       <button
-        onClick={() => console.log(isBlocked ? 'Unblock' : 'Block', 'clicked for', name, 'ID:', id)}
+        onClick={() => {
+          // Call API to toggle block status
+          postEncryptedData('/student/toggle-block', {
+            studentId: id
+          })
+            .then(() => {
+              alert(`Student ${isBlocked ? 'unblocked' : 'blocked'} successfully!`);
+              // Reload the page to reflect the changes
+              window.location.reload();
+            })
+            .catch((error: any) => {
+              console.error('Error toggling student block status:', error);
+              alert(`Failed to ${isBlocked ? 'unblock' : 'block'} student: ${error.response?.data?.message || 'Unknown error'}`);
+            });
+        }}
         className="flex-shrink-0 px-3 py-2 rounded-md text-white text-sm font-medium hover:opacity-80 transition-opacity"
         style={{ backgroundColor: isBlocked ? '#38B000' : '#FF3437' }}
       >
