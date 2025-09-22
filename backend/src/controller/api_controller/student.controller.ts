@@ -471,3 +471,69 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
 export const blockStudent = async (req: Request, res: Response): Promise<void> => {
 
 }
+
+/**
+ * Delete a student by ID - Can only be accessed by an admin
+ * @param req - Express request object with studentId in body
+ * @param res - Express response object
+ */
+export const deleteStudent = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { studentId } = req.body;
+
+        // Validate student ID
+        if (!studentId) {
+            res.status(400).json({
+                status: false,
+                message: 'Student ID is required.'
+            });
+            return;
+        }
+
+        // Get admin college code to ensure they only delete students from their college
+        const adminId = (req as any).user?.id;
+        const admin = await AdminModel.findById(adminId);
+        if (!admin) {
+            res.status(403).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Find the student to verify college code matches
+        const student = await studentModel.findById(studentId);
+        if (!student) {
+            res.status(404).json({
+                status: false,
+                message: 'Student not found.'
+            });
+            return;
+        }
+
+        // Verify student belongs to admin's college
+        if (student.college_code !== admin.college_code) {
+            res.status(403).json({
+                status: false,
+                message: 'You do not have permission to delete students from other colleges.'
+            });
+            return;
+        }
+
+        // Delete the student
+        await studentModel.findByIdAndDelete(studentId);
+
+        // Return success response
+        res.status(200).json({
+            status: true,
+            message: `Student ${student.display_name} (${student.roll}) has been successfully deleted.`
+        });
+    } catch (error) {
+        console.error('Error deleting student:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while deleting the student.',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}

@@ -92,6 +92,15 @@ export const getData = async (endpoint: string, params?: any) => {
     }
 }
 
+export const deleteData = async (endpoint: string, data: any) => {
+    try {
+        const response = await instance.delete(endpoint, { data });
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+}
+
 /**
  * Sends encrypted POST request and handles encrypted response
  * @param endpoint API endpoint to call
@@ -203,3 +212,71 @@ export const getEncryptedData = async (
         throw error;
     }
 };
+
+// The deleteData function is already defined above
+
+/**
+ * Sends encrypted DELETE request
+ * @param endpoint API endpoint to call
+ * @param data Data object to encrypt and send
+ * @param options Optional configuration
+ * @returns Decrypted response data
+ */
+export const deleteEncryptedData = async (
+    endpoint: string,
+    data: any,
+    options: {
+        expectEncryptedResponse?: boolean;
+        clientKeys?: { privateKey: string; publicKey: string };
+    } = {}
+) => {
+    try {
+        const { expectEncryptedResponse = false, clientKeys } = options;
+
+        // 1. Get server's public key
+        const { publicKey: serverPublicKey, keyId } = await getServerPublicKey();
+
+        // 2. Generate client RSA key pair if needed for encrypted response
+        let clientPrivateKey = '';
+        let clientPublicKey = '';
+
+        if (expectEncryptedResponse) {
+            if (clientKeys) {
+                clientPrivateKey = clientKeys.privateKey;
+                clientPublicKey = clientKeys.publicKey;
+            } else {
+                [clientPrivateKey, clientPublicKey] = generateRSAKeyPair();
+            }
+        }
+
+        // 3. Generate AES key and encrypt the data
+        const aesKey = generateAESKey();
+        const dataJson = JSON.stringify(data);
+        const encryptedData = encryptAES(dataJson, aesKey);
+
+        // 4. Encrypt the AES key with server's public key
+        const encryptedAesKey = encryptRSA(aesKey, serverPublicKey);
+
+        // 5. Prepare the encrypted payload
+        const encryptedPayload = {
+            key: encryptedAesKey,
+            keyId: keyId,
+            data: encryptedData,
+            ...(expectEncryptedResponse && { publicKey: clientPublicKey })
+        };
+
+        // 6. Send the encrypted DELETE request
+        const response = await deleteData(endpoint, encryptedPayload);
+
+        // 7. Decrypt response if needed
+        if (expectEncryptedResponse && clientPrivateKey) {
+            return decryptServerResponse(response, clientPrivateKey);
+        }
+
+        return response;
+    } catch (error) {
+        console.error('Encrypted DELETE request failed:', error);
+        throw error;
+    }
+};
+

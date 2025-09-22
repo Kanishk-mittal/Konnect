@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { studentLoginController, getStudentByCollegeCode, bulkStudentRegistration } from '../controller/api_controller/student.controller';
+import { studentLoginController, getStudentByCollegeCode, bulkStudentRegistration, deleteStudent } from '../controller/api_controller/student.controller';
 import { adminAuthMiddleware, authMiddleware } from '../middleware/auth.middleware';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
@@ -10,5 +10,6 @@ const router = Router();
 router.post('/login', decryptRequest, studentLoginController, resolvePublicKey, encryptResponse);
 router.get('/details/:collegeCode', authMiddleware, getStudentByCollegeCode);
 router.post('/addMultiple', authMiddleware, adminAuthMiddleware, decryptRequest, bulkStudentRegistration, encryptResponse);
+router.delete('/delete', authMiddleware, adminAuthMiddleware, decryptRequest, deleteStudent);
 
 export default router;
