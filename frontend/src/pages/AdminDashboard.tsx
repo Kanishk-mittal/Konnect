@@ -195,7 +195,7 @@ const AdminDashboard = () => {
                 <button
                   className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
                   style={{ backgroundColor: '#FF2424' }}
-                  onClick={() => console.log('Remove Student clicked')}
+                  onClick={() => navigate('/admin/remove-student')}
                 >
                   Remove Student
                 </button>
@@ -215,8 +215,8 @@ const AdminDashboard = () => {
                     <button
                       onClick={() => setSelectedTab('Groups')}
                       className={`px-6 py-2 rounded-md font-medium transition-all duration-300 relative ${selectedTab === 'Groups'
-                          ? `${theme === 'dark' ? 'text-white' : 'text-black'} font-bold`
-                          : `${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`
+                        ? `${theme === 'dark' ? 'text-white' : 'text-black'} font-bold`
+                        : `${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`
                         }`}
                     >
                       Groups
@@ -234,8 +234,8 @@ const AdminDashboard = () => {
                     <button
                       onClick={() => setSelectedTab('Clubs')}
                       className={`px-6 py-2 rounded-md font-medium transition-all duration-300 relative ${selectedTab === 'Clubs'
-                          ? `${theme === 'dark' ? 'text-white' : 'text-black'} font-bold`
-                          : `${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`
+                        ? `${theme === 'dark' ? 'text-white' : 'text-black'} font-bold`
+                        : `${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`
                         }`}
                     >
                       Clubs

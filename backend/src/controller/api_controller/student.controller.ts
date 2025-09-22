@@ -537,3 +537,82 @@ export const deleteStudent = async (req: Request, res: Response): Promise<void> 
         });
     }
 }
+
+/**
+ * Delete multiple students by roll numbers - Can only be accessed by an admin
+ * @param req - Express request object with collegeCode and rollNumbers in body
+ * @param res - Express response object
+ */
+export const deleteMultipleStudents = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { collegeCode, rollNumbers } = req.body;
+
+        // Validate input
+        if (!collegeCode || !rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'College code and at least one roll number are required.'
+            });
+            return;
+        }
+
+        // Get admin college code to ensure they only delete students from their college
+        const adminId = (req as any).user?.id;
+        const admin = await AdminModel.findById(adminId);
+        if (!admin) {
+            res.status(403).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Verify the college code matches the admin's college code
+        if (collegeCode !== admin.college_code) {
+            res.status(403).json({
+                status: false,
+                message: 'You do not have permission to delete students from other colleges.'
+            });
+            return;
+        }
+
+        // Find all students matching the roll numbers in this college
+        const students = await studentModel.find({
+            college_code: collegeCode,
+            roll: { $in: rollNumbers }
+        }).select('_id roll display_name');
+
+        if (students.length === 0) {
+            res.status(404).json({
+                status: false,
+                message: 'No students found with the provided roll numbers.'
+            });
+            return;
+        }
+
+        // Extract student IDs for deletion
+        const studentIds = students.map(student => student._id);
+
+        // Delete all found students
+        const deleteResult = await studentModel.deleteMany({
+            _id: { $in: studentIds }
+        });
+
+        // Return success response with simplified information about removed students
+        res.status(200).json({
+            status: true,
+            message: `Successfully removed ${deleteResult.deletedCount} student(s).`,
+            removedCount: deleteResult.deletedCount,
+            notFound: rollNumbers.filter(roll =>
+                !students.some(student => student.roll === roll)
+            )
+        });
+    } catch (error) {
+        console.error('Error deleting students by roll:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while deleting students.',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}
