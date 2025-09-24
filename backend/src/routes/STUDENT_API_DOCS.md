@@ -551,6 +551,86 @@ or
 }
 ```
 
+### `POST /student/block-multiple`
+
+Block multiple students at once.
+
+#### Purpose
+Block multiple students simultaneously. Used by admins for bulk student management. College code is automatically derived from admin's authentication token.
+
+#### Middleware Chain
+```
+authMiddleware → adminAuthMiddleware → decryptRequest → blockMultipleStudents
+```
+
+#### Request Format
+```
+POST /student/block-multiple
+Content-Type: application/json
+Authorization: Bearer <jwt-token>
+```
+
+**Encrypted Request Body:**
+```json
+{
+  "key": "base64-encrypted-aes-key",
+  "keyId": "server-key-identifier",
+  "rollNumbers": "aes-encrypted-array-of-roll-numbers"
+}
+```
+
+#### Response Format
+```json
+{
+  "status": true,
+  "message": "Successfully blocked 3 student(s).",
+  "data": {
+    "blockedCount": 3,
+    "totalRequested": 3
+  }
+}
+```
+
+### `POST /student/unblock-multiple`
+
+Unblock multiple students at once.
+
+#### Purpose
+Unblock multiple students simultaneously. Used by admins for bulk student management. College code is automatically derived from admin's authentication token.
+
+#### Middleware Chain
+```
+authMiddleware → adminAuthMiddleware → decryptRequest → unblockMultipleStudents
+```
+
+#### Request Format
+```
+POST /student/unblock-multiple
+Content-Type: application/json
+Authorization: Bearer <jwt-token>
+```
+
+**Encrypted Request Body:**
+```json
+{
+  "key": "base64-encrypted-aes-key",
+  "keyId": "server-key-identifier",
+  "rollNumbers": "aes-encrypted-array-of-roll-numbers"
+}
+```
+
+#### Response Format
+```json
+{
+  "status": true,
+  "message": "Successfully unblocked 2 student(s).",
+  "data": {
+    "unblockedCount": 2,
+    "totalRequested": 2
+  }
+}
+```
+
 ---
 
 **Last Updated:** September 19, 2025  

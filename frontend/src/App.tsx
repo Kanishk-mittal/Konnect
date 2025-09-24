@@ -8,6 +8,8 @@ import AdminRegistration from './pages/AdminRegistration'
 import AdminDashboard from './pages/AdminDashboard'
 import AddStudent from './pages/AddStudent'
 import RemoveStudent from './pages/RemoveStudent'
+import BlockStudents from './pages/BlockStudents'
+import UnblockStudents from './pages/UnblockStudents'
 import NotFound from './pages/NotFound'
 
 
@@ -37,6 +39,12 @@ const App = () => {
       />
       <Route path="/admin/remove-student"
         element={<RemoveStudent />}
+      />
+      <Route path="/admin/block-students"
+        element={<BlockStudents />}
+      />
+      <Route path="/admin/unblock-students"
+        element={<UnblockStudents />}
       />
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -337,6 +337,116 @@ export const toggleStudentBlockStatus = async (req: Request, res: Response): Pro
 };
 
 /**
+ * Block multiple students
+ * @param req Request with rollNumbers array in body
+ * @param res Response with success/failure message
+ */
+export const blockMultipleStudents = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { rollNumbers } = req.body;
+
+        // Validate input
+        if (!rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'Roll numbers array is required and cannot be empty.'
+            });
+            return;
+        }
+
+        // Get admin details to get college code
+        const adminId = (req as any).user?.id;
+        const admin = await AdminModel.findById(adminId);
+        if (!admin) {
+            res.status(403).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Block all specified students using admin's college code and roll numbers
+        const result = await studentModel.updateMany(
+            {
+                college_code: admin.college_code,
+                roll: { $in: rollNumbers }
+            },
+            { $set: { is_blocked: true } }
+        );
+
+        res.status(200).json({
+            status: true,
+            message: `Successfully blocked ${result.modifiedCount} student(s).`,
+            data: {
+                blockedCount: result.modifiedCount,
+                totalRequested: rollNumbers.length
+            }
+        });
+    } catch (error) {
+        console.error('Error blocking multiple students:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while blocking students.'
+        });
+    }
+};
+
+/**
+ * Unblock multiple students
+ * @param req Request with rollNumbers array in body
+ * @param res Response with success/failure message
+ */
+export const unblockMultipleStudents = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { rollNumbers } = req.body;
+
+        // Validate input
+        if (!rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'Roll numbers array is required and cannot be empty.'
+            });
+            return;
+        }
+
+        // Get admin details to get college code
+        const adminId = (req as any).user?.id;
+        const admin = await AdminModel.findById(adminId);
+        if (!admin) {
+            res.status(403).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Unblock all specified students using admin's college code and roll numbers
+        const result = await studentModel.updateMany(
+            {
+                college_code: admin.college_code,
+                roll: { $in: rollNumbers }
+            },
+            { $set: { is_blocked: false } }
+        );
+
+        res.status(200).json({
+            status: true,
+            message: `Successfully unblocked ${result.modifiedCount} student(s).`,
+            data: {
+                unblockedCount: result.modifiedCount,
+                totalRequested: rollNumbers.length
+            }
+        });
+    } catch (error) {
+        console.error('Error unblocking multiple students:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while unblocking students.'
+        });
+    }
+};
+
+/**
  * Helper function to create multiple student documents in parallel
  * @param students - Array of student data
  * @param collegeCode - College code from admin

@@ -222,7 +222,7 @@ const AdminDashboard = () => {
               </div>
             </div>
             <div className="right flex-grow flex flex-col gap-2">
-              <div className="topRight flex-grow rounded-lg p-4" style={{ backgroundColor: topRightSectionColor }}>
+              <div className="topRight flex-grow rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: topRightSectionColor }}>
                 <h2 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-[#FFA4A4]' : 'text-[#FF0404]'}`}>Blocked Students</h2>
 
                 {/* Blocked Students List */}
@@ -247,6 +247,24 @@ const AdminDashboard = () => {
                       <span className={textColor}>No blocked students found</span>
                     </div>
                   )}
+                </div>
+
+                {/* Block/Unblock Control Buttons */}
+                <div className="blockedControlButtons flex gap-3 mt-4 justify-around">
+                  <button
+                    className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
+                    style={{ backgroundColor: '#FF2424' }}
+                    onClick={() => navigate('/admin/block-students')}
+                  >
+                    Block Multiple
+                  </button>
+                  <button
+                    className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
+                    style={{ backgroundColor: '#38B000' }}
+                    onClick={() => navigate('/admin/unblock-students')}
+                  >
+                    Unblock Multiple
+                  </button>
                 </div>
               </div>
               <div className="bottomRight flex-grow rounded-lg p-4 flex flex-col" style={{ backgroundColor: bottomRightSectionColor }}>

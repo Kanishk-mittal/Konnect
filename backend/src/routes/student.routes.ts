@@ -6,7 +6,9 @@ import {
     bulkStudentRegistration,
     deleteStudent,
     deleteMultipleStudents,
-    toggleStudentBlockStatus
+    toggleStudentBlockStatus,
+    blockMultipleStudents,
+    unblockMultipleStudents
 } from '../controller/api_controller/student.controller';
 import { adminAuthMiddleware, authMiddleware } from '../middleware/auth.middleware';
 import { decryptRequest } from '../middleware/encryption.middleware';
@@ -22,5 +24,7 @@ router.post('/addMultiple', authMiddleware, adminAuthMiddleware, decryptRequest,
 router.delete('/delete', authMiddleware, adminAuthMiddleware, decryptRequest, deleteStudent);
 router.delete('/delete-multiple', authMiddleware, adminAuthMiddleware, decryptRequest, deleteMultipleStudents);
 router.post('/toggle-block', authMiddleware, adminAuthMiddleware, decryptRequest, toggleStudentBlockStatus);
+router.post('/block-multiple', authMiddleware, adminAuthMiddleware, decryptRequest, blockMultipleStudents);
+router.post('/unblock-multiple', authMiddleware, adminAuthMiddleware, decryptRequest, unblockMultipleStudents);
 
 export default router;
