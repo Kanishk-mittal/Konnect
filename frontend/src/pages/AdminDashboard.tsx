@@ -6,8 +6,10 @@ import type { RootState } from '../store/store';
 import { getData } from '../api/requests';
 import { setUserId, setAdminDetails } from '../store/authSlice';
 import Header from "../components/Header"
-import SearchBox from "../components/SearchBox"
-import StudentTab from "../components/StudentTab"
+import SplitLayout from '../components/split/SplitLayout';
+import AllStudentsPanel from '../components/split/AllStudentsPanel';
+import BlockedStudentsPanel from '../components/split/BlockedStudentsPanel';
+import GroupsClubsPanel from '../components/split/GroupsClubsPanel';
 
 interface Student {
   id: string;
@@ -168,168 +170,38 @@ const AdminDashboard = () => {
       {loading ? (
         <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading...</h1>
       ) : adminDetails ? (
-        <div className="flex-grow flex flex-col">
-          {/* Three-section layout */}
-          <div className='flex-grow flex gap-2 p-3'>
-            <div className="left rounded-lg p-4 w-[49%] flex flex-col gap-1" style={{ backgroundColor: leftSectionColor }}>
-              <h2 className={`text-xl font-bold mb-4 ${textColor}`}>All Students</h2>
-              <SearchBox
-                searchText={studentSearchText}
-                setSearchText={setStudentSearchText}
-                placeholder="Search students..."
-              />
-
-              {/* Student List */}
-              <div className="flex-grow overflow-y-auto">
-                {studentsLoading ? (
-                  <div className="text-center py-4">
-                    <span className={textColor}>Loading students...</span>
-                  </div>
-                ) : filteredStudents.length > 0 ? (
-                  filteredStudents.map(student => (
-                    <StudentTab
-                      key={student.id}
-                      id={student.id}
-                      profilePicture={student.profilePicture}
-                      rollNumber={student.rollNumber}
-                      name={student.name}
-                      isBlocked={student.isBlocked}
-                    />
-                  ))
-                ) : (
-                  <div className="text-center py-4">
-                    <span className={textColor}>
-                      {studentSearchText ? 'No students found matching your search' : 'No student added'}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="studentControlButtons flex gap-3 mt-4 justify-around">
-                <button
-                  className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: '#5A189A' }}
-                  onClick={() => navigate('/admin/add-student')}
-                >
-                  Add Student
-                </button>
-                <button
-                  className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: '#FF2424' }}
-                  onClick={() => navigate('/admin/remove-student')}
-                >
-                  Remove Student
-                </button>
-              </div>
-            </div>
-            <div className="right flex-grow flex flex-col gap-2">
-              <div className="topRight flex-grow rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: topRightSectionColor }}>
-                <h2 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-[#FFA4A4]' : 'text-[#FF0404]'}`}>Blocked Students</h2>
-
-                {/* Blocked Students List */}
-                <div className="flex-grow overflow-y-auto">
-                  {blockedStudentsLoading ? (
-                    <div className="text-center py-4">
-                      <span className={textColor}>Loading blocked students...</span>
-                    </div>
-                  ) : blockedStudents.length > 0 ? (
-                    blockedStudents.map(student => (
-                      <StudentTab
-                        key={student.id}
-                        id={student.id}
-                        profilePicture={student.profilePicture}
-                        rollNumber={student.rollNumber}
-                        name={student.name}
-                        isBlocked={student.isBlocked}
-                      />
-                    ))
-                  ) : (
-                    <div className="text-center py-4">
-                      <span className={textColor}>No blocked students found</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Block/Unblock Control Buttons */}
-                <div className="blockedControlButtons flex gap-3 mt-4 justify-around">
-                  <button
-                    className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
-                    style={{ backgroundColor: '#FF2424' }}
-                    onClick={() => navigate('/admin/block-students')}
-                  >
-                    Block Multiple
-                  </button>
-                  <button
-                    className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
-                    style={{ backgroundColor: '#38B000' }}
-                    onClick={() => navigate('/admin/unblock-students')}
-                  >
-                    Unblock Multiple
-                  </button>
-                </div>
-              </div>
-              <div className="bottomRight flex-grow rounded-lg p-4 flex flex-col" style={{ backgroundColor: bottomRightSectionColor }}>
-                {/* Sliding Tab Selector */}
-                <div className="flex justify-center mb-4">
-                  <div className="flex relative rounded-lg p-1 w-[97%] justify-around" style={{
-                    backgroundColor: theme === 'dark' ? '#111827' : 'rgba(255,158,0,0.4)'
-                  }}>
-                    {/* Groups Tab */}
-                    <button
-                      onClick={() => setSelectedTab('Groups')}
-                      className={`px-6 py-2 rounded-md font-medium transition-all duration-300 relative ${selectedTab === 'Groups'
-                        ? `${theme === 'dark' ? 'text-white' : 'text-black'} font-bold`
-                        : `${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`
-                        }`}
-                    >
-                      Groups
-                      {selectedTab === 'Groups' && (
-                        <div
-                          className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
-                          style={{
-                            backgroundColor: theme === 'dark' ? '#FFA4A4' : '#FF0404'
-                          }}
-                        />
-                      )}
-                    </button>
-
-                    {/* Clubs Tab */}
-                    <button
-                      onClick={() => setSelectedTab('Clubs')}
-                      className={`px-6 py-2 rounded-md font-medium transition-all duration-300 relative ${selectedTab === 'Clubs'
-                        ? `${theme === 'dark' ? 'text-white' : 'text-black'} font-bold`
-                        : `${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`
-                        }`}
-                    >
-                      Clubs
-                      {selectedTab === 'Clubs' && (
-                        <div
-                          className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
-                          style={{
-                            backgroundColor: theme === 'dark' ? '#FFA4A4' : '#FF0404'
-                          }}
-                        />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Content based on selected tab */}
-                <div className="flex-grow">
-                  {selectedTab === 'Groups' ? (
-                    <div className={`text-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Groups content will be displayed here
-                    </div>
-                  ) : (
-                    <div className={`text-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Clubs content will be displayed here
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
+        <SplitLayout
+          leftPanel={
+            <AllStudentsPanel
+              students={filteredStudents}
+              studentsLoading={studentsLoading}
+              studentSearchText={studentSearchText}
+              setStudentSearchText={setStudentSearchText}
+              textColor={textColor}
+              theme={theme as 'light' | 'dark'}
+              navigate={navigate}
+              leftSectionColor={leftSectionColor}
+            />
+          }
+          rightTopPanel={
+            <BlockedStudentsPanel
+              blockedStudents={blockedStudents}
+              blockedStudentsLoading={blockedStudentsLoading}
+              textColor={textColor}
+              theme={theme as 'light' | 'dark'}
+              navigate={navigate}
+              topRightSectionColor={topRightSectionColor}
+            />
+          }
+          rightBottomPanel={
+            <GroupsClubsPanel
+              selectedTab={selectedTab}
+              setSelectedTab={setSelectedTab}
+              theme={theme as 'light' | 'dark'}
+              bottomRightSectionColor={bottomRightSectionColor}
+            />
+          }
+        />
       ) : (
         <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Admin Dashboard</h1>
       )}
