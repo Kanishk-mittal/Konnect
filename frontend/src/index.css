@@ -6,11 +6,75 @@
     font-weight: 50;
     font-style: normal;
 }
-*{
+
+* {
     box-sizing: border-box;
     transition: all 0.3s ease-in-out;
 }
 
-body, html {
+/* Disable transitions for react-split components for smooth resizing */
+.split,
+.split *,
+.split>*,
+.split div,
+[style*="split"],
+[class*="split"] {
+    transition: none !important;
+}
+
+.gutter,
+.gutter * {
+    transition: none !important;
+}
+
+/* When actively resizing, disable all transitions in the container */
+.split-layout-container,
+.split-layout-container * {
+    transition: none !important;
+}
+
+/* Horizontal gutter (for vertical split) */
+.gutter.gutter-horizontal {
+    cursor: col-resize !important;
+}
+
+/* Vertical gutter (for horizontal split) */
+.gutter.gutter-vertical {
+    cursor: row-resize !important;
+}
+
+/* Container queries for responsive panels */
+.panel-container {
+    container-type: size;
+}
+
+/* When panel width is small (< 350px), hide non-essential content */
+@container (max-width: 350px) {
+    .panel-minimized .panel-content {
+        display: none;
+    }
+
+    .panel-minimized .panel-title {
+        font-size: 0.875rem;
+        text-align: center;
+        writing-mode: vertical-lr;
+        text-orientation: mixed;
+    }
+}
+
+/* When panel height is small (< 150px), hide non-essential content */
+@container (max-height: 150px) {
+    .panel-minimized .panel-content {
+        display: none;
+    }
+
+    .panel-minimized .panel-title {
+        font-size: 0.875rem;
+        text-align: center;
+    }
+}
+
+body,
+html {
     padding: 0;
 }
