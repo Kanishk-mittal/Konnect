@@ -9,7 +9,8 @@ import Header from "../components/Header"
 import SplitLayout from '../components/split/SplitLayout';
 import AllStudentsPanel from '../components/split/AllStudentsPanel';
 import BlockedStudentsPanel from '../components/split/BlockedStudentsPanel';
-import GroupsClubsPanel from '../components/split/GroupsClubsPanel';
+import GroupsPanel from '../components/split/GroupsPanel';
+import ClubsPanel from '../components/split/ClubsPanel';
 
 interface Student {
   id: string;
@@ -31,7 +32,7 @@ const AdminDashboard = () => {
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [blockedStudents, setBlockedStudents] = useState<Student[]>([]);
   const [blockedStudentsLoading, setBlockedStudentsLoading] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'Groups' | 'Clubs'>('Groups');
+
 
   // Define theme-specific colors
   const backgroundGradient = theme === 'dark'
@@ -171,7 +172,7 @@ const AdminDashboard = () => {
         <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading...</h1>
       ) : adminDetails ? (
         <SplitLayout
-          leftPanel={
+          leftTopPanel={
             <AllStudentsPanel
               students={filteredStudents}
               studentsLoading={studentsLoading}
@@ -181,6 +182,12 @@ const AdminDashboard = () => {
               theme={theme as 'light' | 'dark'}
               navigate={navigate}
               leftSectionColor={leftSectionColor}
+            />
+          }
+          leftBottomPanel={
+            <ClubsPanel
+              theme={theme as 'light' | 'dark'}
+              backgroundColor={leftSectionColor}
             />
           }
           rightTopPanel={
@@ -194,11 +201,9 @@ const AdminDashboard = () => {
             />
           }
           rightBottomPanel={
-            <GroupsClubsPanel
-              selectedTab={selectedTab}
-              setSelectedTab={setSelectedTab}
+            <GroupsPanel
               theme={theme as 'light' | 'dark'}
-              bottomRightSectionColor={bottomRightSectionColor}
+              backgroundColor={bottomRightSectionColor}
             />
           }
         />
