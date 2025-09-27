@@ -74,6 +74,39 @@
     }
 }
 
+/* Ensure proper scrolling in panels */
+.panel-container {
+    container-type: size;
+    overflow: hidden;
+}
+
+.panel-content {
+    overflow: hidden;
+}
+
+/* Smooth scrolling for student lists */
+.student-list-container {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+.student-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.student-list-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.student-list-container::-webkit-scrollbar-thumb {
+    background-color: rgba(155, 155, 155, 0.5);
+    border-radius: 3px;
+}
+
+.student-list-container::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(155, 155, 155, 0.8);
+}
+
 body,
 html {
     padding: 0;

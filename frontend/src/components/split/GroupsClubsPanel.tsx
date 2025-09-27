@@ -14,12 +14,12 @@ const GroupsClubsPanel: React.FC<GroupsClubsPanelProps> = ({
     bottomRightSectionColor
 }) => {
     return (
-        <div className="rounded-lg p-4 h-full w-full flex flex-col panel-minimized" style={{ backgroundColor: bottomRightSectionColor }}>
+        <div className="rounded-lg p-4 h-full w-full flex flex-col panel-minimized overflow-hidden" style={{ backgroundColor: bottomRightSectionColor }}>
             <h2 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-black'} panel-title`}>
                 {selectedTab}
             </h2>
 
-            <div className="panel-content">
+            <div className="panel-content flex flex-col flex-grow overflow-hidden">
                 {/* Sliding Tab Selector */}
                 <div className="flex justify-center mb-4">
                     <div className="flex relative rounded-lg p-1 w-[97%] justify-around" style={{
@@ -66,7 +66,7 @@ const GroupsClubsPanel: React.FC<GroupsClubsPanelProps> = ({
                 </div>
 
                 {/* Content based on selected tab */}
-                <div className="flex-grow">
+                <div className="flex-grow overflow-y-auto min-h-0 student-list-container">
                     {selectedTab === 'Groups' ? (
                         <div className={`text-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                             Groups content will be displayed here

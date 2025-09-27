@@ -32,10 +32,10 @@ const AllStudentsPanel: React.FC<AllStudentsPanelProps> = ({
     leftSectionColor
 }) => {
     return (
-        <div className="rounded-lg p-4 h-full w-full flex flex-col gap-1 panel-minimized" style={{ backgroundColor: leftSectionColor }}>
+        <div className="rounded-lg p-4 h-full w-full flex flex-col gap-1 panel-minimized overflow-hidden" style={{ backgroundColor: leftSectionColor }}>
             <h2 className={`text-xl font-bold mb-4 ${textColor} panel-title`}>All Students</h2>
 
-            <div className="panel-content">
+            <div className="panel-content flex flex-col flex-grow overflow-hidden">
                 <SearchBox
                     searchText={studentSearchText}
                     setSearchText={setStudentSearchText}
@@ -43,7 +43,7 @@ const AllStudentsPanel: React.FC<AllStudentsPanelProps> = ({
                 />
 
                 {/* Student List */}
-                <div className="flex-grow overflow-y-auto mt-1">
+                <div className="flex-grow overflow-y-auto mt-1 min-h-0 student-list-container">
                     {studentsLoading ? (
                         <div className="text-center py-4">
                             <span className={textColor}>Loading students...</span>

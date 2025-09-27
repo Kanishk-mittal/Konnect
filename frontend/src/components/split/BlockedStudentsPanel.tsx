@@ -28,14 +28,14 @@ const BlockedStudentsPanel: React.FC<BlockedStudentsPanelProps> = ({
     topRightSectionColor
 }) => {
     return (
-        <div className="rounded-lg p-4 h-full w-full flex flex-col gap-1 panel-minimized" style={{ backgroundColor: topRightSectionColor }}>
+        <div className="rounded-lg p-4 h-full w-full flex flex-col gap-1 panel-minimized overflow-hidden" style={{ backgroundColor: topRightSectionColor }}>
             <h2 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-[#FFA4A4]' : 'text-[#FF0404]'} panel-title`}>
                 Blocked Students
             </h2>
 
-            <div className="panel-content">
+            <div className="panel-content flex flex-col flex-grow overflow-hidden">
                 {/* Blocked Students List */}
-                <div className="flex-grow overflow-y-auto">
+                <div className="flex-grow overflow-y-auto min-h-0 student-list-container">
                     {blockedStudentsLoading ? (
                         <div className="text-center py-4">
                             <span className={textColor}>Loading blocked students...</span>
