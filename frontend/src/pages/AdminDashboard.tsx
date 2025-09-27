@@ -188,6 +188,7 @@ const AdminDashboard = () => {
             <ClubsPanel
               theme={theme as 'light' | 'dark'}
               backgroundColor={leftSectionColor}
+              navigate={navigate}
             />
           }
           rightTopPanel={
@@ -204,6 +205,7 @@ const AdminDashboard = () => {
             <GroupsPanel
               theme={theme as 'light' | 'dark'}
               backgroundColor={bottomRightSectionColor}
+              navigate={navigate}
             />
           }
         />

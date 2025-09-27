@@ -1,13 +1,16 @@
 import React from 'react';
+import type { NavigateFunction } from 'react-router-dom';
 
 interface ClubsPanelProps {
     theme: 'light' | 'dark';
     backgroundColor: string;
+    navigate: NavigateFunction;
 }
 
 const ClubsPanel: React.FC<ClubsPanelProps> = ({
     theme,
-    backgroundColor
+    backgroundColor,
+    navigate
 }) => {
     return (
         <div className="rounded-lg p-4 h-full w-full flex flex-col panel-minimized overflow-hidden" style={{ backgroundColor }}>
@@ -20,6 +23,16 @@ const ClubsPanel: React.FC<ClubsPanelProps> = ({
                     <div className={`text-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                         Clubs content will be displayed here
                     </div>
+                </div>
+
+                <div className="clubControlButtons flex gap-3 mt-4 justify-center">
+                    <button
+                        className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
+                        style={{ backgroundColor: '#22C55E' }}
+                        onClick={() => navigate('/admin/add-club')}
+                    >
+                        Add Club
+                    </button>
                 </div>
             </div>
         </div>
