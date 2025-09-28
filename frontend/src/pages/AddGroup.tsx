@@ -6,12 +6,13 @@ import Header from '../components/Header';
 import CsvUploader from '../components/CsvUploader';
 import ManualEntryTable from '../components/ManualEntryTable';
 import ImageInput from '../components/ImageInput';
+import TokenInput from '../components/TokenInput';
 import type { Student, WrongValue } from './AddStudent';
 
 interface GroupFormData {
     groupName: string;
     description: string;
-    admins: string;
+    admins: string[];
     picture: File | null;
     members: Student[];
     isAnnouncementGroup: boolean;
@@ -25,7 +26,7 @@ const AddGroup = () => {
     const [formData, setFormData] = useState<GroupFormData>({
         groupName: '',
         description: '',
-        admins: '',
+        admins: [],
         picture: null,
         members: [],
         isAnnouncementGroup: false,
@@ -68,6 +69,13 @@ const AddGroup = () => {
         }));
     };
 
+    const handleAdminsChange = (admins: string[]) => {
+        setFormData(prev => ({
+            ...prev,
+            admins
+        }));
+    };
+
 
 
     // Table column for members (only roll number needed for groups)
@@ -77,11 +85,63 @@ const AddGroup = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        const validMembers = members.filter(member => member.rollNumber.trim() !== '');
         const groupData = {
             ...formData,
-            members: members.filter(member => member.rollNumber.trim() !== '')
+            members: validMembers
         };
-        console.log('Group data:', groupData);
+
+        console.log('='.repeat(50));
+        console.log('📋 GROUP FORM SUBMISSION');
+        console.log('='.repeat(50));
+
+        console.log('🏷️  Basic Information:');
+        console.log('   Group Name:', formData.groupName || '(Not provided)');
+        console.log('   Description:', formData.description || '(Not provided)');
+        console.log('   Admins Count:', formData.admins.length);
+        if (formData.admins.length > 0) {
+            console.log('   Admin Roll Numbers:', formData.admins.join(', '));
+        } else {
+            console.log('   Admin Roll Numbers: (None provided)');
+        }
+
+        console.log('\n🎯 Group Type Settings:');
+        console.log('   Announcement Group:', formData.isAnnouncementGroup ? '✅ Enabled' : '❌ Disabled');
+        console.log('   Chat Group:', formData.isChatGroup ? '✅ Enabled' : '❌ Disabled');
+
+        console.log('\n🖼️  Picture Information:');
+        if (formData.picture) {
+            console.log('   File Name:', formData.picture.name);
+            console.log('   File Size:', Math.round(formData.picture.size / 1024) + ' KB');
+            console.log('   File Type:', formData.picture.type);
+            console.log('   Last Modified:', new Date(formData.picture.lastModified).toLocaleString());
+        } else {
+            console.log('   No picture selected');
+        }
+
+        console.log('\n👥 Members Information:');
+        console.log('   Total Members Added:', validMembers.length);
+        if (validMembers.length > 0) {
+            console.log('   Member Roll Numbers:');
+            validMembers.forEach((member, index) => {
+                console.log(`     ${index + 1}. ${member.rollNumber}`);
+            });
+        } else {
+            console.log('   No members added');
+        }
+
+        console.log('\n📊 Summary:');
+        console.log('   Form Validation Status:', formData.groupName && formData.admins.length > 0 ? '✅ Required fields filled' : '❌ Missing required fields');
+        console.log('   Ready for Backend:', formData.groupName && formData.admins.length > 0 ? 'Yes' : 'No - Missing required data');
+
+        console.log('\n🔧 Complete Form Data Object:');
+        console.log(groupData);
+
+        console.log('='.repeat(50));
+        console.log('📤 END OF FORM SUBMISSION');
+        console.log('='.repeat(50));
+
         // Here you would typically send the data to your backend
         navigate('/admin/dashboard');
     };
@@ -145,18 +205,11 @@ const AddGroup = () => {
                             <label className={`block text-sm font-medium mb-2 ${textColor}`}>
                                 Admins *
                             </label>
-                            <input
-                                type="text"
-                                name="admins"
-                                value={formData.admins}
-                                onChange={handleInputChange}
-                                required
-                                className={`w-full px-4 py-3 rounded-lg border ${textColor} focus:ring-2 focus:ring-purple-500 focus:border-transparent`}
-                                style={{
-                                    backgroundColor: inputBgColor,
-                                    borderColor: borderColor
-                                }}
-                                placeholder="Enter admin roll numbers (comma separated)"
+                            <TokenInput
+                                values={formData.admins}
+                                onChange={handleAdminsChange}
+                                placeholder="Enter admin roll number"
+                                label="Admin Roll Number"
                             />
                         </div>
 
