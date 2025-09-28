@@ -5,6 +5,7 @@ import type { RootState } from '../store/store';
 import Header from '../components/Header';
 import CsvUploader from '../components/CsvUploader';
 import ManualEntryTable from '../components/ManualEntryTable';
+import ImageInput from '../components/ImageInput';
 import type { Student, WrongValue } from './AddStudent';
 
 interface GroupFormData {
@@ -67,13 +68,7 @@ const AddGroup = () => {
         }));
     };
 
-    const handlePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] || null;
-        setFormData(prev => ({
-            ...prev,
-            picture: file
-        }));
-    };
+
 
     // Table column for members (only roll number needed for groups)
     const tableColumns = [
@@ -202,43 +197,13 @@ const AddGroup = () => {
                         </div>
 
                         {/* Picture Upload */}
-                        <div>
-                            <label className={`block text-sm font-medium mb-2 ${textColor}`}>
-                                Group Picture
-                            </label>
-                            <div className="flex items-center space-x-4">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handlePictureChange}
-                                    className="hidden"
-                                    id="picture-upload"
-                                />
-                                <label
-                                    htmlFor="picture-upload"
-                                    className="px-6 py-3 rounded-lg border-2 border-dashed cursor-pointer hover:opacity-80 transition-opacity"
-                                    style={{
-                                        backgroundColor: inputBgColor,
-                                        borderColor: borderColor
-                                    }}
-                                >
-                                    <span className={textColor}>
-                                        {formData.picture ? formData.picture.name : 'Choose Image'}
-                                    </span>
-                                </label>
-                                {formData.picture && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData(prev => ({ ...prev, picture: null }))}
-                                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                                    >
-                                        Remove
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Members Section */}
+                        <ImageInput
+                            label="Group Picture"
+                            value={formData.picture}
+                            onChange={(file) => setFormData(prev => ({ ...prev, picture: file }))}
+                            placeholder="Select group image"
+                            accept="image/*"
+                        />                        {/* Members Section */}
                         <div className="space-y-6">
                             {/* CSV Upload Section */}
                             <div>
