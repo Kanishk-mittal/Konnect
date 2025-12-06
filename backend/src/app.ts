@@ -14,6 +14,7 @@ dotenv.config({ path: __dirname + '/../.env' });
 import adminRoutes from './routes/admin.routes';
 import studentRoutes from './routes/student.routes';
 import clubRoutes from './routes/club.routes';
+import groupsRoutes from './routes/groups.routes';
 import encryptionRoutes from './routes/encryption.routes';
 
 // Import Socket.IO
@@ -22,6 +23,9 @@ import socketService from './socket/socketService';
 
 // Import KeyManager
 import { KeyManager } from './utils/encryption/key-manager.utils';
+
+// Import Cloudinary
+import { initializeCloudinary } from './utils/cloudinary.utils';
 
 
 class App {
@@ -37,6 +41,7 @@ class App {
 
         this.connectDatabase();
         this.initializeKeyManager();
+        this.initializeCloudinary();
         this.initializeMiddlewares();
         this.initializeRoutes();
         this.initializeSocket();
@@ -65,6 +70,15 @@ class App {
         }
     }
 
+    private initializeCloudinary(): void {
+        try {
+            initializeCloudinary();
+        } catch (error) {
+            console.error('❌ Cloudinary initialization failed:', error);
+            // Don't exit process for Cloudinary errors, as it's not critical for basic functionality
+        }
+    }
+
     private initializeMiddlewares(): void {
         // Security middleware
         this.app.use(helmet());
@@ -82,6 +96,9 @@ class App {
         this.app.use(express.json({ limit: '10mb' }));
         this.app.use(express.urlencoded({ extended: true }));
         this.app.use(cookieParser());
+
+        // Static file serving for uploads
+        this.app.use('/uploads', express.static('uploads'));
     }
 
     private initializeRoutes(): void {
@@ -89,6 +106,7 @@ class App {
         this.app.use("/api/admin", adminRoutes);
         this.app.use("/api/student", studentRoutes);
         this.app.use("/api/club", clubRoutes);
+        this.app.use("/api/groups", groupsRoutes);
         // Encryption routes
         this.app.use("/api/encryption", encryptionRoutes);
         // Test routes for debugging
