@@ -8,6 +8,12 @@ import ManualEntryTable from '../components/ManualEntryTable';
 import ImageInput from '../components/ImageInput';
 import TokenInput from '../components/TokenInput';
 import type { Student, WrongValue } from './AddStudent';
+import { encryptAES, generateAESKey } from '../encryption/AES_utils';
+import { encryptRSA, generateRSAKeyPair } from '../encryption/RSA_utils';
+import { getData } from '../api/requests';
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 interface GroupFormData {
     groupName: string;
@@ -39,6 +45,9 @@ const AddGroup = () => {
         emailId: ''
     }]);
     const [wrongValues, setWrongValues] = useState<WrongValue[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     // Define theme-specific colors
     const backgroundGradient = theme === 'dark'
@@ -83,67 +92,81 @@ const AddGroup = () => {
         { key: 'rollNumber' as keyof Student, label: 'Roll Number', type: 'text' as const }
     ];
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const validMembers = members.filter(member => member.rollNumber.trim() !== '');
-        const groupData = {
-            ...formData,
-            members: validMembers
-        };
+        setIsLoading(true);
+        setErrorMessage('');
+        setSuccessMessage('');
 
-        console.log('='.repeat(50));
-        console.log('📋 GROUP FORM SUBMISSION');
-        console.log('='.repeat(50));
+        try {
+            const validMembers = members.filter(member => member.rollNumber.trim() !== '');
 
-        console.log('🏷️  Basic Information:');
-        console.log('   Group Name:', formData.groupName || '(Not provided)');
-        console.log('   Description:', formData.description || '(Not provided)');
-        console.log('   Admins Count:', formData.admins.length);
-        if (formData.admins.length > 0) {
-            console.log('   Admin Roll Numbers:', formData.admins.join(', '));
-        } else {
-            console.log('   Admin Roll Numbers: (None provided)');
+            // Prepare the JSON payload
+            const jsonPayload = {
+                groupName: formData.groupName,
+                description: formData.description,
+                admins: formData.admins,
+                members: validMembers.map(m => m.rollNumber),
+                isAnnouncementGroup: formData.isAnnouncementGroup,
+                isChatGroup: formData.isChatGroup
+            };
+
+            // Get server's public key for encryption
+            const { publicKey: serverPublicKey, keyId } = await getData('/encryption/rsa/publicKey', {});
+
+            // Generate AES key and encrypt the JSON payload
+            const aesKey = generateAESKey();
+            const dataJson = JSON.stringify(jsonPayload);
+            const encryptedData = encryptAES(dataJson, aesKey);
+
+            // Encrypt the AES key with server's public key
+            const encryptedAesKey = encryptRSA(aesKey, serverPublicKey);
+
+            // Create FormData for multipart upload
+            const formDataToSend = new FormData();
+
+            // Add encrypted payload
+            formDataToSend.append('key', encryptedAesKey);
+            formDataToSend.append('keyId', keyId);
+            formDataToSend.append('data', encryptedData);
+
+            // Add image if present
+            if (formData.picture) {
+                formDataToSend.append('image', formData.picture);
+            }
+
+            // Send the request
+            const response = await axios.post(
+                `${API_BASE_URL}/groups/create`,
+                formDataToSend,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    },
+                    withCredentials: true
+                }
+            );
+
+            if (response.data && response.data.status) {
+                setSuccessMessage(response.data.message || 'Group created successfully!');
+                // Reset form after successful creation
+                setTimeout(() => {
+                    navigate('/admin/dashboard');
+                }, 1500);
+            } else {
+                setErrorMessage(response.data?.message || 'Failed to create group');
+            }
+        } catch (error: any) {
+            console.error('Error creating group:', error);
+            setErrorMessage(
+                error.response?.data?.message ||
+                error.message ||
+                'An error occurred while creating the group'
+            );
+        } finally {
+            setIsLoading(false);
         }
-
-        console.log('\n🎯 Group Type Settings:');
-        console.log('   Announcement Group:', formData.isAnnouncementGroup ? '✅ Enabled' : '❌ Disabled');
-        console.log('   Chat Group:', formData.isChatGroup ? '✅ Enabled' : '❌ Disabled');
-
-        console.log('\n🖼️  Picture Information:');
-        if (formData.picture) {
-            console.log('   File Name:', formData.picture.name);
-            console.log('   File Size:', Math.round(formData.picture.size / 1024) + ' KB');
-            console.log('   File Type:', formData.picture.type);
-            console.log('   Last Modified:', new Date(formData.picture.lastModified).toLocaleString());
-        } else {
-            console.log('   No picture selected');
-        }
-
-        console.log('\n👥 Members Information:');
-        console.log('   Total Members Added:', validMembers.length);
-        if (validMembers.length > 0) {
-            console.log('   Member Roll Numbers:');
-            validMembers.forEach((member, index) => {
-                console.log(`     ${index + 1}. ${member.rollNumber}`);
-            });
-        } else {
-            console.log('   No members added');
-        }
-
-        console.log('\n📊 Summary:');
-        console.log('   Form Validation Status:', formData.groupName && formData.admins.length > 0 ? '✅ Required fields filled' : '❌ Missing required fields');
-        console.log('   Ready for Backend:', formData.groupName && formData.admins.length > 0 ? 'Yes' : 'No - Missing required data');
-
-        console.log('\n🔧 Complete Form Data Object:');
-        console.log(groupData);
-
-        console.log('='.repeat(50));
-        console.log('📤 END OF FORM SUBMISSION');
-        console.log('='.repeat(50));
-
-        // Here you would typically send the data to your backend
-        navigate('/admin/dashboard');
     };
 
     const handleCancel = () => {
@@ -159,6 +182,16 @@ const AddGroup = () => {
             <div className="flex-grow p-6">
                 <div className="max-w-4xl mx-auto">
                     <h1 className={`text-3xl font-bold mb-8 ${textColor}`}>Add New Group</h1>
+
+                    {/* Error/Success Messages */}
+                    {(errorMessage || successMessage) && (
+                        <div className={`mb-6 p-4 rounded-lg text-center font-medium ${errorMessage
+                            ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
+                            : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
+                            }`}>
+                            {errorMessage || successMessage}
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Group Name */}
@@ -296,14 +329,16 @@ const AddGroup = () => {
                         <div className="flex gap-4 pt-6">
                             <button
                                 type="submit"
-                                className="px-8 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
+                                disabled={isLoading}
+                                className={`px-8 py-3 bg-green-500 text-white rounded-lg font-medium transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'}`}
                             >
-                                Create Group
+                                {isLoading ? 'Creating...' : 'Create Group'}
                             </button>
                             <button
                                 type="button"
                                 onClick={handleCancel}
-                                className="px-8 py-3 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+                                disabled={isLoading}
+                                className={`px-8 py-3 bg-gray-500 text-white rounded-lg font-medium transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'}`}
                             >
                                 Cancel
                             </button>

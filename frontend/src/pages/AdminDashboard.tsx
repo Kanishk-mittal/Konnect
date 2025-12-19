@@ -20,6 +20,23 @@ interface Student {
   isBlocked: boolean;
 }
 
+interface Group {
+  id: string;
+  name: string;
+  description: string;
+  icon: string | null;
+  type: 'chat' | 'announcement';
+  memberCount: number;
+  adminCount?: number;
+  createdAt: string;
+}
+
+interface Club {
+  id: string;
+  name: string;
+  email: string;
+}
+
 const AdminDashboard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -32,6 +49,10 @@ const AdminDashboard = () => {
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [blockedStudents, setBlockedStudents] = useState<Student[]>([]);
   const [blockedStudentsLoading, setBlockedStudentsLoading] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [clubsLoading, setClubsLoading] = useState(false);
 
 
   // Define theme-specific colors
@@ -134,8 +155,44 @@ const AdminDashboard = () => {
       }
     };
 
+    const fetchGroups = async () => {
+      if (!adminDetails?.collegeCode) return;
+
+      setGroupsLoading(true);
+      try {
+        const response = await getData(`/groups/${adminDetails.collegeCode}`);
+        if (response.status) {
+          setGroups(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching groups:', error);
+        setGroups([]);
+      } finally {
+        setGroupsLoading(false);
+      }
+    };
+
+    const fetchClubs = async () => {
+      if (!adminDetails?.collegeCode) return;
+
+      setClubsLoading(true);
+      try {
+        const response = await getData(`/club/${adminDetails.collegeCode}`);
+        if (response.status) {
+          setClubs(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching clubs:', error);
+        setClubs([]);
+      } finally {
+        setClubsLoading(false);
+      }
+    };
+
     fetchStudents();
     fetchBlockedStudents();
+    fetchGroups();
+    fetchClubs();
   }, [adminDetails]);
 
   // Check admin authentication
@@ -189,6 +246,9 @@ const AdminDashboard = () => {
               theme={theme as 'light' | 'dark'}
               backgroundColor={leftSectionColor}
               navigate={navigate}
+              clubs={clubs}
+              clubsLoading={clubsLoading}
+              textColor={textColor}
             />
           }
           rightTopPanel={
@@ -206,6 +266,9 @@ const AdminDashboard = () => {
               theme={theme as 'light' | 'dark'}
               backgroundColor={bottomRightSectionColor}
               navigate={navigate}
+              groups={groups}
+              groupsLoading={groupsLoading}
+              textColor={textColor}
             />
           }
         />

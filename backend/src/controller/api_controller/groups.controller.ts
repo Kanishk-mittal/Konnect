@@ -6,6 +6,7 @@ import AnnouncementGroupModel from '../../models/announcementGroup.model';
 import ChatGroupMembershipModel from '../../models/chatGroupMembership.model';
 import AnnouncementGroupMembershipModel from '../../models/announcementGroupMembership.model';
 import StudentModel from '../../models/Student.model';
+import AdminModel from '../../models/admin.model';
 
 // Export the configured multer upload for groups
 export const upload = groupImageUpload;
@@ -35,6 +36,18 @@ export const createGroupController = async (req: Request, res: Response): Promis
             return;
         }
 
+        // Get admin's college_code
+        const admin = await AdminModel.findById(req.user?.id).select('college_code');
+        if (!admin) {
+            res.status(404).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        const collegeCode = admin.college_code;
+
         // Normalize members into roll number strings
         const members: string[] = Array.isArray(payload.members)
             ? (typeof payload.members[0] === 'string'
@@ -62,14 +75,22 @@ export const createGroupController = async (req: Request, res: Response): Promis
         const icon = image?.cloudUrl || image?.localPath || undefined;
 
         // Persist to DB using appropriate model(s)
-        const results: Array<{ id: string; type: 'announcement' | 'chat'; name: string; description?: string; icon?: string; admins?: string[]; createdAt: Date; membersAdded: number }> = [];
+        const results: Array<{ id: string; type: 'announcement' | 'chat'; name: string; description?: string; icon?: string; createdAt: Date; membersAdded: number }> = [];
 
         if (payload.isAnnouncementGroup) {
+            // Find admin students by roll numbers to get their ObjectIds
+            const adminStudents = await StudentModel.find({
+                roll: { $in: payload.admins }
+            }).select('_id roll');
+
+            const adminIds = adminStudents.map(student => student._id);
+
             const annDoc = await AnnouncementGroupModel.create({
                 name: payload.groupName,
                 description: payload.description || '',
                 icon,
-                admin: payload.admins,
+                college_code: collegeCode,
+                admin: adminIds,
                 adminType: 'admin' // since endpoint requires admin auth
             });
 
@@ -101,17 +122,25 @@ export const createGroupController = async (req: Request, res: Response): Promis
                 name: annDoc.name as string,
                 description: annDoc.description as string,
                 icon: annDoc.icon as string,
-                admins: annDoc.admin as string[],
                 createdAt: annDoc.createdAt as Date,
                 membersAdded
             });
         }
 
         if (payload.isChatGroup) {
+            // Find admin students by roll numbers to get their ObjectIds
+            const adminStudents = await StudentModel.find({
+                roll: { $in: payload.admins }
+            }).select('_id roll');
+
+            const adminIds = adminStudents.map(student => student._id);
+
             const chatDoc = await ChatGroupModel.create({
                 name: payload.groupName,
                 description: payload.description || '',
-                icon
+                icon,
+                college_code: collegeCode,
+                admin: adminIds
             });
 
             // Add members to chat group
@@ -149,10 +178,19 @@ export const createGroupController = async (req: Request, res: Response): Promis
 
         // If neither flag set, default to chat group creation
         if (!payload.isAnnouncementGroup && !payload.isChatGroup) {
+            // Find admin students by roll numbers to get their ObjectIds
+            const adminStudents = await StudentModel.find({
+                roll: { $in: payload.admins }
+            }).select('_id roll');
+
+            const adminIds = adminStudents.map(student => student._id);
+
             const chatDoc = await ChatGroupModel.create({
                 name: payload.groupName,
                 description: payload.description || '',
-                icon
+                icon,
+                college_code: collegeCode,
+                admin: adminIds
             });
 
             // Add members to chat group
@@ -199,6 +237,87 @@ export const createGroupController = async (req: Request, res: Response): Promis
         });
     } catch (error) {
         console.error('Error in createGroupController:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred.'
+        });
+    }
+};
+
+// Controller: Get groups by college code
+export const getGroupsByCollegeCodeController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { collegeCode } = req.params;
+
+        if (!collegeCode) {
+            res.status(400).json({
+                status: false,
+                message: 'College code is required.'
+            });
+            return;
+        }
+
+        // Fetch both chat and announcement groups for the college
+        const [chatGroups, announcementGroups] = await Promise.all([
+            ChatGroupModel.find({ college_code: collegeCode })
+                .select('name description icon createdAt')
+                .lean(),
+            AnnouncementGroupModel.find({ college_code: collegeCode })
+                .select('name description icon admin createdAt')
+                .lean()
+        ]);
+
+        // Get member counts for each group
+        const chatGroupIds = chatGroups.map(g => g._id);
+        const announcementGroupIds = announcementGroups.map(g => g._id);
+
+        const [chatMemberCounts, announcementMemberCounts] = await Promise.all([
+            ChatGroupMembershipModel.aggregate([
+                { $match: { group: { $in: chatGroupIds } } },
+                { $group: { _id: '$group', count: { $sum: 1 } } }
+            ]),
+            AnnouncementGroupMembershipModel.aggregate([
+                { $match: { group: { $in: announcementGroupIds } } },
+                { $group: { _id: '$group', count: { $sum: 1 } } }
+            ])
+        ]);
+
+        // Create member count maps
+        const chatMemberCountMap = new Map(chatMemberCounts.map(c => [c._id.toString(), c.count]));
+        const announcementMemberCountMap = new Map(announcementMemberCounts.map(c => [c._id.toString(), c.count]));
+
+        // Format response
+        const formattedChatGroups = chatGroups.map(group => ({
+            id: group._id.toString(),
+            name: group.name,
+            description: group.description || '',
+            icon: group.icon || null,
+            type: 'chat',
+            memberCount: chatMemberCountMap.get(group._id.toString()) || 0,
+            createdAt: group.createdAt
+        }));
+
+        const formattedAnnouncementGroups = announcementGroups.map(group => ({
+            id: group._id.toString(),
+            name: group.name,
+            description: group.description || '',
+            icon: group.icon || null,
+            type: 'announcement',
+            adminCount: Array.isArray(group.admin) ? group.admin.length : 0,
+            memberCount: announcementMemberCountMap.get(group._id.toString()) || 0,
+            createdAt: group.createdAt
+        }));
+
+        const allGroups = [...formattedChatGroups, ...formattedAnnouncementGroups]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        res.status(200).json({
+            status: true,
+            message: 'Groups fetched successfully',
+            data: allGroups
+        });
+    } catch (error) {
+        console.error('Error in getGroupsByCollegeCodeController:', error);
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred.'

@@ -4,7 +4,8 @@ const announcementGroupSchema = new Schema({
   name: { type: String, required: true },
   description: { type: String },
   icon: { type: String },
-  admin: [{ type: String }], // can be user or club leader
+  college_code: { type: String, required: true },
+  admin: [{ type: Types.ObjectId, ref: 'User' }], // references to student/admin users
   adminType: { type: String, enum: ['user', 'club', 'admin'], default: 'user' },
   subGroups: [{ type: Types.ObjectId, ref: 'AnnouncementGroup' }],
   parentGroup: { type: Types.ObjectId, ref: 'AnnouncementGroup' },

@@ -1,15 +1,23 @@
 import { Router, Request, Response } from 'express';
-import { createGroupController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getGroupsByCollegeCodeController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
-import { adminAuthMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
 import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
 
 const router = Router();
 
+// Get groups by college code
+router.get('/:collegeCode',
+    authMiddleware,                    // authenticate user
+    adminAuthMiddleware,               // verify user is admin
+    getGroupsByCollegeCodeController   // controller logic
+);
+
 // Create a group (supports optional image upload)
 router.post('/create',
-    adminAuthMiddleware,               // require admin authentication only
+    authMiddleware,                    // authenticate and populate req.user
+    adminAuthMiddleware,               // verify user is admin
     groupImageUpload.single('image'),  // image is sent unencrypted (handled before decrypt)
     handleMulterError,                 // handle multer-specific errors
     decryptRequest,                    // decrypt only the JSON payload

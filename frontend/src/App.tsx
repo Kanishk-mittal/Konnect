@@ -11,6 +11,7 @@ import RemoveStudent from './pages/RemoveStudent'
 import BlockStudents from './pages/BlockStudents'
 import UnblockStudents from './pages/UnblockStudents'
 import AddGroup from './pages/AddGroup'
+import AddClub from './pages/AddClub'
 import NotFound from './pages/NotFound'
 
 
@@ -49,6 +50,9 @@ const App = () => {
       />
       <Route path="/admin/add-group"
         element={<AddGroup />}
+      />
+      <Route path="/admin/add-club"
+        element={<AddClub />}
       />
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -4,6 +4,8 @@ const chatGroupSchema = new Schema({
   name: { type: String, required: true },
   description: { type: String },
   icon: { type: String },
+  college_code: { type: String, required: true },
+  admin: [{ type: Types.ObjectId, ref: 'User' }], // group admins
   subGroups: [{ type: Types.ObjectId, ref: 'ChatGroup' }],
   parentGroup: { type: Types.ObjectId, ref: 'ChatGroup' },
 }, {
