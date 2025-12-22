@@ -9,10 +9,10 @@ import Header from '../components/Header';
 import InputComponent from '../components/InputComponent';
 
 // Redux actions
-import { setAuthenticated, setPrivateKey, setUserId, setUserType } from '../store/authSlice';
+import { setAuthenticated, setPrivateKey, setUserId, setUserType, clearAuth } from '../store/authSlice';
 
 // API and utilities
-import { postEncryptedData } from '../api/requests';
+import { postEncryptedData, logout } from '../api/requests';
 import { savePrivateKey } from '../utils/privateKeyManager';
 
 const AdminLogin = () => {
@@ -39,6 +39,14 @@ const AdminLogin = () => {
     setSuccessMessage('');
 
     try {
+      // First, clear any existing session (logout from any previous admin/club/student session)
+      await logout('admin'); // Try to clear admin cookie
+      await logout('club');  // Try to clear club cookie
+      await logout('student'); // Try to clear student cookie
+
+      // Clear Redux state
+      dispatch(clearAuth());
+
       // Create the data object to send
       const dataToSend = {
         collegeCode: formData.collegeCode,

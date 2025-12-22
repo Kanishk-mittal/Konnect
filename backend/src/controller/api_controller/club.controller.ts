@@ -1,10 +1,14 @@
 import type { Request, Response } from 'express';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
-import { decryptRSA, encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
-import { encryptAES, generateAESKeyFromString, decryptAES, generateAESKey } from '../../utils/encryption/aes.utils';
+import { encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
 import ClubModel from '../../models/club.model';
 import AdminModel from '../../models/admin.model';
-import { KeyManager } from '../../utils/encryption/key-manager.utils';
+import StudentModel from '../../models/Student.model';
+import BlockedStudentModel from '../../models/blockedStudent.model';
+import ChatGroupModel from '../../models/chatGroup.model';
+import AnnouncementGroupModel from '../../models/announcementGroup.model';
+import ChatGroupMembershipModel from '../../models/chatGroupMembership.model';
+import AnnouncementGroupMembershipModel from '../../models/announcementGroupMembership.model';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
 
@@ -41,7 +45,7 @@ export const clubLoginController = async (req: Request, res: Response): Promise<
 
         // Find club by club name and college code
         const club = await ClubModel.findOne({
-            name: loginData.clubName,
+            Club_name: loginData.clubName,
             college_code: loginData.collegeCode
         });
 
@@ -63,7 +67,7 @@ export const clubLoginController = async (req: Request, res: Response): Promise<
             return;
         }
 
-        // Set JWT token
+        // Set JWT token (this will overwrite any existing auth_token cookie)
         const jwtPayload = { type: 'club', id: club._id.toString() };
         setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
 
@@ -168,7 +172,8 @@ export const createClubController = async (req: Request, res: Response): Promise
             password_hash: passwordHash,
             recovery_password: recoveryPassword, // Encrypted password
             public_key: publicKey,
-            private_key: privateKey
+            private_key: privateKey,
+            icon: icon
         });
 
         res.status(201).json({
@@ -205,14 +210,15 @@ export const getClubsByCollegeCodeController = async (req: Request, res: Respons
 
         // Fetch all clubs for the college
         const clubs = await ClubModel.find({ college_code: collegeCode })
-            .select('Club_name email')
+            .select('Club_name email icon')
             .lean();
 
         // Format response
         const formattedClubs = clubs.map(club => ({
             id: club._id.toString(),
             name: club.Club_name,
-            email: club.email
+            email: club.email,
+            icon: club.icon
         }));
 
         res.status(200).json({
@@ -225,6 +231,356 @@ export const getClubsByCollegeCodeController = async (req: Request, res: Respons
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred.'
+        });
+    }
+};
+
+// Delete Club Controller
+export const deleteClubController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId } = req.params;
+
+        if (!clubId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID is required.'
+            });
+            return;
+        }
+
+        // Delete the club
+        const deletedClub = await ClubModel.findByIdAndDelete(clubId);
+
+        if (!deletedClub) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Club deleted successfully',
+            data: {
+                deletedClubId: clubId,
+                deletedClubName: deletedClub.Club_name
+            }
+        });
+    } catch (error) {
+        console.error('Error in deleteClubController:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred.'
+        });
+    }
+};
+
+// Club Logout Controller
+export const clubLogoutController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Clear the auth_token cookie
+        res.clearCookie('auth_token', {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+        });
+        res.status(200).json({
+            status: true,
+            message: 'Logged out successfully.'
+        });
+    } catch (error) {
+        console.error('Error during club logout:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An error occurred during logout.'
+        });
+    }
+};
+
+/**
+ * Get club details by club ID
+ * Returns club name, email, and college code
+ */
+export const getClubDetailsController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId } = req.params;
+
+        if (!clubId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID is required.'
+            });
+            return;
+        }
+
+        // Find club by ID and select only necessary fields
+        const club = await ClubModel.findById(clubId).select('Club_name email college_code');
+
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            data: {
+                clubName: club.Club_name,
+                email: club.email,
+                collegeCode: club.college_code,
+                userId: clubId
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching club details:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching club details.'
+        });
+    }
+};
+
+/**
+ * Get club details from JWT token
+ * Returns club name, email, and college code from authenticated club
+ */
+export const getClubDetailsFromJWTController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        if (!req.user) {
+            res.status(401).json({
+                status: false,
+                message: 'User not authenticated'
+            });
+            return;
+        }
+
+        // Find club by ID from JWT token and select only necessary fields
+        const club = await ClubModel.findById(req.user.id).select('Club_name email college_code');
+
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Club details retrieved successfully.',
+            data: {
+                userId: req.user.id,
+                clubName: club.Club_name,
+                email: club.email,
+                collegeCode: club.college_code
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching club details from JWT:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching club details.'
+        });
+    }
+};
+
+/**
+ * Get all members (students) for a specific club
+ * Since clubs are associated with college_code, return all students from that college
+ */
+export const getClubMembersController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId } = req.params;
+
+        if (!clubId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID is required.'
+            });
+            return;
+        }
+
+        // Find club to get college_code
+        const club = await ClubModel.findById(clubId).select('college_code');
+
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Get all students from the same college
+        const students = await StudentModel.find({
+            college_code: club.college_code
+        }).select('roll display_name profile_picture');
+
+        // Format the response
+        const formattedStudents = students.map((student: any) => ({
+            id: student._id.toString(),
+            rollNumber: student.roll,
+            name: student.display_name,
+            profilePicture: student.profile_picture || null,
+            isBlocked: false
+        }));
+
+        res.status(200).json({
+            status: true,
+            data: formattedStudents
+        });
+    } catch (error) {
+        console.error('Error fetching club members:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching members.'
+        });
+    }
+};
+
+/**
+ * Get blocked students for a specific club
+ * Returns students blocked by the club's college
+ */
+export const getClubBlockedStudentsController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId } = req.params;
+
+        if (!clubId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID is required.'
+            });
+            return;
+        }
+
+        // Find club to get college_code
+        const club = await ClubModel.findById(clubId).select('college_code');
+
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Get blocked students for this college
+        const blockedStudents = await BlockedStudentModel.find({
+            college_code: club.college_code
+        }).populate('student_id', 'roll display_name profile_picture');
+
+        // Format the response
+        const formattedBlockedStudents = blockedStudents.map((blocked: any) => ({
+            id: blocked.student_id._id.toString(),
+            rollNumber: blocked.student_id.roll,
+            name: blocked.student_id.display_name,
+            profilePicture: blocked.student_id.profile_picture || null,
+            isBlocked: true,
+            reason: blocked.reason
+        }));
+
+        res.status(200).json({
+            status: true,
+            data: formattedBlockedStudents
+        });
+    } catch (error) {
+        console.error('Error fetching blocked students:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching blocked students.'
+        });
+    }
+};
+
+/**
+ * Get all groups (chat and announcement) created by a specific club
+ */
+export const getClubGroupsController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId } = req.params;
+
+        if (!clubId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID is required.'
+            });
+            return;
+        }
+
+        // Find club to get college_code
+        const club = await ClubModel.findById(clubId).select('college_code');
+
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Get chat groups created by this club (where club is admin)
+        const chatGroups = await ChatGroupModel.find({
+            college_code: club.college_code,
+            admin: clubId
+        }).select('name description icon createdAt');
+
+        // Get announcement groups created by this club
+        const announcementGroups = await AnnouncementGroupModel.find({
+            college_code: club.college_code,
+            admin: clubId
+        }).select('name description icon createdAt');
+
+        // Count members for each group
+        const formattedChatGroups = await Promise.all(
+            chatGroups.map(async (group: any) => {
+                const memberCount = await ChatGroupMembershipModel.countDocuments({ group: group._id });
+                const adminCount = await ChatGroupMembershipModel.countDocuments({ group: group._id, isAdmin: true });
+                return {
+                    id: group._id.toString(),
+                    name: group.name,
+                    description: group.description || '',
+                    icon: group.icon || null,
+                    type: 'chat' as const,
+                    memberCount,
+                    adminCount,
+                    createdAt: group.createdAt
+                };
+            })
+        );
+
+        const formattedAnnouncementGroups = await Promise.all(
+            announcementGroups.map(async (group: any) => {
+                const memberCount = await AnnouncementGroupMembershipModel.countDocuments({ group: group._id });
+                const adminCount = await AnnouncementGroupMembershipModel.countDocuments({ group: group._id, isAdmin: true });
+                return {
+                    id: group._id.toString(),
+                    name: group.name,
+                    description: group.description || '',
+                    icon: group.icon || null,
+                    type: 'announcement' as const,
+                    memberCount,
+                    adminCount,
+                    createdAt: group.createdAt
+                };
+            })
+        );
+
+        // Combine both types of groups
+        const allGroups = [...formattedChatGroups, ...formattedAnnouncementGroups];
+
+        res.status(200).json({
+            status: true,
+            data: allGroups
+        });
+    } catch (error) {
+        console.error('Error fetching club groups:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching groups.'
         });
     }
 };

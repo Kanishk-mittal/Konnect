@@ -324,3 +324,75 @@ export const getGroupsByCollegeCodeController = async (req: Request, res: Respon
         });
     }
 };
+
+// Controller: Delete a group
+export const deleteGroupController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { groupId } = req.params;
+        const { groupType } = req.body; // 'chat', 'announcement', or 'both'
+
+        if (!groupId) {
+            res.status(400).json({
+                status: false,
+                message: 'Group ID is required.'
+            });
+            return;
+        }
+
+        if (!groupType) {
+            res.status(400).json({
+                status: false,
+                message: 'Group type is required.'
+            });
+            return;
+        }
+
+        const deletionResults: string[] = [];
+
+        // Delete chat group if specified
+        if (groupType === 'chat' || groupType === 'both') {
+            // Delete all memberships first
+            await ChatGroupMembershipModel.deleteMany({ group: groupId });
+
+            // Delete the group
+            const deletedChatGroup = await ChatGroupModel.findByIdAndDelete(groupId);
+            if (deletedChatGroup) {
+                deletionResults.push('chat');
+            }
+        }
+
+        // Delete announcement group if specified
+        if (groupType === 'announcement' || groupType === 'both') {
+            // Delete all memberships first
+            await AnnouncementGroupMembershipModel.deleteMany({ group: groupId });
+
+            // Delete the group
+            const deletedAnnouncementGroup = await AnnouncementGroupModel.findByIdAndDelete(groupId);
+            if (deletedAnnouncementGroup) {
+                deletionResults.push('announcement');
+            }
+        }
+
+        if (deletionResults.length === 0) {
+            res.status(404).json({
+                status: false,
+                message: 'Group not found.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: `${deletionResults.join(' and ')} group(s) deleted successfully`,
+            data: {
+                deletedTypes: deletionResults
+            }
+        });
+    } catch (error) {
+        console.error('Error in deleteGroupController:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred.'
+        });
+    }
+};

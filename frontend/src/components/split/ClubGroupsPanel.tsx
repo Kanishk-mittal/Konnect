@@ -14,7 +14,7 @@ interface Group {
     createdAt: string;
 }
 
-interface GroupsPanelProps {
+interface ClubGroupsPanelProps {
     theme: 'light' | 'dark';
     backgroundColor: string;
     navigate: NavigateFunction;
@@ -23,7 +23,7 @@ interface GroupsPanelProps {
     textColor: string;
 }
 
-const GroupsPanel: React.FC<GroupsPanelProps> = ({
+const ClubGroupsPanel: React.FC<ClubGroupsPanelProps> = ({
     theme,
     backgroundColor,
     navigate,
@@ -54,7 +54,7 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
     }, [] as Array<Group & { type: 'chat' | 'announcement' | 'both'; chatId?: string; announcementId?: string }>);
 
     const handleEdit = (groupId: string) => {
-        navigate(`/admin/edit-group/${groupId}`);
+        navigate(`/club/edit-group/${groupId}`);
     };
 
     const handleDelete = async (groupId: string, groupType: 'chat' | 'announcement' | 'both') => {
@@ -69,6 +69,7 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
             alert(`Failed to delete group: ${error.response?.data?.message || 'Unknown error'}`);
         }
     };
+
     return (
         <div className="rounded-lg p-4 h-full w-full flex flex-col panel-minimized overflow-hidden" style={{ backgroundColor }}>
             <h2 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-black'} panel-title`}>
@@ -104,7 +105,7 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
                     <button
                         className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
                         style={{ backgroundColor: '#22C55E' }}
-                        onClick={() => navigate('/admin/add-group')}
+                        onClick={() => navigate('/club/add-group')}
                     >
                         Add Group
                     </button>
@@ -114,4 +115,4 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
     );
 };
 
-export default GroupsPanel;
+export default ClubGroupsPanel;

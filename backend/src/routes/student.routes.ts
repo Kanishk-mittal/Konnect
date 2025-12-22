@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
     studentLoginController,
+    studentLogoutController,
     getStudentByCollegeCode,
     getBlockedStudentsByCollegeCode,
     bulkStudentRegistration,
@@ -18,6 +19,10 @@ const router = Router();
 
 // Routes with encryption middleware
 router.post('/login', decryptRequest, studentLoginController, resolvePublicKey, encryptResponse);
+
+// Logout endpoint to clear JWT cookie
+router.post('/logout', studentLogoutController);
+
 router.get('/details/:collegeCode', authMiddleware, getStudentByCollegeCode);
 router.get('/blocked/:collegeCode', authMiddleware, getBlockedStudentsByCollegeCode);
 router.post('/addMultiple', authMiddleware, adminAuthMiddleware, decryptRequest, bulkStudentRegistration, encryptResponse);

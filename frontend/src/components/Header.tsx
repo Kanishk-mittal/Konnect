@@ -3,7 +3,7 @@ import Logo from "../assets/Logo.png"
 import ProfileIcon from "../assets/profile_icon.png"
 import ThemeButton from "./ThemeButton"
 import { postData } from "../api/requests"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import type { RootState } from "../store/store"
@@ -15,6 +15,7 @@ interface HeaderProps {
 
 const Header = ({ editProfileUrl }: HeaderProps) => {
     const navigate = useNavigate()
+    const location = useLocation()
     const dispatch = useDispatch();
     const { isAuthenticated, userId } = useSelector((state: RootState) => state.auth)
 
@@ -27,25 +28,32 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
     const [showTooltip, setShowTooltip] = useState(false)
     const tooltipRef = useRef<HTMLDivElement>(null)
 
+    // Check if we're on a login page
+    const isLoginPage = ['/admin/login', '/club/login', '/student/login', '/login'].includes(location.pathname)
+
     useEffect(() => {
         const fetchProfilePicture = async () => {
-            if (isAuthenticated && userId) {
-                setLoading(true)
-                try {
-                    const response = await getData(`/admin/profile/picture/${userId}`)
-                    if (response.status) {
-                        setProfilePicture(response.profilePicture)
-                    }
-                } catch (error) {
-                    // Error fetching profile picture
-                } finally {
-                    setLoading(false)
+            // Don't fetch if on login page or not authenticated
+            if (isLoginPage || !isAuthenticated || !userId) {
+                setProfilePicture(null)
+                return
+            }
+
+            setLoading(true)
+            try {
+                const response = await getData(`/admin/profile/picture/${userId}`)
+                if (response.status) {
+                    setProfilePicture(response.profilePicture)
                 }
+            } catch (error) {
+                // Error fetching profile picture
+            } finally {
+                setLoading(false)
             }
         }
 
         fetchProfilePicture()
-    }, [isAuthenticated, userId])
+    }, [isAuthenticated, userId, isLoginPage])
 
     // Handle click outside tooltip
     useEffect(() => {
@@ -96,37 +104,37 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
     return (
         <header className="flex justify-center items-center select-none pt-1">
             <div className="flex justify-between items-center h-[10vh] w-[90%]">
-                <div onClick={()=>navigate("/")} className="flex items-center cursor-pointer">
+                <div onClick={() => navigate("/")} className="flex items-center cursor-pointer">
                     <img src={Logo} alt="Logo" className="h-18 object-contain" />
                     <Title style="text-3xl md:text-4xl font-bold ml-4" />
                 </div>
                 <div className="flex items-center gap-4">
                     {isAuthenticated && (
                         <div className="relative">
-                            <div 
+                            <div
                                 onClick={handleProfileClick}
                                 className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
                                 {loading ? (
                                     <div className="w-10 h-10 bg-gray-300 rounded-full animate-pulse"></div>
                                 ) : profilePicture ? (
-                                    <img 
-                                        src={profilePicture} 
-                                        alt="Profile" 
+                                    <img
+                                        src={profilePicture}
+                                        alt="Profile"
                                         className="w-10 h-10 rounded-full object-contain border-2 border-gray-300"
                                     />
                                 ) : (
-                                    <img 
-                                        src={ProfileIcon} 
-                                        alt="Profile" 
+                                    <img
+                                        src={ProfileIcon}
+                                        alt="Profile"
                                         className="w-10 h-10 rounded-full object-contain border-2 border-gray-300"
                                     />
                                 )}
                             </div>
-                            
+
                             {/* Tooltip */}
                             {showTooltip && (
-                                <div 
+                                <div
                                     ref={tooltipRef}
                                     className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-40"
                                 >

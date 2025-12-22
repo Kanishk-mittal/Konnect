@@ -13,6 +13,11 @@ interface AuthState {
     email: string;
     collegeCode: string;
   } | null;
+  clubDetails: {
+    clubName: string;
+    email: string;
+    collegeCode: string;
+  } | null;
 }
 
 const initialState: AuthState = {
@@ -22,6 +27,7 @@ const initialState: AuthState = {
   userId: null,
   userType: null,
   adminDetails: null,
+  clubDetails: null,
 };
 
 export const authSlice = createSlice({
@@ -43,8 +49,11 @@ export const authSlice = createSlice({
     setUserType: (state, action: PayloadAction<string>) => {
       state.userType = action.payload;
     },
-    setAdminDetails: (state, action: PayloadAction<{username: string; email: string; collegeCode: string}>) => {
+    setAdminDetails: (state, action: PayloadAction<{ username: string; email: string; collegeCode: string }>) => {
       state.adminDetails = action.payload;
+    },
+    setClubDetails: (state, action: PayloadAction<{ clubName: string; email: string; collegeCode: string }>) => {
+      state.clubDetails = action.payload;
     },
     clearAuth: (state) => {
       state.email = null;
@@ -53,20 +62,22 @@ export const authSlice = createSlice({
       state.userId = null;
       state.userType = null;
       state.adminDetails = null;
-      
+      state.clubDetails = null;
+
       // Clear private keys from localStorage
       clearAllPrivateKeys();
     },
   },
 });
 
-export const { 
-  setEmail, 
-  setAuthenticated, 
-  setPrivateKey, 
-  setUserId, 
+export const {
+  setEmail,
+  setAuthenticated,
+  setPrivateKey,
+  setUserId,
   setUserType,
-  setAdminDetails, 
+  setAdminDetails,
+  setClubDetails,
   clearAuth
 } = authSlice.actions;
 

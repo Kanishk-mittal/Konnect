@@ -1,11 +1,15 @@
 import React from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import ClubTab from '../ClubTab';
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 interface Club {
     id: string;
     name: string;
     email: string;
+    icon?: string;
 }
 
 interface ClubsPanelProps {
@@ -30,8 +34,16 @@ const ClubsPanel: React.FC<ClubsPanelProps> = ({
     };
 
     const handleDelete = async (clubId: string) => {
-        // TODO: Implement delete functionality
-        console.log('Delete club:', clubId);
+        try {
+            await axios.delete(`${API_BASE_URL}/club/delete/${clubId}`, {
+                withCredentials: true
+            });
+            alert('Club deleted successfully!');
+            window.location.reload();
+        } catch (error: any) {
+            console.error('Error deleting club:', error);
+            alert(`Failed to delete club: ${error.response?.data?.message || 'Unknown error'}`);
+        }
     };
 
     const handleSendMessage = (clubId: string) => {
@@ -62,6 +74,7 @@ const ClubsPanel: React.FC<ClubsPanelProps> = ({
                                 id={club.id}
                                 name={club.name}
                                 email={club.email}
+                                icon={club.icon}
                                 onEdit={() => handleEdit(club.id)}
                                 onDelete={() => handleDelete(club.id)}
                                 onSendMessage={() => handleSendMessage(club.id)}

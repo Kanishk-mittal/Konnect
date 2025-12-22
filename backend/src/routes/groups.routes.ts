@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createGroupController, getGroupsByCollegeCodeController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getGroupsByCollegeCodeController, deleteGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -24,6 +24,14 @@ router.post('/create',
     createGroupController,             // controller logic
     resolvePublicKey,                  // prepare for response encryption
     encryptResponse                    // encrypt response if public key present
+);
+
+// Delete a group
+router.delete('/delete/:groupId',
+    authMiddleware,                    // authenticate user
+    adminAuthMiddleware,               // verify user is admin
+    decryptRequest,                    // decrypt request body (contains groupType)
+    deleteGroupController              // controller logic
 );
 
 // Health check endpoint for groups API (basic status check)

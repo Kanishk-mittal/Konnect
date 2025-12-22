@@ -9,10 +9,10 @@ import Header from '../components/Header';
 import InputComponent from '../components/InputComponent';
 
 // Redux actions
-import { setAuthenticated, setPrivateKey, setUserId, setUserType } from '../store/authSlice';
+import { setAuthenticated, setPrivateKey, setUserId, setUserType, clearAuth } from '../store/authSlice';
 
 // API and utilities
-import { postEncryptedData } from '../api/requests';
+import { postEncryptedData, logout } from '../api/requests';
 import { savePrivateKey } from '../utils/privateKeyManager';
 
 const ClubLogin = () => {
@@ -39,6 +39,14 @@ const ClubLogin = () => {
     setSuccessMessage('');
 
     try {
+      // First, clear any existing session (logout from any previous admin/club/student session)
+      await logout('admin'); // Try to clear admin cookie
+      await logout('club');  // Try to clear club cookie
+      await logout('student'); // Try to clear student cookie
+
+      // Clear Redux state
+      dispatch(clearAuth());
+
       // Validate required fields
       if (!formData.collegeCode || !formData.clubName || !formData.password) {
         setErrorMessage('All fields are required');
@@ -61,14 +69,14 @@ const ClubLogin = () => {
         setSuccessMessage(response.message || 'Login successful!');
 
         // Handle response (now automatically decrypted)
-        if (response.privateKey && response.id) {
+        if (response.data?.privateKey && response.data?.id) {
           // Save to Redux store (primary storage)
-          dispatch(setPrivateKey(response.privateKey));
-          dispatch(setUserId(response.id));
+          dispatch(setPrivateKey(response.data.privateKey));
+          dispatch(setUserId(response.data.id));
           dispatch(setUserType('club'));
 
           // Save to localStorage as backup
-          await savePrivateKey(response.privateKey, 'club', response.id);
+          await savePrivateKey(response.data.privateKey, 'club', response.data.id);
         }
 
         dispatch(setAuthenticated(true));

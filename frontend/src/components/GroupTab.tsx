@@ -13,7 +13,7 @@ interface GroupTabProps {
   icon: string | null;
   type: 'chat' | 'announcement' | 'both';
   onEdit?: () => void;
-  onDelete?: () => void;
+  onDelete?: (groupType: 'chat' | 'announcement' | 'both') => void;
 }
 
 const GroupTab: React.FC<GroupTabProps> = ({
@@ -26,6 +26,7 @@ const GroupTab: React.FC<GroupTabProps> = ({
 }) => {
   const theme = useSelector((state: RootState) => state.theme.theme);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Define theme-specific styles
   const backgroundColor = theme === 'light'
@@ -39,20 +40,31 @@ const GroupTab: React.FC<GroupTabProps> = ({
   // Invert icon colors for dark theme
   const iconFilter = theme === 'dark' ? 'invert(1)' : 'none';
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
+    // If it's only one type, just show simple confirmation
+    if (type === 'chat' || type === 'announcement') {
+      if (window.confirm(`Are you sure you want to delete the ${type} group "${name}"?`)) {
+        handleDeleteWithType(type);
+      }
+    } else {
+      // If it's both, show modal to choose
+      setShowDeleteModal(true);
+    }
+  };
+
+  const handleDeleteWithType = async (groupType: 'chat' | 'announcement' | 'both') => {
     if (isDeleting) return;
 
-    if (window.confirm(`Are you sure you want to delete the group "${name}"?`)) {
-      setIsDeleting(true);
-      try {
-        if (onDelete) {
-          await onDelete();
-        }
-      } catch (error) {
-        console.error('Error deleting group:', error);
-      } finally {
-        setIsDeleting(false);
+    setIsDeleting(true);
+    setShowDeleteModal(false);
+    try {
+      if (onDelete) {
+        await onDelete(groupType);
       }
+    } catch (error) {
+      console.error('Error deleting group:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -126,7 +138,7 @@ const GroupTab: React.FC<GroupTabProps> = ({
 
       {/* Delete Button */}
       <button
-        onClick={handleDelete}
+        onClick={handleDeleteClick}
         className="flex-shrink-0 p-2 rounded-md hover:opacity-80 transition-opacity"
         disabled={isDeleting}
         style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
@@ -138,6 +150,56 @@ const GroupTab: React.FC<GroupTabProps> = ({
           style={{ filter: iconFilter, opacity: isDeleting ? 0.5 : 1 }}
         />
       </button>
+
+      {/* Delete Modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <div
+            className={`rounded-lg p-6 max-w-md w-full mx-4 ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-black'
+              }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold mb-4">Delete Group "{name}"</h3>
+            <p className="mb-6">Which type of group would you like to delete?</p>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => handleDeleteWithType('chat')}
+                className="px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+              >
+                Delete Chat Group Only
+              </button>
+
+              <button
+                onClick={() => handleDeleteWithType('announcement')}
+                className="px-4 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors"
+              >
+                Delete Announcement Group Only
+              </button>
+
+              <button
+                onClick={() => handleDeleteWithType('both')}
+                className="px-4 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                Delete Both Groups
+              </button>
+
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className={`px-4 py-3 rounded-lg font-medium transition-colors ${theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-black'
+                  }`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

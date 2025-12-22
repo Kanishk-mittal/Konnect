@@ -10,6 +10,7 @@ interface ClubTabProps {
     id: string;
     name: string;
     email: string;
+    icon?: string;
     onEdit?: () => void;
     onDelete?: () => void;
     onSendMessage?: () => void;
@@ -19,6 +20,7 @@ const ClubTab: React.FC<ClubTabProps> = ({
     id,
     name,
     email,
+    icon,
     onEdit,
     onDelete,
     onSendMessage
@@ -67,7 +69,7 @@ const ClubTab: React.FC<ClubTabProps> = ({
             {/* Club Picture */}
             <div className="flex-shrink-0">
                 <img
-                    src={profileIcon}
+                    src={icon || profileIcon}
                     alt="Club"
                     className="w-12 h-12 rounded-full object-cover"
                 />

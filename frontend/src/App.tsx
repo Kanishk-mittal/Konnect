@@ -6,6 +6,7 @@ import StudentLogin from './pages/StudentLogin'
 import ClubLogin from './pages/ClubLogin'
 import AdminRegistration from './pages/AdminRegistration'
 import AdminDashboard from './pages/AdminDashboard'
+import ClubDashboard from './pages/ClubDashboard'
 import AddStudent from './pages/AddStudent'
 import RemoveStudent from './pages/RemoveStudent'
 import BlockStudents from './pages/BlockStudents'
@@ -35,6 +36,9 @@ const App = () => {
       />
       <Route path="/admin/dashboard"
         element={<AdminDashboard />}
+      />
+      <Route path="/club/dashboard"
+        element={<ClubDashboard />}
       />
       <Route path="/admin/add-student"
         element={<AddStudent />}

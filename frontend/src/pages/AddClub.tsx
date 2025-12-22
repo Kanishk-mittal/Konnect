@@ -132,17 +132,10 @@ const AddClub = () => {
             if (response.data && response.data.status) {
                 setSuccessMessage(response.data.message || 'Club created successfully!');
 
-                // Store the recovery private key if provided
-                if (response.data.data?.recoveryPrivateKey) {
-                    setRecoveryKey(response.data.data.recoveryPrivateKey);
-                }
-
-                // Don't auto-navigate if there's a recovery key to show
-                if (!response.data.data?.recoveryPrivateKey) {
-                    setTimeout(() => {
-                        navigate('/admin/dashboard');
-                    }, 1500);
-                }
+                // Navigate to dashboard after successful creation
+                setTimeout(() => {
+                    navigate('/admin/dashboard');
+                }, 1500);
             } else {
                 setErrorMessage(response.data?.message || 'Failed to create club');
             }
@@ -179,52 +172,6 @@ const AddClub = () => {
                             : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
                             }`}>
                             {errorMessage || successMessage}
-                        </div>
-                    )}
-
-                    {/* Recovery Key Display */}
-                    {recoveryKey && (
-                        <div className={`mb-6 p-6 rounded-lg border-2 ${theme === 'dark' ? 'bg-yellow-900/20 border-yellow-600' : 'bg-yellow-50 border-yellow-400'}`}>
-                            <h2 className={`text-xl font-bold mb-3 ${theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'}`}>
-                                ⚠️ Important: Save Your Recovery Key
-                            </h2>
-                            <p className={`mb-4 ${theme === 'dark' ? 'text-yellow-200' : 'text-yellow-900'}`}>
-                                This recovery key allows you to recover your account password. Save it securely and never share it with anyone.
-                            </p>
-                            <div className={`p-4 rounded font-mono text-sm break-all ${theme === 'dark' ? 'bg-gray-800 text-gray-200' : 'bg-white text-gray-800'}`}>
-                                {recoveryKey}
-                            </div>
-                            <div className="mt-4 flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(recoveryKey);
-                                        alert('Recovery key copied to clipboard!');
-                                    }}
-                                    className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-                                >
-                                    Copy to Clipboard
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const blob = new Blob([recoveryKey], { type: 'text/plain' });
-                                        const url = URL.createObjectURL(blob);
-                                        const a = document.createElement('a');
-                                        a.href = url;
-                                        a.download = `${formData.clubName}_recovery_key.txt`;
-                                        a.click();
-                                        URL.revokeObjectURL(url);
-                                    }}
-                                    className="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
-                                >
-                                    Download as File
-                                </button>
-                                <button
-                                    onClick={() => navigate('/admin/dashboard')}
-                                    className="px-6 py-2 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
-                                >
-                                    Done (Go to Dashboard)
-                                </button>
-                            </div>
                         </div>
                     )}
 

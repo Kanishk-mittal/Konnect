@@ -187,6 +187,28 @@ export const studentLoginController = async (req: Request, res: Response): Promi
     }
 };
 
+// Student Logout Controller
+export const studentLogoutController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Clear the auth_token cookie
+        res.clearCookie('auth_token', {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+        });
+        res.status(200).json({
+            status: true,
+            message: 'Logged out successfully.'
+        });
+    } catch (error) {
+        console.error('Error during student logout:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An error occurred during logout.'
+        });
+    }
+};
+
 /**
  * Get student details by college code
  * Returns roll number, display name, and profile picture for all students with the given college code

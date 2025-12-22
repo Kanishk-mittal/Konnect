@@ -8,6 +8,7 @@ const clubSchema = new Schema({
   recovery_password: { type: String, required: true },
   private_key: { type: String, required: true },
   public_key: { type: String, required: true },
+  icon: { type: String },
 });
 
 export default model('Club', clubSchema);
@@ -20,4 +21,5 @@ export type ClubDocument = {
   recovery_password: string;
   private_key: string;
   public_key: string;
+  icon?: string;
 };

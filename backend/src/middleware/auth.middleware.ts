@@ -29,10 +29,10 @@ export const authMiddleware = (
 ): void => {
     const cookieName = 'auth_token';
     const expiresIn = 30 * 24 * 60 * 60; // 1 month in seconds
-    
+
     try {
         const token = req.cookies?.[cookieName];
-        
+
         if (!token) {
             res.status(401).json({
                 status: false,
@@ -42,7 +42,7 @@ export const authMiddleware = (
         }
 
         const secret = getJwtSecret();
-        
+
         // Verify the token
         const decoded = jwt.verify(token, secret) as {
             id: string;
@@ -61,7 +61,7 @@ export const authMiddleware = (
 
         // Refresh the JWT token
         const refreshed = refreshJwt(req, res, cookieName, expiresIn);
-        
+
         if (!refreshed) {
             res.status(401).json({
                 status: false,
@@ -72,7 +72,7 @@ export const authMiddleware = (
 
         // Continue to next middleware
         next();
-        
+
     } catch (error) {
         if (error instanceof jwt.TokenExpiredError) {
             res.status(401).json({
@@ -81,7 +81,7 @@ export const authMiddleware = (
             });
             return;
         }
-        
+
         if (error instanceof jwt.JsonWebTokenError) {
             res.status(401).json({
                 status: false,
@@ -89,7 +89,7 @@ export const authMiddleware = (
             });
             return;
         }
-        
+
         console.error('Authentication error:', error);
         res.status(500).json({
             status: false,
@@ -147,6 +147,34 @@ export const studentAuthMiddleware = (
         res.status(403).json({
             status: false,
             message: 'Student access required.'
+        });
+        return;
+    }
+
+    next();
+};
+
+/**
+ * Middleware to check if user is a club
+ * Should be used after authMiddleware
+ */
+export const clubAuthMiddleware = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): void => {
+    if (!req.user) {
+        res.status(401).json({
+            status: false,
+            message: 'Authentication required.'
+        });
+        return;
+    }
+
+    if (req.user.type !== 'club') {
+        res.status(403).json({
+            status: false,
+            message: 'Club access required.'
         });
         return;
     }

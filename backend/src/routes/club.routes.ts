@@ -1,18 +1,23 @@
 import { Router } from 'express';
-import { clubLoginController, createClubController, getClubsByCollegeCodeController } from '../controller/api_controller/club.controller';
+import {
+    clubLoginController,
+    clubLogoutController,
+    createClubController,
+    getClubsByCollegeCodeController,
+    deleteClubController,
+    getClubDetailsController,
+    getClubDetailsFromJWTController,
+    getClubMembersController,
+    getClubBlockedStudentsController,
+    getClubGroupsController
+} from '../controller/api_controller/club.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
-import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, adminAuthMiddleware, clubAuthMiddleware } from '../middleware/auth.middleware';
 import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
+import { Request, Response } from 'express';
 
 const router = Router();
-
-// Get clubs by college code
-router.get('/:collegeCode',
-    authMiddleware,                     // Authenticate user
-    adminAuthMiddleware,                // Verify user is admin
-    getClubsByCollegeCodeController     // Controller logic
-);
 
 // Routes with encryption middleware
 router.post('/login',
@@ -32,18 +37,63 @@ router.post('/create',
     createClubController              // Controller logic
 );
 
-// Health check endpoint for Clubs API
-router.get('/health/check', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'Clubs API is running',
-        timestamp: new Date().toISOString(),
-        endpoints: {
-            login: 'POST /api/club/login',
-            create: 'POST /api/club/create',
-            getByCollegeCode: 'GET /api/club/:collegeCode'
-        }
-    });
+// Delete club route (requires admin authentication)
+router.delete('/delete/:clubId',
+    authMiddleware,                   // Authenticate user
+    adminAuthMiddleware,              // Verify user is admin
+    deleteClubController              // Controller logic
+);
+
+// Get club user ID from JWT (requires club authentication)
+router.get("/userID", authMiddleware, clubAuthMiddleware, (req: Request, res: Response): void => {
+    if (!req.user) {
+        res.status(401).json({
+            status: false,
+            message: 'User not authenticated'
+        });
+        return;
+    }
+    res.json({ userId: req.user.id });
 });
+// Logout endpoint to clear JWT cookie
+router.post('/logout', clubLogoutController);
+
+// Get club details by club ID
+router.get('/details/:clubId', getClubDetailsController);
+
+// Get club details from JWT (requires club authentication)
+router.get('/details',
+    authMiddleware,
+    clubAuthMiddleware,
+    getClubDetailsFromJWTController
+);
+
+// Get club members (requires club authentication)
+router.get('/members/:clubId',
+    authMiddleware,
+    clubAuthMiddleware,
+    getClubMembersController
+);
+
+// Get blocked students for club (requires club authentication)
+router.get('/blocked/:clubId',
+    authMiddleware,
+    clubAuthMiddleware,
+    getClubBlockedStudentsController
+);
+
+// Get groups created by club (requires club authentication)
+router.get('/groups/:clubId',
+    authMiddleware,
+    clubAuthMiddleware,
+    getClubGroupsController
+);
+
+// Get clubs by college code (admin only) - Must be last due to dynamic parameter
+router.get('/:collegeCode',
+    authMiddleware,
+    adminAuthMiddleware,
+    getClubsByCollegeCodeController
+);
 
 export default router;
