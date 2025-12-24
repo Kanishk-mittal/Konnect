@@ -6,6 +6,7 @@ import sendIcon from '../assets/send.png';
 import editIcon from '../assets/edit.png';
 import deleteIcon from '../assets/delete.png';
 import { deleteEncryptedData, postEncryptedData } from '../api/requests';
+import EditPositionModal from './EditPositionModal';
 
 interface StudentTabProps {
   id: string;
@@ -30,6 +31,7 @@ const StudentTab: React.FC<StudentTabProps> = ({
 }) => {
   const theme = useSelector((state: RootState) => state.theme.theme);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Define theme-specific styles with red tint for blocked students
   let backgroundColor, borderColor;
@@ -54,6 +56,7 @@ const StudentTab: React.FC<StudentTabProps> = ({
   const iconFilter = theme === 'dark' ? 'invert(1)' : 'none';
 
   return (
+    <>
     <div
       className="flex flex-row justify-around items-center gap-2 p-1 rounded-lg m-1"
       style={{
@@ -146,7 +149,14 @@ const StudentTab: React.FC<StudentTabProps> = ({
 
           {/* Edit Button */}
           <button
-            onClick={() => console.log('Edit clicked for', name, 'ID:', id)}
+            onClick={() => {
+              if (context === 'club' && position !== undefined) {
+                // Open edit position modal for club members
+                setIsEditModalOpen(true);
+              } else {
+                console.log('Edit clicked for', name, 'ID:', id);
+              }
+            }}
             className="p-2 rounded-md hover:opacity-80 transition-opacity"
             style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
           >
@@ -208,6 +218,23 @@ const StudentTab: React.FC<StudentTabProps> = ({
         </div>
       )}
     </div>
+
+    {/* Edit Position Modal */}
+    {context === 'club' && clubId && position !== undefined && (
+      <EditPositionModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        studentId={id}
+        studentName={name}
+        currentPosition={position}
+        clubId={clubId}
+        onSuccess={() => {
+          alert('Position updated successfully!');
+          window.location.reload();
+        }}
+      />
+    )}
+    </>
   );
 };
 

@@ -6,8 +6,6 @@ const chatGroupSchema = new Schema({
   icon: { type: String },
   college_code: { type: String, required: true },
   admin: [{ type: Types.ObjectId, ref: 'User' }], // group admins
-  subGroups: [{ type: Types.ObjectId, ref: 'ChatGroup' }],
-  parentGroup: { type: Types.ObjectId, ref: 'ChatGroup' },
 }, {
   timestamps: true // Automatically adds createdAt and updatedAt
 });

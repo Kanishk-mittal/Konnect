@@ -186,6 +186,72 @@ export const postEncryptedData = async (
 };
 
 /**
+ * Sends encrypted PUT request with automatic encryption/decryption
+ * @param endpoint API endpoint to call
+ * @param data Data to send (will be automatically encrypted)
+ * @param options Optional configuration for response encryption
+ * @returns Response data (decrypted if encrypted)
+ */
+export const putEncryptedData = async (
+    endpoint: string,
+    data: any,
+    options: {
+        expectEncryptedResponse?: boolean;
+        clientKeys?: { privateKey: string; publicKey: string };
+    } = {}
+) => {
+    try {
+        const { expectEncryptedResponse = false, clientKeys } = options;
+
+        // 1. Get server's public key
+        const { publicKey: serverPublicKey, keyId } = await getServerPublicKey();
+
+        // 2. Generate client RSA key pair if needed for encrypted response
+        let clientPrivateKey = '';
+        let clientPublicKey = '';
+
+        if (expectEncryptedResponse) {
+            if (clientKeys) {
+                clientPrivateKey = clientKeys.privateKey;
+                clientPublicKey = clientKeys.publicKey;
+            } else {
+                [clientPrivateKey, clientPublicKey] = generateRSAKeyPair();
+            }
+        }
+
+        // 3. Generate AES key and encrypt the data
+        const aesKey = generateAESKey();
+        const dataJson = JSON.stringify(data);
+        const encryptedData = encryptAES(dataJson, aesKey);
+
+        // 4. Encrypt the AES key with server's public key
+        const encryptedAesKey = encryptRSA(aesKey, serverPublicKey);
+
+        // 5. Prepare the encrypted payload
+        const encryptedPayload = {
+            key: encryptedAesKey,
+            keyId: keyId,
+            data: encryptedData,
+            ...(expectEncryptedResponse && { publicKey: clientPublicKey })
+        };
+
+        // 6. Send the encrypted request via PUT
+        const response = await instance.put(endpoint, encryptedPayload);
+
+        // 7. Decrypt response if needed
+        if (expectEncryptedResponse && clientPrivateKey) {
+            return decryptServerResponse(response.data, clientPrivateKey);
+        }
+
+        return response.data;
+
+    } catch (error) {
+        console.error('Encrypted PUT request failed:', error);
+        throw error;
+    }
+};
+
+/**
  * Sends encrypted GET request and handles encrypted response
  * Note: GET requests typically don't send encrypted data, but can receive encrypted responses
  * @param endpoint API endpoint to call

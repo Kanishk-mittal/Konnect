@@ -13,6 +13,7 @@ import {
     addClubMembersController,
     removeClubMemberController,
     removeClubMembersBulkController,
+    updateClubMemberPositionController,
     blockClubStudentsBulkController,
     unblockClubStudentController,
     unblockClubStudentsBulkController
@@ -117,6 +118,14 @@ router.post('/members/remove-bulk',
     clubAuthMiddleware,
     decryptRequest,
     removeClubMembersBulkController
+);
+
+// Update member position (requires club authentication)
+router.put('/members/update-position',
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    updateClubMemberPositionController
 );
 
 // Block multiple students by CSV (requires club authentication)

@@ -7,8 +7,6 @@ const announcementGroupSchema = new Schema({
   college_code: { type: String, required: true },
   admin: [{ type: Types.ObjectId, ref: 'User' }], // references to student/admin users
   adminType: { type: String, enum: ['user', 'club', 'admin'], default: 'user' },
-  subGroups: [{ type: Types.ObjectId, ref: 'AnnouncementGroup' }],
-  parentGroup: { type: Types.ObjectId, ref: 'AnnouncementGroup' },
 }, {
   timestamps: true // Automatically adds createdAt and updatedAt
 });

@@ -785,6 +785,89 @@ export const removeClubMemberController = async (req: Request, res: Response): P
 };
 
 /**
+ * Update a club member's position
+ */
+export const updateClubMemberPositionController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId, studentId, position } = req.body;
+
+        if (!clubId || !studentId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID and Student ID are required.'
+            });
+            return;
+        }
+
+        if (!position || typeof position !== 'string' || position.trim() === '') {
+            res.status(400).json({
+                status: false,
+                message: 'Position is required and must be a non-empty string.'
+            });
+            return;
+        }
+
+        // Verify club exists
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Verify student exists
+        const student = await StudentModel.findById(studentId);
+        if (!student) {
+            res.status(404).json({
+                status: false,
+                message: 'Student not found.'
+            });
+            return;
+        }
+
+        // Find and update the membership
+        const membership = await ClubMembershipModel.findOneAndUpdate(
+            {
+                club_id: clubId,
+                student_id: studentId
+            },
+            {
+                position: position.trim()
+            },
+            {
+                new: true // Return the updated document
+            }
+        );
+
+        if (!membership) {
+            res.status(404).json({
+                status: false,
+                message: 'Membership not found. This student is not a member of this club.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Member position updated successfully.',
+            data: {
+                studentId: membership.student_id,
+                clubId: membership.club_id,
+                position: membership.position
+            }
+        });
+    } catch (error) {
+        console.error('Error updating club member position:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating position.'
+        });
+    }
+};
+
+/**
  * Remove multiple members from a club by roll numbers
  * Silently skips members that don't exist in the club
  */
