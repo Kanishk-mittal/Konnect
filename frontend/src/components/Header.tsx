@@ -2,6 +2,7 @@ import Title from "./Title"
 import Logo from "../assets/Logo.png"
 import ProfileIcon from "../assets/profile_icon.png"
 import ThemeButton from "./ThemeButton"
+import EditProfileModal from "./EditProfileModal"
 import { postData } from "../api/requests"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
@@ -26,6 +27,7 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
     const [profilePicture, setProfilePicture] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [showTooltip, setShowTooltip] = useState(false)
+    const [showEditModal, setShowEditModal] = useState(false)
     const tooltipRef = useRef<HTMLDivElement>(null)
 
     // Check if we're on a login page
@@ -79,15 +81,7 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
     }, [profilePicture])
 
     const handleEditProfile = () => {
-        if (editProfileUrl) {
-            navigate(editProfileUrl)
-        } else {
-            // Fallback to prompt if no URL is provided
-            const promptUrl = prompt('Enter the edit profile URL:')
-            if (promptUrl) {
-                navigate(promptUrl)
-            }
-        }
+        setShowEditModal(true)
         setShowTooltip(false)
     }
 
@@ -157,6 +151,15 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
                     <ThemeButton height={3.5} />
                 </div>
             </div>
+
+            {/* Edit Profile Modal */}
+            {isAuthenticated && userId && (
+                <EditProfileModal
+                    isOpen={showEditModal}
+                    onClose={() => setShowEditModal(false)}
+                    userId={userId}
+                />
+            )}
         </header>
     )
 }
