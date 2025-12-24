@@ -121,12 +121,12 @@ const BlockStudents = () => {
         : { background: 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%)' };
 
     return (
-        <div className="flex flex-col h-screen" style={{ background: backgroundGradient }}>
+        <div className="flex flex-col" style={{ background: backgroundGradient, minHeight: '100vh' }}>
             <div style={headerBackground}>
                 <Header editProfileUrl="/admin/edit-profile" />
             </div>
 
-            <div className="flex-grow flex flex-col p-4">
+            <div className="flex-grow flex flex-col p-4 pb-12">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className={`text-3xl font-bold ${textColor}`}>Block Students</h1>
                     <button

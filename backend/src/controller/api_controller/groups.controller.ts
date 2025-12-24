@@ -36,17 +36,40 @@ export const createGroupController = async (req: Request, res: Response): Promis
             return;
         }
 
-        // Get admin's college_code
-        const admin = await AdminModel.findById(req.user?.id).select('college_code');
-        if (!admin) {
-            res.status(404).json({
-                status: false,
-                message: 'Admin not found.'
-            });
-            return;
-        }
+        // Get college_code from admin, club, or student
+        let collegeCode: string;
+        let creatorType: 'admin' | 'club' | 'user';
+        let creatorId: string;
 
-        const collegeCode = admin.college_code;
+        // Try to find admin first
+        const admin = await AdminModel.findById(req.user?.id).select('college_code');
+        if (admin) {
+            collegeCode = admin.college_code;
+            creatorType = 'admin';
+            creatorId = admin._id.toString();
+        } else {
+            // If not admin, try to find club
+            const ClubModel = (await import('../../models/club.model')).default;
+            const club = await ClubModel.findById(req.user?.id).select('college_code');
+            if (club) {
+                collegeCode = club.college_code;
+                creatorType = 'club';
+                creatorId = club._id.toString();
+            } else {
+                // If not admin or club, try to find student
+                const student = await StudentModel.findById(req.user?.id).select('college_code');
+                if (!student) {
+                    res.status(404).json({
+                        status: false,
+                        message: 'User not found.'
+                    });
+                    return;
+                }
+                collegeCode = student.college_code as string;
+                creatorType = 'user';
+                creatorId = student._id.toString();
+            }
+        }
 
         // Normalize members into roll number strings
         const members: string[] = Array.isArray(payload.members)
@@ -91,7 +114,7 @@ export const createGroupController = async (req: Request, res: Response): Promis
                 icon,
                 college_code: collegeCode,
                 admin: adminIds,
-                adminType: 'admin' // since endpoint requires admin auth
+                adminType: creatorType // 'admin' or 'club' based on who created it
             });
 
             // Add members to announcement group
@@ -343,6 +366,36 @@ export const deleteGroupController = async (req: Request, res: Response): Promis
             res.status(400).json({
                 status: false,
                 message: 'Group type is required.'
+            });
+            return;
+        }
+
+        // Check if user is college admin
+        const admin = await AdminModel.findById(req.user?.id);
+        const isCollegeAdmin = !!admin;
+
+        // Check if user is group admin for the specified group type
+        let isGroupAdmin = false;
+        if (!isCollegeAdmin) {
+            if (groupType === 'chat' || groupType === 'both') {
+                const chatGroup = await ChatGroupModel.findById(groupId);
+                if (chatGroup && chatGroup.admin) {
+                    isGroupAdmin = chatGroup.admin.some(adminId => adminId.toString() === req.user?.id);
+                }
+            }
+            if (!isGroupAdmin && (groupType === 'announcement' || groupType === 'both')) {
+                const announcementGroup = await AnnouncementGroupModel.findById(groupId);
+                if (announcementGroup && announcementGroup.admin) {
+                    isGroupAdmin = announcementGroup.admin.some(adminId => adminId.toString() === req.user?.id);
+                }
+            }
+        }
+
+        // If user is neither college admin nor group admin, deny access
+        if (!isCollegeAdmin && !isGroupAdmin) {
+            res.status(403).json({
+                status: false,
+                message: 'You do not have permission to delete this group.'
             });
             return;
         }

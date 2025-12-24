@@ -9,6 +9,7 @@ interface Member {
     name: string;
     profilePicture: string | null;
     isBlocked: boolean;
+    position?: string;
 }
 
 interface ClubMembersPanelProps {
@@ -20,6 +21,7 @@ interface ClubMembersPanelProps {
     theme: 'light' | 'dark';
     navigate: NavigateFunction;
     leftSectionColor: string;
+    clubId?: string; // Add clubId prop
 }
 
 const ClubMembersPanel: React.FC<ClubMembersPanelProps> = ({
@@ -29,7 +31,8 @@ const ClubMembersPanel: React.FC<ClubMembersPanelProps> = ({
     setMemberSearchText,
     textColor,
     navigate,
-    leftSectionColor
+    leftSectionColor,
+    clubId
 }) => {
     return (
         <div className="rounded-lg p-4 h-full w-full flex flex-col gap-1 panel-minimized overflow-hidden" style={{ backgroundColor: leftSectionColor }}>
@@ -57,6 +60,9 @@ const ClubMembersPanel: React.FC<ClubMembersPanelProps> = ({
                                 rollNumber={member.rollNumber}
                                 name={member.name}
                                 isBlocked={member.isBlocked}
+                                position={member.position}
+                                context="club"
+                                clubId={clubId}
                             />
                         ))
                     ) : (

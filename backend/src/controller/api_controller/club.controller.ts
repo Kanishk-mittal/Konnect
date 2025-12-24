@@ -9,6 +9,7 @@ import ChatGroupModel from '../../models/chatGroup.model';
 import AnnouncementGroupModel from '../../models/announcementGroup.model';
 import ChatGroupMembershipModel from '../../models/chatGroupMembership.model';
 import AnnouncementGroupMembershipModel from '../../models/announcementGroupMembership.model';
+import ClubMembershipModel from '../../models/clubMembership.model';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
 
@@ -389,7 +390,7 @@ export const getClubDetailsFromJWTController = async (req: Request, res: Respons
 
 /**
  * Get all members (students) for a specific club
- * Since clubs are associated with college_code, return all students from that college
+ * Fetches members based on ClubMembership records
  */
 export const getClubMembersController = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -403,8 +404,8 @@ export const getClubMembersController = async (req: Request, res: Response): Pro
             return;
         }
 
-        // Find club to get college_code
-        const club = await ClubModel.findById(clubId).select('college_code');
+        // Find club to verify it exists
+        const club = await ClubModel.findById(clubId);
 
         if (!club) {
             res.status(404).json({
@@ -414,23 +415,25 @@ export const getClubMembersController = async (req: Request, res: Response): Pro
             return;
         }
 
-        // Get all students from the same college
-        const students = await StudentModel.find({
-            college_code: club.college_code
-        }).select('roll display_name profile_picture');
+        // Get all club memberships for this club with populated student data
+        const memberships = await ClubMembershipModel.find({
+            club_id: clubId
+        }).populate('student_id', 'roll display_name profile_picture');
 
         // Format the response
-        const formattedStudents = students.map((student: any) => ({
-            id: student._id.toString(),
-            rollNumber: student.roll,
-            name: student.display_name,
-            profilePicture: student.profile_picture || null,
-            isBlocked: false
+        const formattedMembers = memberships.map((membership: any) => ({
+            id: membership.student_id._id.toString(),
+            rollNumber: membership.student_id.roll,
+            name: membership.student_id.display_name,
+            profilePicture: membership.student_id.profile_picture || null,
+            position: membership.position,
+            isBlocked: false,
+            joinedAt: membership.created_at
         }));
 
         res.status(200).json({
             status: true,
-            data: formattedStudents
+            data: formattedMembers
         });
     } catch (error) {
         console.error('Error fetching club members:', error);
@@ -457,8 +460,8 @@ export const getClubBlockedStudentsController = async (req: Request, res: Respon
             return;
         }
 
-        // Find club to get college_code
-        const club = await ClubModel.findById(clubId).select('college_code');
+        // Find club
+        const club = await ClubModel.findById(clubId);
 
         if (!club) {
             res.status(404).json({
@@ -468,20 +471,35 @@ export const getClubBlockedStudentsController = async (req: Request, res: Respon
             return;
         }
 
-        // Get blocked students for this college
-        const blockedStudents = await BlockedStudentModel.find({
-            college_code: club.college_code
-        }).populate('student_id', 'roll display_name profile_picture');
+        // Get blocked roll numbers
+        const blockedRolls = club.blocked_students || [];
 
-        // Format the response
-        const formattedBlockedStudents = blockedStudents.map((blocked: any) => ({
-            id: blocked.student_id._id.toString(),
-            rollNumber: blocked.student_id.roll,
-            name: blocked.student_id.display_name,
-            profilePicture: blocked.student_id.profile_picture || null,
-            isBlocked: true,
-            reason: blocked.reason
-        }));
+        if (blockedRolls.length === 0) {
+            res.status(200).json({
+                status: true,
+                data: []
+            });
+            return;
+        }
+
+        // Fetch student details for blocked roll numbers
+        const blockedStudents = await StudentModel.find({
+            roll: { $in: blockedRolls },
+            college_code: club.college_code
+        }).select('_id roll display_name profile_picture');
+
+        // Format the response maintaining the sort order from blocked_students array
+        const formattedBlockedStudents = blockedRolls.map(roll => {
+            const student = blockedStudents.find(s => s.roll === roll);
+            if (!student) return null;
+            return {
+                id: student._id.toString(),
+                rollNumber: student.roll,
+                name: student.display_name,
+                profilePicture: student.profile_picture || null,
+                isBlocked: true
+            };
+        }).filter(Boolean);
 
         res.status(200).json({
             status: true,
@@ -581,6 +599,522 @@ export const getClubGroupsController = async (req: Request, res: Response): Prom
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred while fetching groups.'
+        });
+    }
+};
+
+/**
+ * Add multiple members to a club via CSV upload
+ * CSV format: roll, position
+ */
+export const addClubMembersController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Data is already decrypted by middleware
+        const { members, clubId } = req.body;
+
+        // Validate payload structure
+        if (!members || !Array.isArray(members)) {
+            res.status(400).json({
+                status: false,
+                message: 'Members array is required'
+            });
+            return;
+        }
+
+        if (!clubId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID is required'
+            });
+            return;
+        }
+
+        // Verify club exists and get college code
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        const collegeCode = club.college_code;
+
+        // Validate each member
+        const validationErrors: any[] = [];
+        const validMembers: Array<{ studentId: string; position: string; roll: string }> = [];
+
+        for (let i = 0; i < members.length; i++) {
+            const member = members[i];
+
+            if (!member.roll || !member.position) {
+                validationErrors.push({
+                    row: i + 1,
+                    error: 'Roll number and position are required'
+                });
+                continue;
+            }
+
+            // Check if student exists in the college
+            const student = await StudentModel.findOne({
+                roll: member.roll,
+                college_code: collegeCode
+            });
+
+            if (!student) {
+                validationErrors.push({
+                    row: i + 1,
+                    roll: member.roll,
+                    error: 'Student not found in college'
+                });
+                continue;
+            }
+
+            // Check if already a member - skip if they are
+            const existingMembership = await ClubMembershipModel.findOne({
+                club_id: clubId,
+                student_id: student._id
+            });
+
+            if (existingMembership) {
+                // Skip this member silently
+                continue;
+            }
+
+            validMembers.push({
+                studentId: student._id.toString(),
+                position: member.position.trim(),
+                roll: member.roll
+            });
+        }
+
+        if (validationErrors.length > 0) {
+            res.status(400).json({
+                status: false,
+                message: 'Validation failed for one or more members.',
+                errors: validationErrors
+            });
+            return;
+        }
+
+        // Insert all valid members
+        const membershipDocs = validMembers.map(m => ({
+            club_id: clubId,
+            student_id: m.studentId,
+            position: m.position
+        }));
+
+        const inserted = await ClubMembershipModel.insertMany(membershipDocs);
+
+        res.status(200).json({
+            status: true,
+            message: `Successfully added ${inserted.length} member(s) to the club.`,
+            insertedCount: inserted.length
+        });
+    } catch (error) {
+        console.error('Error adding club members:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while adding members.'
+        });
+    }
+};
+
+/**
+ * Remove a member from a club
+ * Deletes the ClubMembership record without affecting the student
+ */
+export const removeClubMemberController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId, studentId } = req.body;
+
+        if (!clubId || !studentId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID and Student ID are required.'
+            });
+            return;
+        }
+
+        // Verify club exists
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Verify student exists
+        const student = await StudentModel.findById(studentId);
+        if (!student) {
+            res.status(404).json({
+                status: false,
+                message: 'Student not found.'
+            });
+            return;
+        }
+
+        // Find and delete the membership
+        const membership = await ClubMembershipModel.findOneAndDelete({
+            club_id: clubId,
+            student_id: studentId
+        });
+
+        if (!membership) {
+            res.status(404).json({
+                status: false,
+                message: 'Membership not found. This student is not a member of this club.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Member removed from club successfully.'
+        });
+    } catch (error) {
+        console.error('Error removing club member:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while removing member.'
+        });
+    }
+};
+
+/**
+ * Remove multiple members from a club by roll numbers
+ * Silently skips members that don't exist in the club
+ */
+export const removeClubMembersBulkController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { members, clubId } = req.body;
+
+        // Validate input
+        if (!clubId || !members || !Array.isArray(members)) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID and members array are required.'
+            });
+            return;
+        }
+
+        if (members.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'At least one member must be provided.'
+            });
+            return;
+        }
+
+        // Verify club exists
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Extract roll numbers from members array
+        const rollNumbers = members.map((m: { roll: string }) => m.roll).filter(Boolean);
+
+        if (rollNumbers.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'No valid roll numbers provided.'
+            });
+            return;
+        }
+
+        // Find all students by roll numbers in the club's college
+        const students = await StudentModel.find({
+            roll: { $in: rollNumbers },
+            college_code: club.college_code
+        });
+
+        // Extract student IDs
+        const studentIds = students.map(s => s._id);
+
+        // Delete all memberships for these students in this club
+        const deleteResult = await ClubMembershipModel.deleteMany({
+            club_id: clubId,
+            student_id: { $in: studentIds }
+        });
+
+        res.status(200).json({
+            status: true,
+            message: `Successfully removed ${deleteResult.deletedCount} member(s) from the club.`,
+            removedCount: deleteResult.deletedCount
+        });
+    } catch (error) {
+        console.error('Error removing club members:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while removing members.'
+        });
+    }
+};
+
+/**
+ * Block multiple students for a club by roll numbers
+ * Adds students to club's blocked_students array, sorted by roll number
+ * Avoids duplicate entries
+ */
+export const blockClubStudentsBulkController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { students, clubId } = req.body;
+
+        // Validate input
+        if (!clubId || !students || !Array.isArray(students)) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID and students array are required.'
+            });
+            return;
+        }
+
+        if (students.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'At least one student must be provided.'
+            });
+            return;
+        }
+
+        // Verify club exists
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Extract roll numbers from students array
+        const rollNumbers = students.map((s: { roll: string }) => s.roll?.trim()).filter(Boolean);
+
+        if (rollNumbers.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'No valid roll numbers provided.'
+            });
+            return;
+        }
+
+        // Verify students exist in the club's college
+        const foundStudents = await StudentModel.find({
+            roll: { $in: rollNumbers },
+            college_code: club.college_code
+        });
+
+        if (foundStudents.length === 0) {
+            res.status(404).json({
+                status: false,
+                message: 'No matching students found in the college.'
+            });
+            return;
+        }
+
+        // Get validated roll numbers of found students
+        const validRollNumbers: string[] = foundStudents.map(s => s.roll as string);
+
+        // Get current blocked students
+        const currentBlockedRolls: string[] = club.blocked_students || [];
+        const currentBlockedSet = new Set<string>(currentBlockedRolls);
+
+        // Filter out already blocked students
+        const newRollsToBlock: string[] = validRollNumbers.filter(
+            roll => !currentBlockedSet.has(roll)
+        );
+
+        if (newRollsToBlock.length === 0) {
+            res.status(200).json({
+                status: true,
+                message: 'All provided students are already blocked.',
+                blockedCount: 0
+            });
+            return;
+        }
+
+        // Add new roll numbers and sort in ascending order
+        const updatedBlockedRolls: string[] = [...currentBlockedRolls, ...newRollsToBlock].sort((a, b) => {
+            // Natural sort for roll numbers
+            return a.localeCompare(b, undefined, { numeric: true });
+        });
+
+        // Update club with sorted blocked students list
+        club.blocked_students = updatedBlockedRolls;
+        await club.save();
+
+        res.status(200).json({
+            status: true,
+            message: `Successfully blocked ${newRollsToBlock.length} student(s).`,
+            blockedCount: newRollsToBlock.length
+        });
+    } catch (error) {
+        console.error('Error blocking club students:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while blocking students.'
+        });
+    }
+};
+
+/**
+ * Unblock a student from a club
+ * Removes student from club's blocked_students array
+ */
+export const unblockClubStudentController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId, studentId } = req.body;
+
+        if (!clubId || !studentId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID and Student ID are required.'
+            });
+            return;
+        }
+
+        // Verify club exists
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Get student's roll number
+        const student = await StudentModel.findById(studentId).select('roll');
+        if (!student) {
+            res.status(404).json({
+                status: false,
+                message: 'Student not found.'
+            });
+            return;
+        }
+
+        // Check if student is in blocked list
+        const currentBlockedRolls: string[] = club.blocked_students || [];
+        const isBlocked = currentBlockedRolls.includes(student.roll as string);
+
+        if (!isBlocked) {
+            res.status(404).json({
+                status: false,
+                message: 'Student is not in the blocked list.'
+            });
+            return;
+        }
+
+        // Remove student from blocked list
+        club.blocked_students = currentBlockedRolls.filter(roll => roll !== student.roll as string);
+        await club.save();
+
+        res.status(200).json({
+            status: true,
+            message: 'Student unblocked successfully.'
+        });
+    } catch (error) {
+        console.error('Error unblocking club student:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while unblocking student.'
+        });
+    }
+};
+
+// Unblock club students in bulk (by roll numbers)
+export const unblockClubStudentsBulkController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId, students } = req.body;
+
+        if (!clubId || !students || !Array.isArray(students)) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID and students array are required.'
+            });
+            return;
+        }
+
+        // Verify club exists
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Extract roll numbers from students array
+        const rollNumbers = students.map(s => s.roll?.trim()).filter(Boolean);
+
+        if (rollNumbers.length === 0) {
+            res.status(400).json({
+                status: false,
+                message: 'No valid roll numbers provided.'
+            });
+            return;
+        }
+
+        // Verify students exist in the club's college
+        const foundStudents = await StudentModel.find({
+            roll: { $in: rollNumbers },
+            college_code: club.college_code
+        }).select('roll');
+
+        if (foundStudents.length === 0) {
+            res.status(404).json({
+                status: false,
+                message: 'No students found with the provided roll numbers.'
+            });
+            return;
+        }
+
+        // Get validated roll numbers
+        const validRollNumbers: string[] = foundStudents.map(s => s.roll as string);
+
+        // Filter blocked list to remove students
+        const currentBlockedRolls: string[] = club.blocked_students || [];
+        const updatedBlockedList: string[] = currentBlockedRolls.filter(
+            roll => !validRollNumbers.includes(roll)
+        );
+
+        const unblockedCount = currentBlockedRolls.length - updatedBlockedList.length;
+
+        if (unblockedCount === 0) {
+            res.status(404).json({
+                status: false,
+                message: 'None of the provided students were in the blocked list.'
+            });
+            return;
+        }
+
+        // Update club's blocked list
+        club.blocked_students = updatedBlockedList;
+        await club.save();
+
+        res.status(200).json({
+            status: true,
+            message: `Successfully unblocked ${unblockedCount} student(s).`,
+            data: {
+                unblockedCount,
+                totalProvided: rollNumbers.length,
+                studentsFound: foundStudents.length
+            }
+        });
+    } catch (error) {
+        console.error('Error unblocking club students in bulk:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while unblocking students.'
         });
     }
 };

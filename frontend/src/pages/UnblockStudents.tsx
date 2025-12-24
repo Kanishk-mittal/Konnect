@@ -121,7 +121,7 @@ const UnblockStudents = () => {
         : { background: 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%)' };
 
     return (
-        <div className="flex flex-col h-screen" style={{ background: backgroundGradient }}>
+        <div className="flex flex-col" style={{ background: backgroundGradient, minHeight: '100vh' }}>
             <div style={headerBackground}>
                 <Header editProfileUrl="/admin/edit-profile" />
             </div>

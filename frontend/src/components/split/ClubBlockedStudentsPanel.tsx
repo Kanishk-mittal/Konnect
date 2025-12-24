@@ -17,6 +17,7 @@ interface ClubBlockedStudentsPanelProps {
     theme: 'light' | 'dark';
     navigate: NavigateFunction;
     topRightSectionColor: string;
+    clubId?: string; // Add clubId prop
 }
 
 const ClubBlockedStudentsPanel: React.FC<ClubBlockedStudentsPanelProps> = ({
@@ -25,7 +26,8 @@ const ClubBlockedStudentsPanel: React.FC<ClubBlockedStudentsPanelProps> = ({
     textColor,
     theme,
     navigate,
-    topRightSectionColor
+    topRightSectionColor,
+    clubId
 }) => {
     return (
         <div className="rounded-lg p-4 h-full w-full flex flex-col panel-minimized overflow-hidden" style={{ backgroundColor: topRightSectionColor }}>
@@ -52,6 +54,8 @@ const ClubBlockedStudentsPanel: React.FC<ClubBlockedStudentsPanelProps> = ({
                                 rollNumber={student.rollNumber}
                                 name={student.name}
                                 isBlocked={student.isBlocked}
+                                context="club"
+                                clubId={clubId}
                             />
                         ))
                     )}

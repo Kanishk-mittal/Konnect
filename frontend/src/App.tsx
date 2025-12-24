@@ -13,6 +13,10 @@ import BlockStudents from './pages/BlockStudents'
 import UnblockStudents from './pages/UnblockStudents'
 import AddGroup from './pages/AddGroup'
 import AddClub from './pages/AddClub'
+import AddClubMember from './pages/AddClubMember'
+import RemoveClubMember from './pages/RemoveClubMember'
+import BlockClubStudents from './pages/BlockClubStudents'
+import UnblockClubStudents from './pages/UnblockClubStudents'
 import NotFound from './pages/NotFound'
 
 
@@ -57,6 +61,18 @@ const App = () => {
       />
       <Route path="/admin/add-club"
         element={<AddClub />}
+      />
+      <Route path="/club/add-member"
+        element={<AddClubMember />}
+      />
+      <Route path="/club/remove-member"
+        element={<RemoveClubMember />}
+      />
+      <Route path="/club/block-students"
+        element={<BlockClubStudents />}
+      />
+      <Route path="/club/unblock-students"
+        element={<UnblockClubStudents />}
       />
       <Route path="*" element={<NotFound />} />
     </Routes>

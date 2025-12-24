@@ -9,7 +9,13 @@ import {
     getClubDetailsFromJWTController,
     getClubMembersController,
     getClubBlockedStudentsController,
-    getClubGroupsController
+    getClubGroupsController,
+    addClubMembersController,
+    removeClubMemberController,
+    removeClubMembersBulkController,
+    blockClubStudentsBulkController,
+    unblockClubStudentController,
+    unblockClubStudentsBulkController
 } from '../controller/api_controller/club.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
@@ -87,6 +93,54 @@ router.get('/groups/:clubId',
     authMiddleware,
     clubAuthMiddleware,
     getClubGroupsController
+);
+
+// Add members to club (requires club authentication)
+router.post('/members/add',
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    addClubMembersController
+);
+
+// Remove member from club (requires club authentication)
+router.delete('/members/remove',
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    removeClubMemberController
+);
+
+// Remove multiple members from club by CSV (requires club authentication)
+router.post('/members/remove-bulk',
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    removeClubMembersBulkController
+);
+
+// Block multiple students by CSV (requires club authentication)
+router.post('/students/block-bulk',
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    blockClubStudentsBulkController
+);
+
+// Unblock a student (requires club authentication)
+router.post('/students/unblock',
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    unblockClubStudentController
+);
+
+// Unblock multiple students by CSV (requires club authentication)
+router.post('/students/unblock-bulk',
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    unblockClubStudentsBulkController
 );
 
 // Get clubs by college code (admin only) - Must be last due to dynamic parameter

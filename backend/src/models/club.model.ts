@@ -9,7 +9,15 @@ const clubSchema = new Schema({
   private_key: { type: String, required: true },
   public_key: { type: String, required: true },
   icon: { type: String },
+  blocked_students: {
+    type: [String],
+    default: [],
+    // Keep array sorted in ascending order for efficient binary search
+  },
 });
+
+// Index for efficient searching in blocked_students array
+clubSchema.index({ blocked_students: 1 });
 
 export default model('Club', clubSchema);
 
@@ -22,4 +30,5 @@ export type ClubDocument = {
   private_key: string;
   public_key: string;
   icon?: string;
+  blocked_students?: string[];
 };
