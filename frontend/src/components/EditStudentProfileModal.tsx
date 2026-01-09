@@ -3,18 +3,19 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store/store';
 import editIcon from '../assets/edit.png';
 import profileIcon from '../assets/profile_icon.png';
-import { getData, postEncryptedData } from '../api/requests';
+import { getData, postData, postEncryptedData } from '../api/requests';
 
-interface EditProfileModalProps {
+interface EditStudentProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
     userId: string;
 }
 
-const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, userId }) => {
+const EditStudentProfileModal: React.FC<EditStudentProfileModalProps> = ({ isOpen, onClose, userId }) => {
     const theme = useSelector((state: RootState) => state.theme.theme);
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
     const [username, setUsername] = useState('');
+    const [collegeCode, setCollegeCode] = useState('');
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -33,10 +34,16 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
 
     const fetchProfileData = async () => {
         try {
-            const response = await getData(`/admin/profile/${userId}`);
+            // Get student details from JWT token (authenticated endpoint)
+            const response = await getData('/student/details');
             if (response.status) {
-                setUsername(response.data.username || '');
-                setProfilePicture(response.data.profile_picture || null);
+                setUsername(response.data.name || '');
+                setCollegeCode(response.data.collegeCode || '');
+                // Get profile picture from separate endpoint if available
+                const picResponse = await getData(`/student/profile/picture/${userId}`);
+                if (picResponse.status) {
+                    setProfilePicture(picResponse.profilePicture || null);
+                }
             }
         } catch (err) {
             console.error('Error fetching profile:', err);
@@ -69,9 +76,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
         try {
             const formData = new FormData();
             formData.append('image', file);
-            formData.append('userId', userId);
 
-            const response = await postEncryptedData('/admin/profile/picture', formData);
+            const response = await postData('/student/profile/picture', formData);
             if (response.status) {
                 setProfilePicture(response.data.profilePicture);
                 setSuccess('Profile picture updated successfully!');
@@ -94,7 +100,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
         setError('');
 
         try {
-            const response = await postEncryptedData('/admin/profile/username', {
+            const response = await postEncryptedData('/student/profile/username', {
                 userId,
                 username: username.trim()
             });
@@ -130,8 +136,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
         setError('');
 
         try {
-            // Request OTP for password change
-            const response = await postEncryptedData('/admin/profile/password/request-otp', {
+            const response = await postEncryptedData('/student/profile/password/request-otp', {
                 userId,
                 currentPassword
             });
@@ -157,7 +162,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
         setError('');
 
         try {
-            const response = await postEncryptedData('/admin/profile/password/change', {
+            const response = await postEncryptedData('/student/profile/password/change', {
                 userId,
                 currentPassword,
                 newPassword,
@@ -201,7 +206,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
             >
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">Edit Profile</h2>
+                    <h2 className="text-2xl font-bold">Edit Profile - Student</h2>
                     <button
                         onClick={onClose}
                         className="text-2xl hover:opacity-70 transition-opacity"
@@ -212,12 +217,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
 
                 {/* Messages */}
                 {error && (
-                    <div className="mb-4 p-3 rounded-lg bg-red-500 bg-opacity-20 text-red-500 border border-red-500">
+                    <div className="mb-4 p-3 rounded-lg bg-red-100 border border-red-400" style={{ color: '#dc2626' }}>
                         {error}
                     </div>
                 )}
                 {success && (
-                    <div className="mb-4 p-3 rounded-lg bg-green-500 bg-opacity-20 text-green-500 border border-green-500">
+                    <div className="mb-4 p-3 rounded-lg bg-green-100 border border-green-400" style={{ color: '#16a34a' }}>
                         {success}
                     </div>
                 )}
@@ -251,31 +256,38 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
                     </div>
                 </div>
 
-                {/* Username Section */}
+                {/* Student Info Section (Read-only) */}
                 <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-3">Username</h3>
-                    <div className="flex gap-3">
-                        <input
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            className="flex-1 px-4 py-2 rounded-lg border"
-                            style={{
-                                backgroundColor: inputBg,
-                                borderColor: theme === 'dark' ? '#444' : '#ccc',
-                                color: textColor
-                            }}
-                            placeholder="Enter username"
-                            disabled={isLoading}
-                        />
-                        <button
-                            onClick={handleUsernameUpdate}
-                            disabled={isLoading}
-                            className="px-6 py-2 rounded-lg font-medium text-white hover:opacity-80 transition-opacity"
-                            style={{ backgroundColor: isLoading ? '#666' : '#4CAF50' }}
-                        >
-                            Update
-                        </button>
+                    <h3 className="text-lg font-semibold mb-3">Student Information</h3>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm opacity-70 mb-1">Name</label>
+                            <input
+                                type="text"
+                                value={username}
+                                className="w-full px-4 py-2 rounded-lg border"
+                                style={{
+                                    backgroundColor: inputBg,
+                                    borderColor: theme === 'dark' ? '#444' : '#ccc',
+                                    color: textColor
+                                }}
+                                disabled
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm opacity-70 mb-1">College Code</label>
+                            <input
+                                type="text"
+                                value={collegeCode}
+                                className="w-full px-4 py-2 rounded-lg border"
+                                style={{
+                                    backgroundColor: inputBg,
+                                    borderColor: theme === 'dark' ? '#444' : '#ccc',
+                                    color: textColor
+                                }}
+                                disabled
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -364,4 +376,4 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
     );
 };
 
-export default EditProfileModal;
+export default EditStudentProfileModal;

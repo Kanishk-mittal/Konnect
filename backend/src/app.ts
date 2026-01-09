@@ -16,6 +16,7 @@ import studentRoutes from './routes/student.routes';
 import clubRoutes from './routes/club.routes';
 import groupsRoutes from './routes/groups.routes';
 import encryptionRoutes from './routes/encryption.routes';
+import generalRoutes from './routes/general.routes';
 
 // Import Socket.IO
 import { SocketHandler } from './socket/socketHandler';
@@ -109,6 +110,8 @@ class App {
         this.app.use("/api/groups", groupsRoutes);
         // Encryption routes
         this.app.use("/api/encryption", encryptionRoutes);
+        // General routes
+        this.app.use("/api/general", generalRoutes);
         // Test routes for debugging
 
         // Socket.IO status endpoint

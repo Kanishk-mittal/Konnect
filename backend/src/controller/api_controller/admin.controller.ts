@@ -10,6 +10,7 @@ import type { AdminDocument } from '../../models/admin.model';
 import { internalAesKey } from '../../constants/keys';
 import { KeyManager } from '../../utils/encryption/key-manager.utils';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
+import { isCloudinaryConfigured, uploadAndCleanup } from '../../utils/cloudinary.utils';
 
 // Types
 type AdminRegistrationData = {
@@ -327,6 +328,7 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         });
     }
 };
+
 // Admin Logout Controller
 export const adminLogoutController = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -468,6 +470,80 @@ export const getAdminDetailsFromJWT = async (req: Request, res: Response): Promi
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred while fetching admin details.'
+        });
+    }
+};
+
+/**
+ * Update admin profile picture
+ * Requires authentication - gets admin ID from JWT token
+ */
+export const updateAdminProfilePicture = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get admin ID from authenticated user (from JWT)
+        const adminId = req.user?.id;
+
+        if (!adminId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        // Find admin
+        const admin = await AdminModel.findById(adminId);
+        if (!admin) {
+            res.status(404).json({
+                status: false,
+                message: 'Admin not found.'
+            });
+            return;
+        }
+
+        // Handle optional local file upload + optional Cloudinary push
+        let profilePictureUrl: string | undefined;
+
+        if ((req as any).file) {
+            const localPath = (req as any).file.path as string;
+
+            if (isCloudinaryConfigured()) {
+                const uploaded = await uploadAndCleanup(localPath, { folder: 'konnect/profiles' });
+                if (uploaded.success && uploaded.secure_url) {
+                    profilePictureUrl = uploaded.secure_url;
+                } else {
+                    profilePictureUrl = localPath;
+                }
+            } else {
+                profilePictureUrl = localPath;
+            }
+        }
+
+        if (!profilePictureUrl) {
+            res.status(400).json({
+                status: false,
+                message: 'No image file provided.'
+            });
+            return;
+        }
+
+        // Update admin profile picture
+        admin.profile_picture = profilePictureUrl;
+        await admin.save();
+
+        res.status(200).json({
+            status: true,
+            message: 'Profile picture updated successfully.',
+            data: {
+                profilePicture: profilePictureUrl
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating admin profile picture:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating profile picture.'
         });
     }
 };
