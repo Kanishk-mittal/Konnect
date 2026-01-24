@@ -12,6 +12,8 @@ import AnnouncementGroupMembershipModel from '../../models/announcementGroupMemb
 import ClubMembershipModel from '../../models/clubMembership.model';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
+import { sendOTPEmail } from '../../utils/mailer.utils';
+import { OTP } from '../../utils/otp.utils';
 
 // Types
 type ClubLoginData = {
@@ -1198,6 +1200,245 @@ export const unblockClubStudentsBulkController = async (req: Request, res: Respo
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred while unblocking students.'
+        });
+    }
+};
+
+/**
+ * Get club profile picture by club ID
+ * Public endpoint - no authentication required
+ */
+export const sendClubProfilePicture = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { clubId } = req.params;
+        if (!clubId) {
+            res.status(400).json({
+                status: false,
+                message: 'Club ID is required.'
+            });
+            return;
+        }
+
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Send profile picture URL or null if not set
+        res.status(200).json({
+            status: true,
+            profilePicture: club.icon
+        });
+    } catch (error) {
+        console.error('Error fetching club profile picture:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching profile picture.'
+        });
+    }
+};
+
+/**
+ * Update club profile picture
+ * Requires club authentication - gets club ID from JWT token
+ */
+export const updateClubProfilePicture = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get club ID from authenticated user (from JWT)
+        const clubId = req.user?.id;
+
+        if (!clubId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        // Find club
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Handle optional local file upload + optional Cloudinary push
+        let profilePictureUrl: string | undefined;
+
+        if ((req as any).file) {
+            const localPath = (req as any).file.path as string;
+
+            if (isCloudinaryConfigured()) {
+                const uploaded = await uploadAndCleanup(localPath, { folder: 'konnect/clubs' });
+                if (uploaded.success && uploaded.secure_url) {
+                    profilePictureUrl = uploaded.secure_url;
+                } else {
+                    profilePictureUrl = localPath;
+                }
+            } else {
+                profilePictureUrl = localPath;
+            }
+        }
+
+        if (!profilePictureUrl) {
+            res.status(400).json({
+                status: false,
+                message: 'No image file provided.'
+            });
+            return;
+        }
+
+        // Update club profile picture (stored in 'icon' field)
+        club.icon = profilePictureUrl;
+        await club.save();
+
+        res.status(200).json({
+            status: true,
+            message: 'Profile picture updated successfully.',
+            data: {
+                profilePicture: profilePictureUrl
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating club profile picture:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating profile picture.'
+        });
+    }
+};
+
+/**
+ * Request OTP for club password change
+ * Requires club authentication - sends OTP to club's registered email
+ */
+export const requestClubPasswordChangeOTP = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get club ID from authenticated user (from JWT)
+        const clubId = req.user?.id;
+
+        if (!clubId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        // Find club
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Send OTP to club email
+        const otpResult = await sendOTPEmail(club.email, 'OTP for Password Change - Konnect');
+
+        if (!otpResult.status) {
+            res.status(500).json({
+                status: false,
+                message: 'Failed to send OTP. Please try again.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'OTP sent successfully to your registered email.'
+        });
+
+    } catch (error) {
+        console.error('Error requesting club password change OTP:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while requesting OTP.'
+        });
+    }
+};
+
+/**
+ * Change club password with OTP verification
+ * Requires club authentication - verifies OTP and updates password
+ */
+export const changeClubPasswordWithOTP = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get club ID from authenticated user (from JWT)
+        const clubId = req.user?.id;
+        const { newPassword, otp } = req.body;
+
+
+        if (!clubId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        if (!newPassword || !otp) {
+            res.status(400).json({
+                status: false,
+                message: 'New password and OTP are required.'
+            });
+            return;
+        }
+
+        // Validate new password length
+        if (newPassword.length < 8) {
+            res.status(400).json({
+                status: false,
+                message: 'New password must be at least 8 characters long.'
+            });
+            return;
+        }
+
+        // Find club
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({
+                status: false,
+                message: 'Club not found.'
+            });
+            return;
+        }
+
+        // Verify OTP
+        const isOTPValid = OTP.verifyOTP(club.email, otp);
+        if (!isOTPValid) {
+            res.status(401).json({
+                status: false,
+                message: 'Invalid or expired OTP.'
+            });
+            return;
+        }
+
+        // Hash new password and update
+        const newPasswordHash = await createHash(newPassword);
+        club.password_hash = newPasswordHash;
+        await club.save();
+
+        res.status(200).json({
+            status: true,
+            message: 'Password changed successfully.'
+        });
+
+    } catch (error) {
+        console.error('Error changing club password:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while changing password.'
         });
     }
 };

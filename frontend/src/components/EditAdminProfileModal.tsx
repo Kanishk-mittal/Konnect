@@ -9,9 +9,10 @@ interface EditAdminProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
     userId: string;
+    onProfileUpdate?: () => void;
 }
 
-const EditAdminProfileModal: React.FC<EditAdminProfileModalProps> = ({ isOpen, onClose, userId }) => {
+const EditAdminProfileModal: React.FC<EditAdminProfileModalProps> = ({ isOpen, onClose, userId, onProfileUpdate }) => {
     const theme = useSelector((state: RootState) => state.theme.theme);
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
     const [username, setUsername] = useState('');
@@ -81,6 +82,8 @@ const EditAdminProfileModal: React.FC<EditAdminProfileModalProps> = ({ isOpen, o
                 setProfilePicture(response.data.profilePicture);
                 setSuccess('Profile picture updated successfully!');
                 setTimeout(() => setSuccess(''), 3000);
+                // Notify parent to refresh profile picture
+                if (onProfileUpdate) onProfileUpdate();
             }
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to update profile picture');

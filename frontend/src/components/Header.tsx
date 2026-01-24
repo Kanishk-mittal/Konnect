@@ -12,11 +12,8 @@ import { useSelector, useDispatch } from "react-redux"
 import type { RootState } from "../store/store"
 import { getData } from "../api/requests"
 
-interface HeaderProps {
-    editProfileUrl?: string;
-}
 
-const Header = ({ editProfileUrl }: HeaderProps) => {
+const Header = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const dispatch = useDispatch();
@@ -36,42 +33,45 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
     // Check if we're on a login page
     const isLoginPage = ['/admin/login', '/club/login', '/student/login', '/login'].includes(location.pathname)
 
-    useEffect(() => {
-        const fetchProfilePicture = async () => {
-            // Don't fetch if on login page or not authenticated
-            if (isLoginPage || !isAuthenticated || !userId) {
-                setProfilePicture(null)
-                return
-            }
-
-            setLoading(true)
-            try {
-                // First, get the user status
-                const statusResponse = await getData('/general/status')
-                if (statusResponse.status && statusResponse.userStatus) {
-                    setUserStatus(statusResponse.userStatus)
-
-                    // Then fetch profile picture based on user type
-                    const userType = statusResponse.userStatus.toLowerCase()
-                    if (userType !== 'logged out') {
-                        const response = await getData(`/${userType}/profile/picture/${userId}`)
-                        if (response.status) {
-                            setProfilePicture(response.profilePicture)
-                        }
-                    }
-                }
-            } catch (error) {
-                // Error fetching profile picture or status
-                console.error('Error fetching user data:', error)
-            } finally {
-                setLoading(false)
-            }
+    const fetchProfilePicture = async () => {
+        // Don't fetch if on login page or not authenticated
+        if (isLoginPage || !isAuthenticated || !userId) {
+            setProfilePicture(null)
+            return
         }
 
+        setLoading(true)
+        try {
+            // First, get the user status
+            const statusResponse = await getData('/general/status')
+            if (statusResponse.status && statusResponse.userStatus) {
+                setUserStatus(statusResponse.userStatus)
+
+                // Then fetch profile picture based on user type
+                const userType = statusResponse.userStatus.toLowerCase()
+                if (userType !== 'logged out') {
+                    const response = await getData(`/${userType}/profile/picture/${userId}`)
+                    if (response.status) {
+                        setProfilePicture(response.profilePicture)
+                    }
+                }
+            }
+        } catch (error) {
+            // Error fetching profile picture or status
+            console.error('Error fetching user data:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
         fetchProfilePicture()
     }, [isAuthenticated, userId, isLoginPage])
 
-    // Handle click outside tooltip
+    const handleProfileUpdate = () => {
+        // Refresh profile picture after update
+        fetchProfilePicture()
+    }
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
@@ -88,11 +88,6 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
     const handleProfileClick = () => {
         setShowTooltip(!showTooltip)
     }
-
-    // Debug: Log profilePicture value
-    useEffect(() => {
-        console.log('Profile picture value:', profilePicture)
-    }, [profilePicture])
 
     const handleEditProfile = () => {
         setShowEditModal(true)
@@ -132,13 +127,13 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
                                     <img
                                         src={profilePicture}
                                         alt="Profile"
-                                        className="w-10 h-10 rounded-full object-contain border-2 border-gray-300"
+                                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                     />
                                 ) : (
                                     <img
                                         src={ProfileIcon}
                                         alt="Profile"
-                                        className="w-10 h-10 rounded-full object-contain border-2 border-gray-300"
+                                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                     />
                                 )}
                             </div>
@@ -175,6 +170,7 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
                     isOpen={showEditModal}
                     onClose={() => setShowEditModal(false)}
                     userId={userId}
+                    onProfileUpdate={handleProfileUpdate}
                 />
             )}
             {isAuthenticated && userId && userStatus === 'Student' && (
@@ -182,6 +178,7 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
                     isOpen={showEditModal}
                     onClose={() => setShowEditModal(false)}
                     userId={userId}
+                    onProfileUpdate={handleProfileUpdate}
                 />
             )}
             {isAuthenticated && userId && userStatus === 'Club' && (
@@ -189,6 +186,7 @@ const Header = ({ editProfileUrl }: HeaderProps) => {
                     isOpen={showEditModal}
                     onClose={() => setShowEditModal(false)}
                     userId={userId}
+                    onProfileUpdate={handleProfileUpdate}
                 />
             )}
         </header>

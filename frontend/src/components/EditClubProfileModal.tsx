@@ -9,14 +9,14 @@ interface EditClubProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
     userId: string;
+    onProfileUpdate?: () => void;
 }
 
-const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onClose, userId }) => {
+const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onClose, userId, onProfileUpdate }) => {
     const theme = useSelector((state: RootState) => state.theme.theme);
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
     const [clubName, setClubName] = useState('');
     const [collegeCode, setCollegeCode] = useState('');
-    const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [otp, setOtp] = useState('');
@@ -37,7 +37,7 @@ const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onC
             // Get club details from JWT token (authenticated endpoint)
             const response = await getData('/club/details');
             if (response.status) {
-                setClubName(response.data.name || '');
+                setClubName(response.data.clubName || '');
                 setCollegeCode(response.data.collegeCode || '');
                 // Get profile picture from separate endpoint if available
                 const picResponse = await getData(`/club/profile/picture/${userId}`);
@@ -82,6 +82,8 @@ const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onC
                 setProfilePicture(response.data.profilePicture);
                 setSuccess('Profile picture updated successfully!');
                 setTimeout(() => setSuccess(''), 3000);
+                // Notify parent to refresh profile picture
+                if (onProfileUpdate) onProfileUpdate();
             }
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to update profile picture');
@@ -91,8 +93,8 @@ const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onC
     };
 
     const handlePasswordChange = async () => {
-        if (!currentPassword || !newPassword || !confirmPassword) {
-            setError('All password fields are required');
+        if (!newPassword || !confirmPassword) {
+            setError('New password and confirmation are required');
             return;
         }
 
@@ -110,10 +112,7 @@ const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onC
         setError('');
 
         try {
-            const response = await postEncryptedData('/club/profile/password/request-otp', {
-                userId,
-                currentPassword
-            });
+            const response = await getData('/club/profile/password/request-otp');
 
             if (response.status) {
                 setShowOtpField(true);
@@ -138,14 +137,12 @@ const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onC
         try {
             const response = await postEncryptedData('/club/profile/password/change', {
                 userId,
-                currentPassword,
                 newPassword,
                 otp: otp.trim()
             });
 
             if (response.status) {
                 setSuccess('Password changed successfully!');
-                setCurrentPassword('');
                 setNewPassword('');
                 setConfirmPassword('');
                 setOtp('');
@@ -171,12 +168,10 @@ const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onC
         <div
             className="fixed inset-0 z-50 flex items-center justify-center"
             style={{ backgroundColor: overlayColor }}
-            onClick={onClose}
         >
             <div
                 className="rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
                 style={{ backgroundColor, color: textColor }}
-                onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6">
@@ -269,19 +264,6 @@ const EditClubProfileModal: React.FC<EditClubProfileModalProps> = ({ isOpen, onC
                 <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-3">Change Password</h3>
                     <div className="space-y-3">
-                        <input
-                            type="password"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border"
-                            style={{
-                                backgroundColor: inputBg,
-                                borderColor: theme === 'dark' ? '#444' : '#ccc',
-                                color: textColor
-                            }}
-                            placeholder="Current Password"
-                            disabled={isLoading}
-                        />
                         <input
                             type="password"
                             value={newPassword}

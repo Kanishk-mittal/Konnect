@@ -16,7 +16,11 @@ import {
     updateClubMemberPositionController,
     blockClubStudentsBulkController,
     unblockClubStudentController,
-    unblockClubStudentsBulkController
+    unblockClubStudentsBulkController,
+    sendClubProfilePicture,
+    updateClubProfilePicture,
+    requestClubPasswordChangeOTP,
+    changeClubPasswordWithOTP
 } from '../controller/api_controller/club.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
@@ -64,6 +68,33 @@ router.get("/userID", authMiddleware, clubAuthMiddleware, (req: Request, res: Re
 });
 // Logout endpoint to clear JWT cookie
 router.post('/logout', clubLogoutController);
+
+// Get club profile picture by club ID (public endpoint)
+router.get("/profile/picture/:clubId", sendClubProfilePicture);
+
+// Update club profile picture (authenticated)
+router.post("/profile/picture",
+    authMiddleware,
+    clubAuthMiddleware,
+    groupImageUpload.single('image'),
+    handleMulterError,
+    updateClubProfilePicture
+);
+
+// Request OTP for password change (authenticated)
+router.get("/profile/password/request-otp",
+    authMiddleware,
+    clubAuthMiddleware,
+    requestClubPasswordChangeOTP
+);
+
+// Change password with OTP (authenticated)
+router.post("/profile/password/change",
+    authMiddleware,
+    clubAuthMiddleware,
+    decryptRequest,
+    changeClubPasswordWithOTP
+);
 
 // Get club details by club ID
 router.get('/details/:clubId', getClubDetailsController);

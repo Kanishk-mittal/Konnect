@@ -9,9 +9,10 @@ interface EditStudentProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
     userId: string;
+    onProfileUpdate?: () => void;
 }
 
-const EditStudentProfileModal: React.FC<EditStudentProfileModalProps> = ({ isOpen, onClose, userId }) => {
+const EditStudentProfileModal: React.FC<EditStudentProfileModalProps> = ({ isOpen, onClose, userId, onProfileUpdate }) => {
     const theme = useSelector((state: RootState) => state.theme.theme);
     const [profilePicture, setProfilePicture] = useState<string | null>(null);
     const [username, setUsername] = useState('');
@@ -82,6 +83,8 @@ const EditStudentProfileModal: React.FC<EditStudentProfileModalProps> = ({ isOpe
                 setProfilePicture(response.data.profilePicture);
                 setSuccess('Profile picture updated successfully!');
                 setTimeout(() => setSuccess(''), 3000);
+                // Notify parent to refresh profile picture
+                if (onProfileUpdate) onProfileUpdate();
             }
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to update profile picture');
