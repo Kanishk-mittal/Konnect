@@ -5,8 +5,7 @@ const announcementGroupSchema = new Schema({
   description: { type: String },
   icon: { type: String },
   college_code: { type: String, required: true },
-  admin: [{ type: Types.ObjectId, ref: 'User' }], // references to student/admin users
-  adminType: { type: String, enum: ['user', 'club', 'admin'], default: 'user' },
+  created_by: { type: Types.ObjectId, required: true, ref: 'User' },
 }, {
   timestamps: true // Automatically adds createdAt and updatedAt
 });
