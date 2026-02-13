@@ -1,55 +1,45 @@
 import { Request, Response } from 'express';
 // import { OTP } from '../../utils/otp.utils';
-// import { AdminRegistrationSchema, AdminRegistrationData } from '../../inputSchema/admin.schema';
+import { validateAdminLoginData, AdminLoginData } from '../../inputSchema/admin.schema';
 import { verifyHash } from '../../utils/encryption/hash.utils';
 // import { encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
 import { generateAESKeyFromString, decryptAES } from '../../utils/encryption/aes.utils';
 // import { sendOTPEmail } from '../../utils/mailer.utils';
 import AdminModel from '../../models/admin.model';
-// import UserModel from '../../models/user.model';
+import UserModel from '../../models/user.model';
 // import { checkExistingAdmin } from '../../services/admin.services';
-import type { AdminDocument } from '../../models/admin.model';
+// import type { AdminDocument } from '../../models/admin.model';
 import { internalAesKey } from '../../constants/keys';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { isCloudinaryConfigured, uploadAndCleanup } from '../../utils/cloudinary.utils';
-
-type AdminLoginData = {
-    collegeCode: string;
-    username: string;
-    password: string;
-};
 
 // Admin Login Controller
 export const adminLoginController = async (req: Request, res: Response): Promise<void> => {
     try {
         // The middleware has already decrypted the request data
-        const loginData: AdminLoginData = req.body;
+        const validation = validateAdminLoginData(req.body);
+        
+        if (!validation.status || !validation.data) {
+            res.status(400).json({
+                status: false,
+                message: validation.message
+            });
+            return;
+        }
+
+        const loginData = validation.data;
 
         // Client's public key (if provided) is stored by decryptRequest middleware
         const clientPublicKey = (req as any).clientPublicKey;
 
-        // Validate input
-        if (!loginData.collegeCode || !loginData.username || !loginData.password) {
-            res.status(400).json({
-                status: false,
-                message: 'College code, username and password are required.'
-            });
-            return;
-        }
-
-        // Find admin by college code
-        const admin = await AdminModel.findOne({
+        // Find user by college code and ID (which is passed as 'username' in login input)
+        const user = await UserModel.findOne({
+            user_type: 'admin',
             college_code: loginData.collegeCode,
+            id: loginData.username
         });
-        if (!admin) {
-            res.status(404).json({
-                status: false,
-                message: 'Admin not found.'
-            });
-            return;
-        }
-        // Check if username matches
-        if (admin.username !== loginData.username) {
+
+        if (!user) {
             res.status(404).json({
                 status: false,
                 message: 'Admin not found.'
@@ -58,7 +48,7 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         }
 
         // Verify password
-        const isPasswordValid = await verifyHash(loginData.password, admin.password_hash);
+        const isPasswordValid = await verifyHash(loginData.password, user.password_hash);
         if (!isPasswordValid) {
             res.status(401).json({
                 status: false,
@@ -68,11 +58,11 @@ export const adminLoginController = async (req: Request, res: Response): Promise
         }
 
         // Set JWT token
-        const jwtPayload = { type: 'admin', id: admin._id.toString() };
+        const jwtPayload = { type: 'admin', id: user._id.toString() };
         setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
 
         // Decrypt private key from database
-        const privateKey = decryptAES(admin.private_key, generateAESKeyFromString(loginData.password));
+        const privateKey = decryptAES(user.private_key, generateAESKeyFromString(loginData.password));
 
         // Return success response with sensitive data
         // The encryptResponse middleware will automatically encrypt this if a public key is available
@@ -80,7 +70,7 @@ export const adminLoginController = async (req: Request, res: Response): Promise
             status: true,
             message: 'Login successful!',
             data: {
-                id: admin._id.toString(),
+                id: user._id.toString(),
                 privateKey: privateKey
             },
             // Include public key in response so resolvePublicKey middleware can use it
