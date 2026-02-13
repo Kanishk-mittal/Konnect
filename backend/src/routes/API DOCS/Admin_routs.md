@@ -19,5 +19,29 @@ input : -
 controller :- `adminLoginController`
 response :- Sets an `auth_token` cookie and returns the `privateKey`.
 
+### 2. /userID
+Method :- `GET`
+Description :- Checks if an admin is authenticated and returns the user's MongoDB `_id` from the JWT token.
+Note :- Requires `authMiddleware` and `adminAuthMiddleware`.
+controller :- Inline handler in routes
+response :-
+```json
+{
+    "userId": "65cad..."
+}
+```
+
+### 3. /logout
+Method :- `POST`
+Description :- Clears the `auth_token` cookie to log out the admin session.
+controller :- `adminLogoutController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Logged out successfully."
+}
+```
+
 
 
