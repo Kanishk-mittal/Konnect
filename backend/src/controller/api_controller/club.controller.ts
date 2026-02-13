@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
-import { encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
 import { generateAESKeyFromString, decryptAES } from '../../utils/encryption/aes.utils';
 import ClubModel from '../../models/club.model';
+import { createClub, findClubUser } from '../../services/club-service';
 import UserModel from '../../models/user.model';
 import AdminModel from '../../models/admin.model';
 import StudentModel from '../../models/Student.model';
@@ -16,6 +16,7 @@ import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary
 import { sendOTPEmail } from '../../utils/mailer.utils';
 import { OTP } from '../../utils/otp.utils';
 import { validateClubLoginData } from '../../inputSchema/club.schema';
+import { getAdminId } from '../../services/admin.services';
 
 // Types
 type CreateClubPayload = {
@@ -102,92 +103,70 @@ export const createClubController = async (req: Request, res: Response): Promise
         // The middleware has already decrypted the request data
         const payload: CreateClubPayload = req.body;
 
-        // Validate input
-        if (!payload.clubName || !payload.email || !payload.password) {
+        // Validate input using validateClubLoginData
+        const validation = validateClubLoginData(payload);
+        if (!validation.status || !validation.data) {
             res.status(400).json({
                 status: false,
-                message: 'Club name, email, and password are required.'
+                message: validation.message
             });
             return;
         }
 
         // Get admin's college_code
-        const admin = await AdminModel.findById(req.user?.id).select('college_code');
-        if (!admin) {
-            res.status(404).json({
+        const adminId = await getAdminId(req.user?.id || '');
+        if (!adminId) {
+            res.status(401).json({
                 status: false,
-                message: 'Admin not found.'
+                message: 'Admin authentication required to create a club.'
             });
             return;
         }
+        const collegeCode = await UserModel.findById(req.user?.id).select('college_code').then(user => user?.college_code);
 
-        const collegeCode = admin.college_code;
+        if (!collegeCode) {
+            res.status(400).json({
+                status: false,
+                message: 'Unable to determine college code for the admin.'
+            })
+            return;
+        }
 
-        // Check if club with same name already exists for this college
-        const existingClub = await ClubModel.findOne({
-            Club_name: payload.clubName,
-            college_code: collegeCode
-        });
-
-        if (existingClub) {
+        // Check if a club user already exists with the same username, college code, and email (in id)
+        const existingClubUser = await findClubUser(payload.clubName, collegeCode, payload.email);
+        if (existingClubUser) {
             res.status(409).json({
                 status: false,
-                message: 'A club with this name already exists.'
+                message: 'A club with this username and email already exists for this college.'
             });
             return;
         }
 
-        // Hash the password
-        const passwordHash = await createHash(payload.password);
-
-        // Generate RSA key pair for the club (for regular encryption)
-        const [privateKey, publicKey] = generateRSAKeyPair();
-
-        // Generate a separate RSA key pair for password recovery
-        const [recoveryPrivateKey, recoveryPublicKey] = generateRSAKeyPair();
-
-        // Encrypt the password with recovery public key to create recovery_password
-        const recoveryPassword = encryptRSA(payload.password, recoveryPublicKey);
-
-        // Handle optional local file upload + optional Cloudinary push
-        let image:
-            | { localPath: string; cloudUrl?: string }
-            | undefined;
-
-        if ((req as any).file) {
-            const localPath = (req as any).file.path as string;
-            image = { localPath };
-            if (isCloudinaryConfigured()) {
-                const uploaded = await uploadAndCleanup(localPath, { folder: 'konnect/clubs' });
-                if (uploaded.success && uploaded.secure_url) {
-                    image.cloudUrl = uploaded.secure_url;
-                }
-            }
-        }
-
-        // Choose icon value from cloud URL if available, else local
-        const icon = image?.cloudUrl || image?.localPath || undefined;
-
-        // Create the club
-        const club = await ClubModel.create({
-            Club_name: payload.clubName,
-            college_code: collegeCode,
+        // Use the new club service to create the user and club
+        const result = await createClub({
+            clubName: payload.clubName,
             email: payload.email,
-            password_hash: passwordHash,
-            recovery_password: recoveryPassword, // Encrypted password
-            public_key: publicKey,
-            private_key: privateKey,
-            icon: icon
+            password: payload.password,
+            collegeCode: collegeCode,
+            adminId: adminId
         });
+
+        if (!result.status) {
+            res.status(500).json({
+                status: false,
+                message: result.error || 'Failed to create club.'
+            });
+            return;
+        }
 
         res.status(201).json({
             status: true,
-            message: 'Club created successfully. Please save the recovery key securely!',
+            message: 'Club created successfully.',
             data: {
-                id: club._id.toString(),
+                id: result.club._id.toString(),
                 clubName: payload.clubName,
                 email: payload.email,
-                recoveryPrivateKey: recoveryPrivateKey // Send this to user to decrypt recovery_password later
+                userId: result.user._id,
             }
         });
     } catch (error) {

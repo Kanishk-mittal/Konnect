@@ -1,3 +1,12 @@
+/**
+ * Returns the Admin collection _id for a given User collection _id.
+ * @param userId - The _id of the user in the User collection
+ * @returns The _id of the admin in the Admin collection, or null if not found
+ */
+export const getAdminId = async (userId: string): Promise<string | null> => {
+    const admin = await AdminModel.findOne({ user_id: userId }).select('_id');
+    return admin ? admin._id.toString() : null;
+};
 
 import UserModel from '../models/user.model';
 import AdminModel from '../models/admin.model';
@@ -5,7 +14,7 @@ import { createUser } from './user.services';
 
 export type RootAdminInput = {
     adminUsername: string;
-    collegeCode: string; 
+    collegeCode: string;
     emailId: string;
     password: string;
 };
@@ -15,22 +24,22 @@ export type NormalAdminInput = {
     collegeCode: string; // The ObjectId of the college
     emailId: string;
     password: string;
-    createdBy: string; 
+    createdBy: string;
 };
 
 export const checkExistingAdmin = async (collegeCode: string, emailId: string): Promise<{ exists: boolean; message?: string }> => {
-	const existingAdmin = await UserModel.findOne({
-		user_type: 'admin',
-		college_code: collegeCode,
-		email_id: emailId
-	});
+    const existingAdmin = await UserModel.findOne({
+        user_type: 'admin',
+        college_code: collegeCode,
+        email_id: emailId
+    });
 
-	if (existingAdmin) {
-		let message = 'Registration failed. This email is already registered as an admin for this college.';
-		return { exists: true, message };
-	}
+    if (existingAdmin) {
+        let message = 'Registration failed. This email is already registered as an admin for this college.';
+        return { exists: true, message };
+    }
 
-	return { exists: false };
+    return { exists: false };
 };
 
 /**
@@ -59,8 +68,8 @@ export const createRootAdmin = async (data: RootAdminInput): Promise<{ status: b
 
         await newAdmin.save();
 
-        return { 
-            status: true, 
+        return {
+            status: true,
             message: 'College root admin created successfully',
             user: userResp.user,
             rawKeys: userResp.rawKeys
@@ -97,8 +106,8 @@ export const createNormalAdmin = async (data: NormalAdminInput): Promise<{ statu
 
         await newAdmin.save();
 
-        return { 
-            status: true, 
+        return {
+            status: true,
             message: 'Admin created successfully',
             user: userResp.user,
             rawKeys: userResp.rawKeys

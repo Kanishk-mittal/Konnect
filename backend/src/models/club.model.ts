@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 
 const clubSchema = new Schema({
   blocked_users: [{ type: Types.ObjectId, ref: 'User' }],
+  created_by: { type: Types.ObjectId, ref: 'Admin', required: true },
 });
 
 

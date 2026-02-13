@@ -25,3 +25,5 @@ test_data/
 *.njsproj
 *.sln
 *.sw?
+
+temp.txt
