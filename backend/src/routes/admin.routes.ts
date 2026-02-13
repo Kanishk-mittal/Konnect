@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
 import {
     adminLoginController,
-    adminLogoutController,
-    updateAdminProfilePicture
+    adminLogoutController
 } from '../controller/api_controller/admin.controller';
 import {
     adminAuthMiddleware,
@@ -10,7 +9,6 @@ import {
 } from '../middleware/auth.middleware';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
-import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
 
 const router = Router();
 
@@ -32,15 +30,6 @@ router.get("/userID", authMiddleware, adminAuthMiddleware, (req: Request, res: R
     }
     res.json({ userId: req.user.id });
 }); // Endpoint to check if admin is logged in
-
-// Update admin profile picture (authenticated)
-router.post("/profile/picture",
-    authMiddleware,                     // Verify JWT token
-    adminAuthMiddleware,                // Verify admin role
-    groupImageUpload.single('image'),   // Handle file upload
-    handleMulterError,                  // Handle multer errors
-    updateAdminProfilePicture           // Controller
-);
 
 // Logout endpoint to clear JWT cookie
 router.post("/logout", adminLogoutController);

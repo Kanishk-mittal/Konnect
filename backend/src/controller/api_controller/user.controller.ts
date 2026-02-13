@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import UserModel from '../../models/user.model';
 import { decryptAES } from '../../utils/encryption/aes.utils';
 import { internalAesKey } from '../../constants/keys';
+import { isCloudinaryConfigured, uploadAndCleanup } from '../../utils/cloudinary.utils';
 
 /**
  * Get profile picture for a specific user by their ID
@@ -132,6 +133,80 @@ export const getMyDetails = async (req: Request, res: Response): Promise<void> =
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred while fetching user details.'
+        });
+    }
+};
+
+/**
+ * Update current user's profile picture
+ * Requires authentication - gets user ID from JWT token
+ */
+export const updateProfilePicture = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get user ID from authenticated user (from JWT)
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        // Find user
+        const user = await UserModel.findById(userId);
+        if (!user) {
+            res.status(404).json({
+                status: false,
+                message: 'User not found.'
+            });
+            return;
+        }
+
+        // Handle optional local file upload + optional Cloudinary push
+        let profilePictureUrl: string | undefined;
+
+        if ((req as any).file) {
+            const localPath = (req as any).file.path as string;
+
+            if (isCloudinaryConfigured()) {
+                const uploaded = await uploadAndCleanup(localPath, { folder: 'konnect/profiles' });
+                if (uploaded.success && uploaded.secure_url) {
+                    profilePictureUrl = uploaded.secure_url;
+                } else {
+                    profilePictureUrl = localPath;
+                }
+            } else {
+                profilePictureUrl = localPath;
+            }
+        }
+
+        if (!profilePictureUrl) {
+            res.status(400).json({
+                status: false,
+                message: 'No image file provided.'
+            });
+            return;
+        }
+
+        // Update profile picture
+        user.profile_picture = profilePictureUrl;
+        await user.save();
+
+        res.status(200).json({
+            status: true,
+            message: 'Profile picture updated successfully.',
+            data: {
+                profilePicture: profilePictureUrl
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating profile picture:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating profile picture.'
         });
     }
 };

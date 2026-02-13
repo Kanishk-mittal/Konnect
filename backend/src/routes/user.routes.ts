@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { 
-    getUserProfilePicture, 
+import {
+    getUserProfilePicture,
     getUserDetails,
-    getMyDetails 
+    getMyDetails,
+    updateProfilePicture
 } from '../controller/api_controller/user.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
 
 const router = Router();
 
@@ -16,5 +18,13 @@ router.get('/details/:userId', getUserDetails);
 
 // Route to get current user details (from JWT)
 router.get('/details', authMiddleware, getMyDetails);
+
+// Route to update profile picture (authenticated)
+router.post('/profile-picture',
+    authMiddleware,                     // Verify JWT token
+    groupImageUpload.single('image'),   // Handle file upload
+    handleMulterError,                  // Handle multer errors
+    updateProfilePicture                // Controller
+);
 
 export default router;
