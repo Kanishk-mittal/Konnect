@@ -1,10 +1,11 @@
 import type { Request, Response } from 'express';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { encryptRSA, generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
+import { generateAESKeyFromString, decryptAES } from '../../utils/encryption/aes.utils';
 import ClubModel from '../../models/club.model';
+import UserModel from '../../models/user.model';
 import AdminModel from '../../models/admin.model';
 import StudentModel from '../../models/Student.model';
-import BlockedStudentModel from '../../models/blockedStudent.model';
 import ChatGroupModel from '../../models/chatGroup.model';
 import AnnouncementGroupModel from '../../models/announcementGroup.model';
 import ChatGroupMembershipModel from '../../models/chatGroupMembership.model';
@@ -14,14 +15,9 @@ import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
 import { sendOTPEmail } from '../../utils/mailer.utils';
 import { OTP } from '../../utils/otp.utils';
+import { validateClubLoginData } from '../../inputSchema/club.schema';
 
 // Types
-type ClubLoginData = {
-    collegeCode: string;
-    clubName: string;
-    password: string;
-};
-
 type CreateClubPayload = {
     clubName: string;
     email: string;
@@ -32,27 +28,29 @@ type CreateClubPayload = {
 export const clubLoginController = async (req: Request, res: Response): Promise<void> => {
     try {
         // The middleware has already decrypted the request data
-        const loginData: ClubLoginData = req.body;
+        const validation = validateClubLoginData(req.body);
 
-        // Client's public key (if provided) is stored by decryptRequest middleware
-        const clientPublicKey = (req as any).clientPublicKey;
-
-        // Validate input
-        if (!loginData.clubName || !loginData.collegeCode || !loginData.password) {
+        if (!validation.status || !validation.data) {
             res.status(400).json({
                 status: false,
-                message: 'College code, club name, and password are required.'
+                message: validation.message
             });
             return;
         }
 
-        // Find club by club name and college code
-        const club = await ClubModel.findOne({
-            Club_name: loginData.clubName,
-            college_code: loginData.collegeCode
+        const loginData = validation.data;
+
+        // Client's public key (if provided) is stored by decryptRequest middleware
+        const clientPublicKey = (req as any).clientPublicKey;
+
+        // Find user by college code and club name (which is passed as 'clubName' in login input)
+        const user = await UserModel.findOne({
+            user_type: 'club',
+            college_code: loginData.collegeCode,
+            id: loginData.clubName
         });
 
-        if (!club) {
+        if (!user) {
             res.status(404).json({
                 status: false,
                 message: 'Club not found.'
@@ -61,7 +59,7 @@ export const clubLoginController = async (req: Request, res: Response): Promise<
         }
 
         // Verify password
-        const isPasswordValid = await verifyHash(loginData.password, club.password_hash);
+        const isPasswordValid = await verifyHash(loginData.password, user.password_hash);
         if (!isPasswordValid) {
             res.status(401).json({
                 status: false,
@@ -71,8 +69,11 @@ export const clubLoginController = async (req: Request, res: Response): Promise<
         }
 
         // Set JWT token (this will overwrite any existing auth_token cookie)
-        const jwtPayload = { type: 'club', id: club._id.toString() };
+        const jwtPayload = { type: 'club', id: user._id.toString() };
         setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
+
+        // Decrypt private key from database using the provided password
+        const privateKey = decryptAES(user.private_key, generateAESKeyFromString(loginData.password));
 
         // Return success response with sensitive data
         // The encryptResponse middleware will automatically encrypt this if a public key is available
@@ -80,8 +81,8 @@ export const clubLoginController = async (req: Request, res: Response): Promise<
             status: true,
             message: 'Login successful!',
             data: {
-                privateKey: club.private_key,
-                id: club._id.toString()
+                id: user._id.toString(),
+                privateKey: privateKey
             },
             // Include public key in response so resolvePublicKey middleware can use it
             publicKey: clientPublicKey
