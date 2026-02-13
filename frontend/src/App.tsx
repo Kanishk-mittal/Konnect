@@ -57,7 +57,10 @@ const App = () => {
         element={<UnblockStudents />}
       />
       <Route path="/admin/add-group"
-        element={<AddGroup />}
+        element={<AddGroup redirectUrl="/admin/dashboard" editProfileUrl="/admin/edit-profile" />}
+      />
+      <Route path="/club/add-group"
+        element={<AddGroup redirectUrl="/club/dashboard" editProfileUrl="/club/edit-profile" />}
       />
       <Route path="/admin/add-club"
         element={<AddClub />}

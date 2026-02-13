@@ -21,6 +21,7 @@ type CreateGroupPayload = {
     isChatGroup?: boolean;
 };
 
+// TODO: Check this route its sus
 // Controller: Create a group
 export const createGroupController = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -36,39 +37,45 @@ export const createGroupController = async (req: Request, res: Response): Promis
             return;
         }
 
-        // Get college_code from admin, club, or student
-        let collegeCode: string;
-        let creatorType: 'admin' | 'club' | 'user';
-        let creatorId: string;
+        // Get creator type from JWT (already decoded by authMiddleware)
+        const creatorType: 'admin' | 'club' | 'user' = (req.user?.type as 'admin' | 'club' | 'user') || 'admin';
+        const creatorId: string = req.user?.id || '';
 
-        // Try to find admin first
-        const admin = await AdminModel.findById(req.user?.id).select('college_code');
-        if (admin) {
-            collegeCode = admin.college_code;
-            creatorType = 'admin';
-            creatorId = admin._id.toString();
-        } else {
-            // If not admin, try to find club
-            const ClubModel = (await import('../../models/club.model')).default;
-            const club = await ClubModel.findById(req.user?.id).select('college_code');
-            if (club) {
-                collegeCode = club.college_code;
-                creatorType = 'club';
-                creatorId = club._id.toString();
-            } else {
-                // If not admin or club, try to find student
-                const student = await StudentModel.findById(req.user?.id).select('college_code');
-                if (!student) {
-                    res.status(404).json({
-                        status: false,
-                        message: 'User not found.'
-                    });
-                    return;
-                }
-                collegeCode = student.college_code as string;
-                creatorType = 'user';
-                creatorId = student._id.toString();
+        // Get college_code based on creator type
+        let collegeCode: string;
+
+        if (creatorType === 'admin') {
+            const admin = await AdminModel.findById(creatorId).select('college_code');
+            if (!admin) {
+                res.status(404).json({
+                    status: false,
+                    message: 'Admin not found.'
+                });
+                return;
             }
+            collegeCode = admin.college_code;
+        } else if (creatorType === 'club') {
+            const ClubModel = (await import('../../models/club.model')).default;
+            const club = await ClubModel.findById(creatorId).select('college_code');
+            if (!club) {
+                res.status(404).json({
+                    status: false,
+                    message: 'Club not found.'
+                });
+                return;
+            }
+            collegeCode = club.college_code;
+        } else {
+            // creatorType === 'user' (student)
+            const student = await StudentModel.findById(creatorId).select('college_code');
+            if (!student) {
+                res.status(404).json({
+                    status: false,
+                    message: 'User not found.'
+                });
+                return;
+            }
+            collegeCode = student.college_code as string;
         }
 
         // Normalize members into roll number strings

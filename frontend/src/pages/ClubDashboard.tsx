@@ -137,10 +137,10 @@ const ClubDashboard = () => {
 
         const fetchGroups = async () => {
             if (!clubId) return;
-
             setGroupsLoading(true);
             try {
                 const response = await getData(`/club/groups/${clubId}`);
+                console.log('Groups response:', response);
                 if (response.status) {
                     setGroups(response.data);
                 }
@@ -186,7 +186,7 @@ const ClubDashboard = () => {
             background: backgroundGradient
         }}>
             <div style={headerBackground}>
-                <Header editProfileUrl="/club/edit-profile" />
+                <Header />
             </div>
 
             {loading ? (

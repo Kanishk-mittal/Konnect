@@ -25,7 +25,12 @@ interface GroupFormData {
     isChatGroup: boolean;
 }
 
-const AddGroup = () => {
+interface AddGroupProps {
+    redirectUrl: string;
+    editProfileUrl: string;
+}
+
+const AddGroup = ({ redirectUrl, editProfileUrl }: AddGroupProps) => {
     const navigate = useNavigate();
     const theme = useSelector((state: RootState) => state.theme.theme);
 
@@ -152,7 +157,7 @@ const AddGroup = () => {
                 setSuccessMessage(response.data.message || 'Group created successfully!');
                 // Reset form after successful creation
                 setTimeout(() => {
-                    navigate('/admin/dashboard');
+                    navigate(redirectUrl);
                 }, 1500);
             } else {
                 setErrorMessage(response.data?.message || 'Failed to create group');
@@ -170,13 +175,13 @@ const AddGroup = () => {
     };
 
     const handleCancel = () => {
-        navigate('/admin/dashboard');
+        navigate(redirectUrl);
     };
 
     return (
         <div className="min-h-screen flex flex-col" style={{ background: backgroundGradient }}>
             <div style={headerBackground}>
-                <Header editProfileUrl="/admin/edit-profile" />
+                <Header />
             </div>
 
             <div className="flex-grow p-6">

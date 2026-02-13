@@ -58,7 +58,7 @@ const AdminRegistration = () => {
 
       // Use postEncryptedData to handle encryption automatically
       const response = await postEncryptedData(
-        '/admin/register',
+        '/college/register-college',
         dataToSend,
         { expectEncryptedResponse: true }
       );
@@ -141,7 +141,7 @@ const AdminRegistration = () => {
       }
 
       // Request backend to send OTP
-      const response = await postData('/admin/otp', { emailId: formData.emailId });
+      const response = await postData('/college/otp', { emailId: formData.emailId });
 
       if (response && response.status === true) {
         setSuccessMessage(response.message || 'OTP sent successfully!');

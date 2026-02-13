@@ -4,7 +4,7 @@ const userSchema = new Schema({
     // identification fields
     user_type: { type: String, enum: ['admin', 'student', 'club', 'faculty'], required: true },
     id: { type: String, required: true, unique: true },
-    college_code: { type: Schema.Types.ObjectId, ref: 'College', required: true },
+    college_code: { type: String, required: true },
 
     // personal information
     email_id: { type: String, required: true },
@@ -28,6 +28,21 @@ const userSchema = new Schema({
 userSchema.index({ id: 1, college_code: 1 }, { unique: true });
 
 export default model('User', userSchema);
+
+export type UserDocument = {
+    user_type: 'admin' | 'student' | 'club' | 'faculty';
+    id: string;
+    college_code: string;
+    email_id: string;
+    profile_picture: string | null;
+    username: string;
+    blocked_users: Types.ObjectId[];
+    password_hash: string;
+    recovery_password: string;
+    private_key: string;
+    public_key: string;
+    recovery_key_hash: string;
+}
 
 /**
  * here is the details of what each column mean

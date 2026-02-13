@@ -181,3 +181,25 @@ export const clubAuthMiddleware = (
 
     next();
 };
+
+export const facultyAuthMiddleware = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): void => {
+    if (!req.user) {
+        res.status(401).json({
+            status: false,
+            message: 'Authentication required.'
+        });
+        return;
+    }
+    if (req.user.type !== 'faculty') {
+        res.status(403).json({
+            status: false,
+            message: 'Faculty access required.'
+        });
+        return;
+    }
+    next();
+}

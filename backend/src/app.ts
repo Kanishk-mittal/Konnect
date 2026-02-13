@@ -12,6 +12,7 @@ dotenv.config({ path: __dirname + '/../.env' });
 
 // Import routes
 import adminRoutes from './routes/admin.routes';
+import collegeRoutes from './routes/college.routes';
 import studentRoutes from './routes/student.routes';
 import clubRoutes from './routes/club.routes';
 import groupsRoutes from './routes/groups.routes';
@@ -105,6 +106,7 @@ class App {
     private initializeRoutes(): void {
         // Authentication and user routes
         this.app.use("/api/admin", adminRoutes);
+        this.app.use("/api/college", collegeRoutes);
         this.app.use("/api/student", studentRoutes);
         this.app.use("/api/club", clubRoutes);
         this.app.use("/api/groups", groupsRoutes);

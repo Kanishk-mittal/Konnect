@@ -1,8 +1,6 @@
 import { Router, Request, Response } from 'express';
 import {
-    registerController,
     adminLoginController,
-    sendRegistrationOTP,
     sendAdminProfilePicture,
     getAdminDetails,
     getAdminDetailsFromJWT,
@@ -20,12 +18,6 @@ import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
 const router = Router();
 
 // Routes with encryption middleware
-router.post('/register',
-    decryptRequest,        // Decrypt incoming encrypted request
-    registerController,    // Controller logic
-    resolvePublicKey,      // Resolve pubclubAuthMiddlewarelic key for response encryption
-    encryptResponse        // Encrypt sensitive response data
-);
 
 router.post('/login',
     decryptRequest,        // Decrypt incoming encrypted request
@@ -33,7 +25,6 @@ router.post('/login',
     resolvePublicKey,      // Resolve public key for response encryption
     encryptResponse        // Encrypt sensitive response data
 );
-router.post("/otp", sendRegistrationOTP); // Assuming you have a function to handle OTP registration
 router.get("/profile/picture/:adminId", sendAdminProfilePicture); // Changed to GET with URL parameter
 router.get("/details/:adminId", getAdminDetails); // New endpoint for admin details
 router.get("/details", authMiddleware, adminAuthMiddleware, getAdminDetailsFromJWT); // Get admin details from JWT

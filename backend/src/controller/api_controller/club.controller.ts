@@ -522,7 +522,7 @@ export const getClubBlockedStudentsController = async (req: Request, res: Respon
 export const getClubGroupsController = async (req: Request, res: Response): Promise<void> => {
     try {
         const { clubId } = req.params;
-
+        console.log("=====", clubId, "+++++")
         if (!clubId) {
             res.status(400).json({
                 status: false,
