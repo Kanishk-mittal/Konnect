@@ -1,8 +1,6 @@
 import { Router, Request, Response } from 'express';
 import {
     adminLoginController,
-    getAdminDetails,
-    getAdminDetailsFromJWT,
     adminLogoutController,
     updateAdminProfilePicture
 } from '../controller/api_controller/admin.controller';
@@ -24,8 +22,6 @@ router.post('/login',
     resolvePublicKey,      // Resolve public key for response encryption
     encryptResponse        // Encrypt sensitive response data
 );
-router.get("/details/:adminId", getAdminDetails); // New endpoint for admin details
-router.get("/details", authMiddleware, adminAuthMiddleware, getAdminDetailsFromJWT); // Get admin details from JWT
 router.get("/userID", authMiddleware, adminAuthMiddleware, (req: Request, res: Response): void => {
     if (!req.user) {
         res.status(401).json({
