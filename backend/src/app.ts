@@ -18,6 +18,7 @@ import clubRoutes from './routes/club.routes';
 import groupsRoutes from './routes/groups.routes';
 import encryptionRoutes from './routes/encryption.routes';
 import generalRoutes from './routes/general.routes';
+import userRoutes from './routes/user.routes';
 
 // Import Socket.IO
 import { SocketHandler } from './socket/socketHandler';
@@ -110,6 +111,7 @@ class App {
         this.app.use("/api/student", studentRoutes);
         this.app.use("/api/club", clubRoutes);
         this.app.use("/api/groups", groupsRoutes);
+        this.app.use("/api/user", userRoutes);
         // Encryption routes
         this.app.use("/api/encryption", encryptionRoutes);
         // General routes
