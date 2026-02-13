@@ -1,3 +1,29 @@
+#
+### 2. /create
+Method :- `POST`
+Description :- Creates a new club and corresponding user account. Only accessible by an authenticated admin. The request should be encrypted using the security handshake.
+input : -
+```json
+{
+    "clubName": "Tech Club",
+    "email": "techclub@exuni.edu",
+    "password": "securePass123"
+}
+```
+controller :- `createClubController`
+response :- Returns the created club and user details, including cryptographic keys for secure access.
+```json
+{
+    "status": true,
+    "message": "Club created successfully.",
+    "data": {
+        "id": "65cad...",
+        "clubName": "Tech Club",
+        "email": "techclub@exuni.edu",
+        "userId": "65cad..."
+    }
+}
+```
 # Club Routes
 This Document contains all information regarding club.routes.ts
 

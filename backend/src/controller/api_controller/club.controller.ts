@@ -3,6 +3,7 @@ import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { generateAESKeyFromString, decryptAES } from '../../utils/encryption/aes.utils';
 import ClubModel from '../../models/club.model';
 import { createClub, findClubUser } from '../../services/club-service';
+import { sendClubCredentialsEmail } from '../../utils/mailer.utils';
 import UserModel from '../../models/user.model';
 import AdminModel from '../../models/admin.model';
 import StudentModel from '../../models/Student.model';
@@ -157,6 +158,19 @@ export const createClubController = async (req: Request, res: Response): Promise
                 message: result.error || 'Failed to create club.'
             });
             return;
+        }
+
+        // Send credentials email to the club
+        try {
+            await sendClubCredentialsEmail(
+                payload.email,
+                payload.clubName,
+                collegeCode,
+                payload.password
+            );
+        } catch (emailError) {
+            console.error('Failed to send club credentials email:', emailError);
+            // Do not fail the request if email sending fails
         }
 
         res.status(201).json({

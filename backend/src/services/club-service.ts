@@ -33,7 +33,7 @@ export const createClub = async (clubData: {
     // Step 1: Create the user (type: 'club')
     const userInput: userDataInput = {
         userType: 'club',
-        id: clubData.clubName, // clubName as id for login
+        id: clubData.email,
         collegeCode: clubData.collegeCode,
         emailId: clubData.email,
         username: clubData.clubName,

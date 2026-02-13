@@ -1,3 +1,57 @@
+
+/**
+ * Sends credentials email to a club when a new club is created
+ * @param clubEmail - Club's email address
+ * @param clubName - Club's display name
+ * @param collegeCode - College code
+ * @param password - Generated password
+ * @returns Promise that resolves when email is sent
+ */
+export const sendClubCredentialsEmail = async (
+  clubEmail: string,
+  clubName: string,
+  collegeCode: string,
+  password: string
+): Promise<void> => {
+  try {
+    console.log(`🏛️ Sending club credentials email to: ${clubEmail} | Club: ${clubName}`);
+    const subject = 'Welcome to Konnect - Your Club Account Credentials';
+
+    const message = `
+      <h2>Welcome to Konnect!</h2>
+      <p>Dear <strong>${clubName}</strong> Team,</p>
+      <p>Your club account has been successfully created and activated. Here are your login credentials:</p>
+      <div style="background-color: #f9f9f9; padding: 20px; margin: 20px 0; border-left: 4px solid #4a7aff;">
+        <h3>Your Login Credentials:</h3>
+        <p><strong>College Code:</strong> ${collegeCode}</p>
+        <p><strong>Club Name (Login ID):</strong> ${clubName}</p>
+        <p><strong>Temporary Password:</strong> <code style="background-color: #e0e0e0; padding: 2px 5px; border-radius: 3px;">${password}</code></p>
+      </div>
+      <div style="background-color: #d4edda; padding: 15px; margin: 20px 0; border: 1px solid #c3e6cb; border-radius: 5px;">
+        <h4 style="color: #155724; margin: 0 0 10px 0;">✅ Account Status: Successfully Created</h4>
+        <p style="color: #155724; margin: 0;">Your club account is now active and ready to use. You can log in immediately using the credentials above.</p>
+      </div>
+      <div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border: 1px solid #ffeaa7; border-radius: 5px;">
+        <h4 style="color: #856404; margin: 0 0 10px 0;">⚠️ Important Security Instructions:</h4>
+        <ul style="color: #856404; margin: 0;">
+          <li><strong>Change your password immediately</strong> after your first login</li>
+          <li><strong>Create recovery keys</strong> to secure your account</li>
+          <li><strong>Keep your credentials safe</strong> and do not share them with anyone</li>
+          <li><strong>Log in as soon as possible</strong> to secure your account</li>
+        </ul>
+      </div>
+      <p>You can log in to Konnect using the credentials provided above. Make sure to follow the security instructions for the safety of your account.</p>
+      <p>If you have any questions or need assistance, please contact your system administrator.</p>
+      <p>Best regards,<br>The Konnect Team</p>
+    `;
+
+    await sendTemplatedEmail(subject, message, clubEmail);
+    console.log(`✅ Club credentials email sent successfully to: ${clubEmail} | Club: ${clubName}`);
+  } catch (error) {
+    console.error(`❌ Failed to send club credentials email to: ${clubEmail} | Club: ${clubName} | Error:`, error);
+    throw error;
+  }
+};
 import nodemailer, { SentMessageInfo } from 'nodemailer';
 import { OTP } from './otp.utils';
 
