@@ -71,3 +71,26 @@ response :- Confirms the deletion of the club and its associated user.
     }
 }
 ```
+
+### 4. /members
+Method :- `GET`
+Description :- Fetches all members (students) for the authenticated club.
+input :- None (Uses authenticated club's credentials).
+controller :- `getClubMembersController`
+response :- Returns a list of members with their profile and position.
+```json
+{
+    "status": true,
+    "data": [
+        {
+            "id": "65cad...",
+            "rollNumber": "21001",
+            "name": "John Doe",
+            "profilePicture": "https://...",
+            "position": "President",
+            "isBlocked": false,
+            "joinedAt": "2024-02-14T..."
+        }
+    ]
+}
+```

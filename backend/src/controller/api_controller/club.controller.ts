@@ -339,18 +339,18 @@ export const clubLogoutController = async (req: Request, res: Response): Promise
  */
 export const getClubMembersController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { clubId } = req.params;
+        const userId = req.user?.id;
 
-        if (!clubId) {
-            res.status(400).json({
+        if (!userId) {
+            res.status(401).json({
                 status: false,
-                message: 'Club ID is required.'
+                message: 'Authentication required.'
             });
             return;
         }
 
-        // Find club to verify it exists
-        const club = await ClubModel.findById(clubId);
+        // Find club by the user_id (the account ID of the club)
+        const club = await ClubModel.findOne({ user_id: userId });
 
         if (!club) {
             res.status(404).json({
@@ -360,20 +360,22 @@ export const getClubMembersController = async (req: Request, res: Response): Pro
             return;
         }
 
-        // Get all club memberships for this club with populated student data
+        const clubId = club._id;
+
+        // Get all club memberships for this club with populated member data
         const memberships = await ClubMembershipModel.find({
             club_id: clubId
-        }).populate('student_id', 'roll display_name profile_picture');
+        }).populate('member_id', 'id username profile_picture');
 
         // Format the response
         const formattedMembers = memberships.map((membership: any) => ({
-            id: membership.student_id._id.toString(),
-            rollNumber: membership.student_id.roll,
-            name: membership.student_id.display_name,
-            profilePicture: membership.student_id.profile_picture || null,
+            id: membership.member_id._id.toString(),
+            rollNumber: membership.member_id.id,
+            name: membership.member_id.username,
+            profilePicture: membership.member_id.profile_picture || null,
             position: membership.position,
             isBlocked: false,
-            joinedAt: membership.created_at
+            joinedAt: (membership as any).createdAt
         }));
 
         res.status(200).json({

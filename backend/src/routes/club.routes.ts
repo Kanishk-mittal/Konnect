@@ -54,7 +54,7 @@ router.post('/logout', clubLogoutController);
 
 
 // Get club members (requires club authentication)
-router.get('/members/:clubId',
+router.get('/members',
     authMiddleware,
     clubAuthMiddleware,
     getClubMembersController
