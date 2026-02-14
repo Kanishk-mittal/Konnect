@@ -94,7 +94,28 @@ response :- Returns a list of members with their profile and position.
     ]
 }
 ```
-
+### 7. /members/add
+Method :- `POST`
+Description :- Adds multiple members to the authenticated club. Validates roll numbers against the club's college.
+Note :- This request should be encrypted.
+input :-
+```json
+{
+    "members": [
+        { "roll": "21001", "position": "Coordinator" },
+        { "roll": "21002", "position": "Member" }
+    ]
+}
+```
+controller :- `addClubMembersController`
+response :- Returns counts of successfully added members or specific validation errors.
+```json
+{
+    "status": true,
+    "message": "Successfully added 2 member(s) to the club.",
+    "insertedCount": 2
+}
+```
 ### 5. /blocked
 Method :- `GET`
 Description :- Fetches all students blocked by the authenticated club.

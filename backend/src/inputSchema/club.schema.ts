@@ -15,10 +15,39 @@ export const clubLoginSchema = z.object({
 export type ClubLoginData = z.infer<typeof clubLoginSchema>;
 
 /**
+ * Schema for adding club members validation
+ */
+export const addClubMembersSchema = z.object({
+    members: z.array(
+        z.object({
+            roll: z.string().min(1, 'Roll number is required'),
+            position: z.string().min(1, 'Position is required'),
+        })
+    ).min(1, 'At least one member is required'),
+}).strict();
+
+/**
+ * Type inferred from the schema
+ */
+export type AddClubMembersData = z.infer<typeof addClubMembersSchema>;
+
+/**
  * Utility function to validate club login data
  */
 export const validateClubLoginData = (data: unknown): { status: boolean; message: string; data?: ClubLoginData } => {
     const result = clubLoginSchema.safeParse(data);
+    if (!result.success) {
+        const errorMessage = result.error.issues[0]?.message || 'Invalid input.';
+        return { status: false, message: errorMessage };
+    }
+    return { status: true, message: 'Validation successful', data: result.data };
+};
+
+/**
+ * Utility function to validate add club members data
+ */
+export const validateAddClubMembersData = (data: unknown): { status: boolean; message: string; data?: AddClubMembersData } => {
+    const result = addClubMembersSchema.safeParse(data);
     if (!result.success) {
         const errorMessage = result.error.issues[0]?.message || 'Invalid input.';
         return { status: false, message: errorMessage };

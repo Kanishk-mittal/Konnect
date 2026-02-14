@@ -1,4 +1,7 @@
 import UserModel from '../models/user.model';
+import StudentModel from '../models/Student.model';
+import ClubMembershipModel from '../models/clubMembership.model';
+import { Types } from 'mongoose';
 
 /**
  * Finds a club user by username, college code, and email (checked in id attribute).
@@ -83,4 +86,61 @@ export const createClub = async (clubData: {
     } catch (error) {
         return { status: false, error: (error as Error).message };
     }
+};
+
+/**
+ * Validates and processes a list of club members.
+ * Checks if students exist in the college and if they are already members of the club.
+ * 
+ * @param members - Array of member data (roll number and position)
+ * @param collegeCode - The college code to validate students against
+ * @param clubId - The ID of the club to check for existing memberships
+ * @returns An object containing valid members and validation errors
+ */
+export const validateClubMembers = async (
+    members: Array<{ roll: string; position: string }>,
+    collegeCode: string,
+    clubId: string | Types.ObjectId
+): Promise<{
+    validMembers: Array<{ studentId: string; position: string; roll: string }>;
+    validationErrors: Array<{ row: number; roll: string; error: string }>;
+}> => {
+    const validationErrors: Array<{ row: number; roll: string; error: string }> = [];
+    const validMembers: Array<{ studentId: string; position: string; roll: string }> = [];
+
+    for (const [index, member] of members.entries()) {
+        // Check if student exists in the college
+        const student = await StudentModel.findOne({
+            roll: member.roll,
+            college_code: collegeCode
+        });
+
+        if (!student) {
+            validationErrors.push({
+                row: index + 1,
+                roll: member.roll,
+                error: 'Student not found in college'
+            });
+            continue;
+        }
+
+        // Check if already a member
+        const existingMembership = await ClubMembershipModel.findOne({
+            club_id: clubId,
+            student_id: student._id
+        });
+
+        if (existingMembership) {
+            // Already a member, skip silently as per controller logic
+            continue;
+        }
+
+        validMembers.push({
+            studentId: student._id.toString(),
+            position: member.position.trim(),
+            roll: member.roll
+        });
+    }
+
+    return { validMembers, validationErrors };
 };

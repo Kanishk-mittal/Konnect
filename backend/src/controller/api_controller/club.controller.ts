@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { generateAESKeyFromString, decryptAES } from '../../utils/encryption/aes.utils';
 import ClubModel from '../../models/club.model';
-import { createClub, findClubUser, deleteClub } from '../../services/club-service';
+import { createClub, findClubUser, deleteClub, validateClubMembers } from '../../services/club-service';
 import { sendClubCredentialsEmail } from '../../utils/mailer.utils';
 import UserModel, { UserDocument } from '../../models/user.model';
 import StudentModel from '../../models/Student.model';
@@ -15,7 +15,7 @@ import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
 import { sendOTPEmail } from '../../utils/mailer.utils';
 import { OTP } from '../../utils/otp.utils';
-import { validateClubLoginData } from '../../inputSchema/club.schema';
+import { validateClubLoginData, validateAddClubMembersData } from '../../inputSchema/club.schema';
 import { getAdminId } from '../../services/admin.services';
 
 // Types
@@ -554,84 +554,45 @@ export const getClubGroupsController = async (req: Request, res: Response): Prom
 export const addClubMembersController = async (req: Request, res: Response): Promise<void> => {
     try {
         // Data is already decrypted by middleware
-        const { members, clubId } = req.body;
+        const validation = validateAddClubMembersData(req.body);
 
-        // Validate payload structure
-        if (!members || !Array.isArray(members)) {
+        if (!validation.status || !validation.data) {
             res.status(400).json({
                 status: false,
-                message: 'Members array is required'
+                message: validation.message
             });
             return;
         }
 
-        if (!clubId) {
-            res.status(400).json({
+        const { members } = validation.data;
+        const userId = req.user!.id;
+
+        // Fetch user to get college code
+        const user = await UserModel.findById(userId);
+        if (!user) {
+            res.status(404).json({
                 status: false,
-                message: 'Club ID is required'
+                message: 'User not found.'
             });
             return;
         }
 
-        // Verify club exists and get college code
-        const club = await ClubModel.findById(clubId);
+        const collegeCode = user.college_code;
+
+        // Find the club associated with this user
+        const club = await ClubModel.findOne({ user_id: userId });
         if (!club) {
             res.status(404).json({
                 status: false,
-                message: 'Club not found.'
+                message: 'Club details not found.'
             });
             return;
         }
 
-        const collegeCode = club.college_code;
+        const clubId = club._id;
 
-        // Validate each member
-        const validationErrors: any[] = [];
-        const validMembers: Array<{ studentId: string; position: string; roll: string }> = [];
-
-        for (let i = 0; i < members.length; i++) {
-            const member = members[i];
-
-            if (!member.roll || !member.position) {
-                validationErrors.push({
-                    row: i + 1,
-                    error: 'Roll number and position are required'
-                });
-                continue;
-            }
-
-            // Check if student exists in the college
-            const student = await StudentModel.findOne({
-                roll: member.roll,
-                college_code: collegeCode
-            });
-
-            if (!student) {
-                validationErrors.push({
-                    row: i + 1,
-                    roll: member.roll,
-                    error: 'Student not found in college'
-                });
-                continue;
-            }
-
-            // Check if already a member - skip if they are
-            const existingMembership = await ClubMembershipModel.findOne({
-                club_id: clubId,
-                student_id: student._id
-            });
-
-            if (existingMembership) {
-                // Skip this member silently
-                continue;
-            }
-
-            validMembers.push({
-                studentId: student._id.toString(),
-                position: member.position.trim(),
-                roll: member.roll
-            });
-        }
+        // Validate each member using the service
+        const { validMembers, validationErrors } = await validateClubMembers(members, collegeCode, clubId);
 
         if (validationErrors.length > 0) {
             res.status(400).json({
