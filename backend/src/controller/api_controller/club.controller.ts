@@ -397,18 +397,18 @@ export const getClubMembersController = async (req: Request, res: Response): Pro
  */
 export const getClubBlockedStudentsController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { clubId } = req.params;
+        const userId = req.user?.id;
 
-        if (!clubId) {
-            res.status(400).json({
+        if (!userId) {
+            res.status(401).json({
                 status: false,
-                message: 'Club ID is required.'
+                message: 'Authentication required.'
             });
             return;
         }
 
-        // Find club
-        const club = await ClubModel.findById(clubId);
+        // Find club by the user_id (the account ID of the club)
+        const club = await ClubModel.findOne({ user_id: userId });
 
         if (!club) {
             res.status(404).json({
@@ -418,10 +418,10 @@ export const getClubBlockedStudentsController = async (req: Request, res: Respon
             return;
         }
 
-        // Get blocked roll numbers
-        const blockedRolls = club.blocked_students || [];
+        // Get blocked users (ObjectIds referencing User collection)
+        const blockedUserIds = club.blocked_users || [];
 
-        if (blockedRolls.length === 0) {
+        if (blockedUserIds.length === 0) {
             res.status(200).json({
                 status: true,
                 data: []
@@ -429,21 +429,20 @@ export const getClubBlockedStudentsController = async (req: Request, res: Respon
             return;
         }
 
-        // Fetch student details for blocked roll numbers
-        const blockedStudents = await StudentModel.find({
-            roll: { $in: blockedRolls },
-            college_code: club.college_code
-        }).select('_id roll display_name profile_picture');
+        // Fetch user details for blocked user IDs
+        const blockedUsers = await UserModel.find({
+            _id: { $in: blockedUserIds }
+        }).select('_id id username profile_picture');
 
-        // Format the response maintaining the sort order from blocked_students array
-        const formattedBlockedStudents = blockedRolls.map(roll => {
-            const student = blockedStudents.find(s => s.roll === roll);
-            if (!student) return null;
+        // Format the response maintaining the order from blocked_users array
+        const formattedBlockedStudents = blockedUserIds.map(id => {
+            const user = blockedUsers.find(u => u._id.toString() === id.toString());
+            if (!user) return null;
             return {
-                id: student._id.toString(),
-                rollNumber: student.roll,
-                name: student.display_name,
-                profilePicture: student.profile_picture || null,
+                id: user._id.toString(),
+                rollNumber: user.id, // 'id' stores the roll number in User model
+                name: user.username, // 'username' stores the name in User model
+                profilePicture: user.profile_picture || null,
                 isBlocked: true
             };
         }).filter(Boolean);

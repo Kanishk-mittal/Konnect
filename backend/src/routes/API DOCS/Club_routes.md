@@ -94,3 +94,24 @@ response :- Returns a list of members with their profile and position.
     ]
 }
 ```
+
+### 5. /blocked
+Method :- `GET`
+Description :- Fetches all students blocked by the authenticated club.
+input :- None (Uses authenticated club's credentials).
+controller :- `getClubBlockedStudentsController`
+response :- Returns a list of blocked students with their profile details.
+```json
+{
+    "status": true,
+    "data": [
+        {
+            "id": "65cad...",
+            "rollNumber": "21005",
+            "name": "Jane Smith",
+            "profilePicture": "https://...",
+            "isBlocked": true
+        }
+    ]
+}
+```

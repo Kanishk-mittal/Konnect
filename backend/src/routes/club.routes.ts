@@ -61,7 +61,7 @@ router.get('/members',
 );
 
 // Get blocked students for club (requires club authentication)
-router.get('/blocked/:clubId',
+router.get('/blocked',
     authMiddleware,
     clubAuthMiddleware,
     getClubBlockedStudentsController
