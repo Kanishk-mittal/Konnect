@@ -30,6 +30,7 @@ userSchema.index({ id: 1, college_code: 1 }, { unique: true });
 export default model('User', userSchema);
 
 export type UserDocument = {
+    _id: Types.ObjectId;
     user_type: 'admin' | 'student' | 'club' | 'faculty';
     id: string;
     college_code: string;

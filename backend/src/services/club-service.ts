@@ -16,7 +16,34 @@ export const findClubUser = async (username: string, collegeCode: string, email:
     });
 };
 import ClubModel from '../models/club.model';
-import { createUser, userDataInput } from './user.services';
+import { createUser, userDataInput, deleteUser } from './user.services';
+
+/**
+ * Deletes a club and its corresponding user record.
+ * @param userId - The _id of the user in the User collection
+ * @returns {Promise<{ status: boolean, error?: string }>}
+ */
+export const deleteClub = async (userId: string): Promise<{ status: boolean, error?: string }> => {
+    try {
+        // Step 1: Delete the club record (linked by club_user_id)
+        const deletedClub = await ClubModel.findOneAndDelete({ user_id: userId });
+
+        if (!deletedClub) {
+            return { status: false, error: 'Club record associated with this user was not found.' };
+        }
+
+        // Step 2: Delete the user record
+        const userResult = await deleteUser(userId);
+
+        if (!userResult.status) {
+            return { status: false, error: userResult.error || 'Failed to delete club user.' };
+        }
+
+        return { status: true };
+    } catch (error) {
+        return { status: false, error: (error as Error).message };
+    }
+};
 
 /**
  * Creates a new club by first creating a corresponding user, then a club record.
@@ -47,6 +74,7 @@ export const createClub = async (clubData: {
     // Step 2: Create the club record
     try {
         const clubDoc = new ClubModel({
+            club_user_id: userResult.user._id,
             created_by: clubData.adminId,
             blocked_users: []
         });

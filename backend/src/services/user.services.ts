@@ -56,7 +56,7 @@ const createCryptographicFields = async (password: string): Promise<{ docFields:
 
 const createUserDocument = async (userData: userDataInput): Promise<{ userDoc: any, rawKeys: any }> => {
     const { docFields, rawKeys } = await createCryptographicFields(userData.password);
-    
+
     return {
         userDoc: {
             user_type: userData.userType,
@@ -78,6 +78,23 @@ export const createUser = async (userData: userDataInput): Promise<{ status: boo
         const newUser = new UserModel(userDoc);
         await newUser.save();
         return { status: true, user: newUser.toObject(), rawKeys };
+    } catch (error) {
+        return { status: false, error: (error as Error).message };
+    }
+};
+
+/**
+ * Deletes a user from the User collection by their _id.
+ * @param userId - The _id of the user to delete
+ * @returns {Promise<{ status: boolean, error?: string }>}
+ */
+export const deleteUser = async (userId: string): Promise<{ status: boolean, error?: string }> => {
+    try {
+        const deletedUser = await UserModel.findByIdAndDelete(userId);
+        if (!deletedUser) {
+            return { status: false, error: 'User not found.' };
+        }
+        return { status: true };
     } catch (error) {
         return { status: false, error: (error as Error).message };
     }

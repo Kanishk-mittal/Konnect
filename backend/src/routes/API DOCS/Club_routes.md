@@ -54,3 +54,20 @@ response :- Sets an `auth_token` cookie and returns the `privateKey`.
     }
 }
 ```
+
+### 3. /delete/:clubId
+Method :- `DELETE`
+Description :- Deletes a specific club and its corresponding user account. Only accessible by an authenticated admin who belongs to the same college as the club.
+input :- `clubId` as a URL parameter.
+controller :- `deleteClubController`
+response :- Confirms the deletion of the club and its associated user.
+```json
+{
+    "status": true,
+    "message": "Club and associated user deleted successfully",
+    "data": {
+        "deletedClubId": "65cad...",
+        "deletedClubName": "Tech Club"
+    }
+}
+```

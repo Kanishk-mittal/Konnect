@@ -2,10 +2,9 @@ import type { Request, Response } from 'express';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { generateAESKeyFromString, decryptAES } from '../../utils/encryption/aes.utils';
 import ClubModel from '../../models/club.model';
-import { createClub, findClubUser } from '../../services/club-service';
+import { createClub, findClubUser, deleteClub } from '../../services/club-service';
 import { sendClubCredentialsEmail } from '../../utils/mailer.utils';
-import UserModel from '../../models/user.model';
-import AdminModel from '../../models/admin.model';
+import UserModel, { UserDocument } from '../../models/user.model';
 import StudentModel from '../../models/Student.model';
 import ChatGroupModel from '../../models/chatGroup.model';
 import AnnouncementGroupModel from '../../models/announcementGroup.model';
@@ -245,10 +244,17 @@ export const deleteClubController = async (req: Request, res: Response): Promise
             return;
         }
 
-        // Delete the club
-        const deletedClub = await ClubModel.findByIdAndDelete(clubId);
+        // Get admin's college code
+        const adminUser = await UserModel.findById(req.user?.id).select('college_code');
+        if (!adminUser) {
+            res.status(401).json({ status: false, message: 'Admin not found.' });
+            return;
+        }
 
-        if (!deletedClub) {
+        // Find the club and populate its associated user to get the college code
+        const club = await ClubModel.findById(clubId).populate<{ user_id: UserDocument }>('user_id');
+
+        if (!club) {
             res.status(404).json({
                 status: false,
                 message: 'Club not found.'
@@ -256,12 +262,44 @@ export const deleteClubController = async (req: Request, res: Response): Promise
             return;
         }
 
+        // Extract the populated user (it will be of type UserDocument after population)
+        const clubUser = club.user_id;
+
+        if (!clubUser) {
+            res.status(404).json({
+                status: false,
+                message: 'Club user record not found.'
+            });
+            return;
+        }
+
+        // Check if the college code matches
+        if (clubUser.college_code !== adminUser.college_code) {
+            res.status(403).json({
+                status: false,
+                message: 'You are not authorized to delete a club from another college.'
+            });
+            return;
+        }
+
+        // Delete the club and its corresponding user
+        // Pass the user collection id as input (from the populated user's _id or club_user_id)
+        const result = await deleteClub(clubUser._id.toString());
+
+        if (!result.status) {
+            res.status(500).json({
+                status: false,
+                message: result.error || 'Failed to delete club.'
+            });
+            return;
+        }
+
         res.status(200).json({
             status: true,
-            message: 'Club deleted successfully',
+            message: 'Club and associated user deleted successfully',
             data: {
                 deletedClubId: clubId,
-                deletedClubName: deletedClub.Club_name
+                deletedClubName: (club as any).Club_name
             }
         });
     } catch (error) {
