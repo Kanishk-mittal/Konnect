@@ -74,3 +74,41 @@ response :-
     }
 }
 ```
+
+### 5. /password/request-otp
+Method :- `GET`
+Description :- Requests an OTP for password change. The OTP is sent to the user's primary email address.
+Note :- Requires `auth_token` cookie.
+controller :- `requestPasswordChangeOTP`
+response :- 
+```json
+{
+    "status": true,
+    "message": "OTP sent successfully to your registered email."
+}
+```
+
+### 6. /password/change
+Method :- `POST`
+Description :- Changes the user's password after verifying the OTP.
+Note :- Requires `auth_token` cookie. The request should be encrypted.
+Input :-
+```json
+{
+    "previousPassword": "oldPassword123",
+    "newPassword": "newSecurePassword123!",
+    "otp": "123456"
+}
+```
+Note :- `newPassword` must be at least 12 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.
+controller :- `changePasswordWithOTP`
+response :-
+```json
+{
+    "status": true,
+    "message": "Password changed successfully.",
+    "data": {
+        "recoveryKey": "new-base64-recovery-key-..."
+    }
+}
+```

@@ -5,8 +5,6 @@ import {
     createClubController,
     getClubsByCollegeCodeController,
     deleteClubController,
-    getClubDetailsController,
-    getClubDetailsFromJWTController,
     getClubMembersController,
     getClubBlockedStudentsController,
     getClubGroupsController,
@@ -16,11 +14,7 @@ import {
     updateClubMemberPositionController,
     blockClubStudentsBulkController,
     unblockClubStudentController,
-    unblockClubStudentsBulkController,
-    sendClubProfilePicture,
-    updateClubProfilePicture,
-    requestClubPasswordChangeOTP,
-    changeClubPasswordWithOTP
+    unblockClubStudentsBulkController
 } from '../controller/api_controller/club.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
@@ -55,56 +49,9 @@ router.delete('/delete/:clubId',
     deleteClubController              // Controller logic
 );
 
-// Get club user ID from JWT (requires club authentication)
-router.get("/userID", authMiddleware, clubAuthMiddleware, (req: Request, res: Response): void => {
-    if (!req.user) {
-        res.status(401).json({
-            status: false,
-            message: 'User not authenticated'
-        });
-        return;
-    }
-    res.json({ userId: req.user.id });
-});
 // Logout endpoint to clear JWT cookie
 router.post('/logout', clubLogoutController);
 
-// Get club profile picture by club ID (public endpoint)
-router.get("/profile/picture/:clubId", sendClubProfilePicture);
-
-// Update club profile picture (authenticated)
-router.post("/profile/picture",
-    authMiddleware,
-    clubAuthMiddleware,
-    groupImageUpload.single('image'),
-    handleMulterError,
-    updateClubProfilePicture
-);
-
-// Request OTP for password change (authenticated)
-router.get("/profile/password/request-otp",
-    authMiddleware,
-    clubAuthMiddleware,
-    requestClubPasswordChangeOTP
-);
-
-// Change password with OTP (authenticated)
-router.post("/profile/password/change",
-    authMiddleware,
-    clubAuthMiddleware,
-    decryptRequest,
-    changeClubPasswordWithOTP
-);
-
-// Get club details by club ID
-router.get('/details/:clubId', getClubDetailsController);
-
-// Get club details from JWT (requires club authentication)
-router.get('/details',
-    authMiddleware,
-    clubAuthMiddleware,
-    getClubDetailsFromJWTController
-);
 
 // Get club members (requires club authentication)
 router.get('/members/:clubId',

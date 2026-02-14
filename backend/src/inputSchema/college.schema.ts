@@ -5,7 +5,7 @@ export const collegeRegistrationSchema = z.object({
     collegeName: z.string().min(1, 'College name is required'),
     adminUsername: z.string().min(1, 'Admin username is required'),
     collegeCode: z.string().min(1, 'College code is required'),
-    emailId: z.string().email('Invalid email address'),
+    emailId: z.email('Invalid email address'),
     password: z.string()
         .min(12, 'Password must be at least 12 characters long')
         .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')

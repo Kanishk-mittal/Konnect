@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
 import UserModel from '../../models/user.model';
-import { decryptAES } from '../../utils/encryption/aes.utils';
-import { internalAesKey } from '../../constants/keys';
 import { isCloudinaryConfigured, uploadAndCleanup } from '../../utils/cloudinary.utils';
+import { sendOTPEmail } from '../../utils/mailer.utils';
+import { OTP } from '../../utils/otp.utils';
+import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
+import { validateChangePasswordData } from '../../inputSchema/user.schema';
+import { updateCryptographicFields } from '../../services/user.services';
 
 /**
  * Get profile picture for a specific user by their ID
@@ -67,15 +70,13 @@ export const getUserDetails = async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        // Decrypt the email since it's stored encrypted
-        const decryptedEmail = decryptAES(user.email_id, internalAesKey);
-
+        // Return user details with plain text email
         res.status(200).json({
             status: true,
             message: 'User details retrieved successfully.',
             data: {
                 username: user.username,
-                email: decryptedEmail,
+                email: user.email_id,
                 collegeCode: user.college_code,
                 userType: user.user_type
             }
@@ -113,16 +114,14 @@ export const getMyDetails = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        // Decrypt the email
-        const decryptedEmail = decryptAES(user.email_id, internalAesKey);
-
+        // Return user details with plain text email
         res.status(200).json({
             status: true,
             message: 'User details retrieved successfully.',
             data: {
                 userId: req.user.id,
                 username: user.username,
-                email: decryptedEmail,
+                email: user.email_id,
                 collegeCode: user.college_code,
                 userType: user.user_type
             }
@@ -154,16 +153,6 @@ export const updateProfilePicture = async (req: Request, res: Response): Promise
             return;
         }
 
-        // Find user
-        const user = await UserModel.findById(userId);
-        if (!user) {
-            res.status(404).json({
-                status: false,
-                message: 'User not found.'
-            });
-            return;
-        }
-
         // Handle optional local file upload + optional Cloudinary push
         let profilePictureUrl: string | undefined;
 
@@ -190,9 +179,20 @@ export const updateProfilePicture = async (req: Request, res: Response): Promise
             return;
         }
 
-        // Update profile picture
-        user.profile_picture = profilePictureUrl;
-        await user.save();
+        // Update profile picture using findByIdAndUpdate
+        const updatedUser = await UserModel.findByIdAndUpdate(
+            userId,
+            { profile_picture: profilePictureUrl },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            res.status(404).json({
+                status: false,
+                message: 'User not found during update.'
+            });
+            return;
+        }
 
         res.status(200).json({
             status: true,
@@ -207,6 +207,146 @@ export const updateProfilePicture = async (req: Request, res: Response): Promise
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred while updating profile picture.'
+        });
+    }
+};
+
+/**
+ * Request OTP for password change
+ * Requires authentication - sends OTP to user's registered email
+ */
+export const requestPasswordChangeOTP = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get user ID from authenticated user (from JWT)
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        // Find user
+        const user = await UserModel.findById(userId).select('email_id');
+        if (!user) {
+            res.status(404).json({
+                status: false,
+                message: 'User not found.'
+            });
+            return;
+        }
+
+        // Send OTP to user email
+        const otpResult = await sendOTPEmail(user.email_id, 'OTP for Password Change - Konnect');
+
+        if (!otpResult.status) {
+            res.status(500).json({
+                status: false,
+                message: 'Failed to send OTP. Please try again.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'OTP sent successfully to your registered email.'
+        });
+
+    } catch (error) {
+        console.error('Error requesting password change OTP:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while requesting OTP.'
+        });
+    }
+};
+
+/**
+ * Change user password with OTP verification
+ * Requires authentication - verifies OTP and updates password
+ */
+export const changePasswordWithOTP = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Get user ID from authenticated user (from JWT)
+        const userId = req.user?.id;
+
+        // Use Zod schema to validate input
+        const validation = validateChangePasswordData(req.body);
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        if (!validation.status || !validation.data) {
+            res.status(400).json({
+                status: false,
+                message: validation.message
+            });
+            return;
+        }
+
+        const { previousPassword, newPassword, otp } = validation.data;
+
+        // Find user - select fields needed for crypto update
+        const user = await UserModel.findById(userId).select('email_id password_hash private_key');
+        if (!user) {
+            res.status(404).json({
+                status: false,
+                message: 'User not found.'
+            });
+            return;
+        }
+
+        // Verify previous password
+        const isPreviousPasswordValid = await verifyHash(previousPassword, user.password_hash);
+        if (!isPreviousPasswordValid) {
+            res.status(401).json({
+                status: false,
+                message: 'Incorrect previous password.'
+            });
+            return;
+        }
+
+        // Verify OTP using email from DB
+        const isOTPValid = OTP.verifyOTP(user.email_id, otp);
+        if (!isOTPValid) {
+            res.status(401).json({
+                status: false,
+                message: 'Invalid or expired OTP.'
+            });
+            return;
+        }
+
+        // Update cryptographic fields and save to DB (hashes password, re-encrypts private key, regenerates recovery keys)
+        const cryptoUpdate = await updateCryptographicFields(user as any, previousPassword, newPassword);
+
+        if (!cryptoUpdate.status) {
+            res.status(500).json({
+                status: false,
+                message: cryptoUpdate.error || 'Failed to update cryptographic keys.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Password changed successfully.',
+            data: {
+                recoveryKey: cryptoUpdate.recoveryKey
+            }
+        });
+
+    } catch (error) {
+        console.error('Error changing password:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while changing password.'
         });
     }
 };

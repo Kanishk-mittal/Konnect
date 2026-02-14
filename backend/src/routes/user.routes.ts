@@ -3,9 +3,12 @@ import {
     getUserProfilePicture,
     getUserDetails,
     getMyDetails,
-    updateProfilePicture
+    updateProfilePicture,
+    requestPasswordChangeOTP,
+    changePasswordWithOTP
 } from '../controller/api_controller/user.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { decryptRequest } from '../middleware/encryption.middleware';
 import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
 
 const router = Router();
@@ -25,6 +28,16 @@ router.post('/profile-picture',
     groupImageUpload.single('image'),   // Handle file upload
     handleMulterError,                  // Handle multer errors
     updateProfilePicture                // Controller
+);
+
+// Route to request password change OTP (authenticated)
+router.get('/password/request-otp', authMiddleware, requestPasswordChangeOTP);
+
+// Route to change password with OTP (authenticated)
+router.post('/password/change',
+    authMiddleware,
+    decryptRequest,
+    changePasswordWithOTP
 );
 
 export default router;
