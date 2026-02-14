@@ -135,6 +135,54 @@ response :- Confirms the removal of the member.
     "message": "Member removed from club successfully."
 }
 ```
+
+### 9. /members/remove-bulk
+Method :- `POST`
+Description :- Removes multiple members from the authenticated club by their roll numbers.
+Note :- This request should be encrypted.
+input :-
+```json
+{
+    "members": [
+        { "roll": "21001" },
+        { "roll": "21002" }
+    ]
+}
+```
+controller :- `removeClubMembersBulkController`
+response :- Returns the count of removed members.
+```json
+{
+    "status": true,
+    "message": "Successfully removed 2 member(s) from the club.",
+    "removedCount": 2
+}
+```
+
+### 10. /members/update-position
+Method :- `PUT`
+Description :- Updates the position of a specific member in the authenticated club.
+Note :- This request should be encrypted.
+input :-
+```json
+{
+    "studentId": "65cad...",
+    "position": "Vice President"
+}
+```
+controller :- `updateClubMemberPositionController`
+response :- Confirms the update and returns the new details.
+```json
+{
+    "status": true,
+    "message": "Member position updated successfully.",
+    "data": {
+        "studentId": "65cad...",
+        "clubId": "65cad...",
+        "position": "Vice President"
+    }
+}
+```
 ### 5. /blocked
 Method :- `GET`
 Description :- Fetches all students blocked by the authenticated club.
@@ -177,5 +225,74 @@ response :- Returns a list of groups with member and admin counts.
             "createdAt": "2024-02-14T..."
         }
     ]
+}
+```
+
+### 11. /students/block-bulk
+Method :- `POST`
+Description :- Blocks multiple students for the authenticated club.
+Note :- This request should be encrypted.
+input :-
+```json
+{
+    "students": [
+        { "roll": "21001" },
+        { "roll": "21005" }
+    ]
+}
+```
+controller :- `blockClubStudentsBulkController`
+response :- Returns the count of newly blocked students.
+```json
+{
+    "status": true,
+    "message": "Successfully blocked 2 student(s).",
+    "blockedCount": 2
+}
+```
+
+### 12. /students/unblock
+Method :- `POST`
+Description :- Unblocks a specific student for the authenticated club.
+Note :- This request should be encrypted.
+input :-
+```json
+{
+    "studentId": "65cad..."
+}
+```
+controller :- `unblockClubStudentController`
+response :- Confirms the unblocking action.
+```json
+{
+    "status": true,
+    "message": "Student unblocked successfully."
+}
+```
+
+### 13. /students/unblock-bulk
+Method :- `POST`
+Description :- Unblocks multiple students for the authenticated club.
+Note :- This request should be encrypted.
+input :-
+```json
+{
+    "students": [
+        { "roll": "21001" },
+        { "roll": "21005" }
+    ]
+}
+```
+controller :- `unblockClubStudentsBulkController`
+response :- Returns detailed counts of the operation.
+```json
+{
+    "status": true,
+    "message": "Successfully unblocked 2 student(s).",
+    "data": {
+        "unblockedCount": 2,
+        "totalProvided": 2,
+        "studentsFound": 2
+    }
 }
 ```

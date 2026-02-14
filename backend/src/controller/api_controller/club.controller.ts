@@ -697,12 +697,12 @@ export const removeClubMemberController = async (req: Request, res: Response): P
  */
 export const updateClubMemberPositionController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { clubId, studentId, position } = req.body;
+        const { studentId, position } = req.body;
 
-        if (!clubId || !studentId) {
+        if (!studentId) {
             res.status(400).json({
                 status: false,
-                message: 'Club ID and Student ID are required.'
+                message: 'Student ID is required.'
             });
             return;
         }
@@ -715,8 +715,19 @@ export const updateClubMemberPositionController = async (req: Request, res: Resp
             return;
         }
 
-        // Verify club exists
-        const club = await ClubModel.findById(clubId);
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        // Find club by the user_id (the account ID of the club)
+        const club = await ClubModel.findOne({ user_id: userId });
+
         if (!club) {
             res.status(404).json({
                 status: false,
@@ -725,8 +736,10 @@ export const updateClubMemberPositionController = async (req: Request, res: Resp
             return;
         }
 
-        // Verify student exists
-        const student = await StudentModel.findById(studentId);
+        const clubId = club._id;
+
+        // Verify student exists as a User
+        const student = await UserModel.findById(studentId);
         if (!student) {
             res.status(404).json({
                 status: false,
@@ -739,7 +752,7 @@ export const updateClubMemberPositionController = async (req: Request, res: Resp
         const membership = await ClubMembershipModel.findOneAndUpdate(
             {
                 club_id: clubId,
-                student_id: studentId
+                member_id: studentId
             },
             {
                 position: position.trim()
@@ -761,7 +774,7 @@ export const updateClubMemberPositionController = async (req: Request, res: Resp
             status: true,
             message: 'Member position updated successfully.',
             data: {
-                studentId: membership.student_id,
+                studentId: membership.member_id,
                 clubId: membership.club_id,
                 position: membership.position
             }
@@ -781,13 +794,23 @@ export const updateClubMemberPositionController = async (req: Request, res: Resp
  */
 export const removeClubMembersBulkController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { members, clubId } = req.body;
+        const { members } = req.body;
+
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
 
         // Validate input
-        if (!clubId || !members || !Array.isArray(members)) {
+        if (!members || !Array.isArray(members)) {
             res.status(400).json({
                 status: false,
-                message: 'Club ID and members array are required.'
+                message: 'Members array is required.'
             });
             return;
         }
@@ -800,8 +823,9 @@ export const removeClubMembersBulkController = async (req: Request, res: Respons
             return;
         }
 
-        // Verify club exists
-        const club = await ClubModel.findById(clubId);
+        // Find club by the user_id
+        const club = await ClubModel.findOne({ user_id: userId });
+
         if (!club) {
             res.status(404).json({
                 status: false,
@@ -809,6 +833,8 @@ export const removeClubMembersBulkController = async (req: Request, res: Respons
             });
             return;
         }
+
+        const clubId = club._id;
 
         // Extract roll numbers from members array
         const rollNumbers = members.map((m: { roll: string }) => m.roll).filter(Boolean);
@@ -821,10 +847,11 @@ export const removeClubMembersBulkController = async (req: Request, res: Respons
             return;
         }
 
-        // Find all students by roll numbers in the club's college
-        const students = await StudentModel.find({
-            roll: { $in: rollNumbers },
-            college_code: club.college_code
+        // Find all students by roll numbers in the club's college using UserModel
+        const students = await UserModel.find({
+            id: { $in: rollNumbers }, // 'id' field stores roll number
+            college_code: club.college_code,
+            user_type: 'student'
         });
 
         // Extract student IDs
@@ -833,7 +860,7 @@ export const removeClubMembersBulkController = async (req: Request, res: Respons
         // Delete all memberships for these students in this club
         const deleteResult = await ClubMembershipModel.deleteMany({
             club_id: clubId,
-            student_id: { $in: studentIds }
+            member_id: { $in: studentIds }
         });
 
         res.status(200).json({
@@ -857,13 +884,22 @@ export const removeClubMembersBulkController = async (req: Request, res: Respons
  */
 export const blockClubStudentsBulkController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { students, clubId } = req.body;
+        const { students } = req.body;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
 
         // Validate input
-        if (!clubId || !students || !Array.isArray(students)) {
+        if (!students || !Array.isArray(students)) {
             res.status(400).json({
                 status: false,
-                message: 'Club ID and students array are required.'
+                message: 'Students array is required.'
             });
             return;
         }
@@ -876,8 +912,8 @@ export const blockClubStudentsBulkController = async (req: Request, res: Respons
             return;
         }
 
-        // Verify club exists
-        const club = await ClubModel.findById(clubId);
+        // Find club by user_id
+        const club = await ClubModel.findOne({ user_id: userId });
         if (!club) {
             res.status(404).json({
                 status: false,
@@ -897,10 +933,11 @@ export const blockClubStudentsBulkController = async (req: Request, res: Respons
             return;
         }
 
-        // Verify students exist in the club's college
-        const foundStudents = await StudentModel.find({
-            roll: { $in: rollNumbers },
-            college_code: club.college_code
+        // Verify students exist in the club's college using UserModel
+        const foundStudents = await UserModel.find({
+            id: { $in: rollNumbers },
+            college_code: club.college_code,
+            user_type: 'student'
         });
 
         if (foundStudents.length === 0) {
@@ -911,8 +948,8 @@ export const blockClubStudentsBulkController = async (req: Request, res: Respons
             return;
         }
 
-        // Get validated roll numbers of found students
-        const validRollNumbers: string[] = foundStudents.map(s => s.roll as string);
+        // Get validated roll numbers of found students (using 'id' field which stores roll number)
+        const validRollNumbers: string[] = foundStudents.map(s => s.id as string);
 
         // Get current blocked students
         const currentBlockedRolls: string[] = club.blocked_students || [];
@@ -962,18 +999,27 @@ export const blockClubStudentsBulkController = async (req: Request, res: Respons
  */
 export const unblockClubStudentController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { clubId, studentId } = req.body;
+        const { studentId } = req.body;
+        const userId = req.user?.id;
 
-        if (!clubId || !studentId) {
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        if (!studentId) {
             res.status(400).json({
                 status: false,
-                message: 'Club ID and Student ID are required.'
+                message: 'Student ID is required.'
             });
             return;
         }
 
         // Verify club exists
-        const club = await ClubModel.findById(clubId);
+        const club = await ClubModel.findOne({ user_id: userId });
         if (!club) {
             res.status(404).json({
                 status: false,
@@ -982,8 +1028,8 @@ export const unblockClubStudentController = async (req: Request, res: Response):
             return;
         }
 
-        // Get student's roll number
-        const student = await StudentModel.findById(studentId).select('roll');
+        // Get student's roll number from UserModel
+        const student = await UserModel.findById(studentId).select('id'); // 'id' field is roll for students
         if (!student) {
             res.status(404).json({
                 status: false,
@@ -994,7 +1040,7 @@ export const unblockClubStudentController = async (req: Request, res: Response):
 
         // Check if student is in blocked list
         const currentBlockedRolls: string[] = club.blocked_students || [];
-        const isBlocked = currentBlockedRolls.includes(student.roll as string);
+        const isBlocked = currentBlockedRolls.includes(student.id as string);
 
         if (!isBlocked) {
             res.status(404).json({
@@ -1005,7 +1051,7 @@ export const unblockClubStudentController = async (req: Request, res: Response):
         }
 
         // Remove student from blocked list
-        club.blocked_students = currentBlockedRolls.filter(roll => roll !== student.roll as string);
+        club.blocked_students = currentBlockedRolls.filter(roll => roll !== student.id as string);
         await club.save();
 
         res.status(200).json({
@@ -1024,18 +1070,27 @@ export const unblockClubStudentController = async (req: Request, res: Response):
 // Unblock club students in bulk (by roll numbers)
 export const unblockClubStudentsBulkController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { clubId, students } = req.body;
+        const { students } = req.body;
+        const userId = req.user?.id;
 
-        if (!clubId || !students || !Array.isArray(students)) {
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        if (!students || !Array.isArray(students)) {
             res.status(400).json({
                 status: false,
-                message: 'Club ID and students array are required.'
+                message: 'Students array is required.'
             });
             return;
         }
 
         // Verify club exists
-        const club = await ClubModel.findById(clubId);
+        const club = await ClubModel.findOne({ user_id: userId });
         if (!club) {
             res.status(404).json({
                 status: false,
@@ -1056,10 +1111,11 @@ export const unblockClubStudentsBulkController = async (req: Request, res: Respo
         }
 
         // Verify students exist in the club's college
-        const foundStudents = await StudentModel.find({
-            roll: { $in: rollNumbers },
-            college_code: club.college_code
-        }).select('roll');
+        const foundStudents = await UserModel.find({
+            id: { $in: rollNumbers }, // 'id' field is roll for students
+            college_code: club.college_code,
+            user_type: 'student'
+        }).select('id');
 
         if (foundStudents.length === 0) {
             res.status(404).json({
@@ -1070,7 +1126,7 @@ export const unblockClubStudentsBulkController = async (req: Request, res: Respo
         }
 
         // Get validated roll numbers
-        const validRollNumbers: string[] = foundStudents.map(s => s.roll as string);
+        const validRollNumbers: string[] = foundStudents.map(s => s.id as string);
 
         // Filter blocked list to remove students
         const currentBlockedRolls: string[] = club.blocked_students || [];
