@@ -116,6 +116,25 @@ response :- Returns counts of successfully added members or specific validation 
     "insertedCount": 2
 }
 ```
+
+### 8. /members/remove
+Method :- `DELETE`
+Description :- Removes a specific member from the authenticated club.
+Note :- This request should be encrypted.
+input :-
+```json
+{
+    "studentId": "65cad..."
+}
+```
+controller :- `removeClubMemberController`
+response :- Confirms the removal of the member.
+```json
+{
+    "status": true,
+    "message": "Member removed from club successfully."
+}
+```
 ### 5. /blocked
 Method :- `GET`
 Description :- Fetches all students blocked by the authenticated club.

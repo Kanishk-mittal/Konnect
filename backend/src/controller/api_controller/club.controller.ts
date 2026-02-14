@@ -632,18 +632,29 @@ export const addClubMembersController = async (req: Request, res: Response): Pro
  */
 export const removeClubMemberController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { clubId, studentId } = req.body;
+        const { studentId } = req.body;
 
-        if (!clubId || !studentId) {
+        if (!studentId) {
             res.status(400).json({
                 status: false,
-                message: 'Club ID and Student ID are required.'
+                message: 'Student ID is required.'
             });
             return;
         }
 
-        // Verify club exists
-        const club = await ClubModel.findById(clubId);
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        // Find club by the user_id (the account ID of the club)
+        const club = await ClubModel.findOne({ user_id: userId });
+
         if (!club) {
             res.status(404).json({
                 status: false,
@@ -652,20 +663,12 @@ export const removeClubMemberController = async (req: Request, res: Response): P
             return;
         }
 
-        // Verify student exists
-        const student = await StudentModel.findById(studentId);
-        if (!student) {
-            res.status(404).json({
-                status: false,
-                message: 'Student not found.'
-            });
-            return;
-        }
+        const clubId = club._id;
 
         // Find and delete the membership
         const membership = await ClubMembershipModel.findOneAndDelete({
             club_id: clubId,
-            student_id: studentId
+            member_id: studentId
         });
 
         if (!membership) {
