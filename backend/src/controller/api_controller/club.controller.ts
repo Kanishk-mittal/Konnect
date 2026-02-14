@@ -465,18 +465,18 @@ export const getClubBlockedStudentsController = async (req: Request, res: Respon
  */
 export const getClubGroupsController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { clubId } = req.params;
-        console.log("=====", clubId, "+++++")
-        if (!clubId) {
-            res.status(400).json({
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
                 status: false,
-                message: 'Club ID is required.'
+                message: 'Authentication required.'
             });
             return;
         }
 
         // Find club to get college_code
-        const club = await ClubModel.findById(clubId).select('college_code');
+        const club = await ClubModel.findOne({ user_id: userId }).select('college_code');
 
         if (!club) {
             res.status(404).json({
@@ -486,16 +486,14 @@ export const getClubGroupsController = async (req: Request, res: Response): Prom
             return;
         }
 
-        // Get chat groups created by this club (where club is admin)
+        // Get chat groups created by this club (using the user_id as created_by)
         const chatGroups = await ChatGroupModel.find({
-            college_code: club.college_code,
-            admin: clubId
+            created_by: userId
         }).select('name description icon createdAt');
 
         // Get announcement groups created by this club
         const announcementGroups = await AnnouncementGroupModel.find({
-            college_code: club.college_code,
-            admin: clubId
+            created_by: userId
         }).select('name description icon createdAt');
 
         // Count members for each group

@@ -115,3 +115,27 @@ response :- Returns a list of blocked students with their profile details.
     ]
 }
 ```
+
+### 6. /groups
+Method :- `GET`
+Description :- Fetches all chat and announcement groups created by the authenticated club.
+input :- None (Uses authenticated club's credentials).
+controller :- `getClubGroupsController`
+response :- Returns a list of groups with member and admin counts.
+```json
+{
+    "status": true,
+    "data": [
+        {
+            "id": "65cad...",
+            "name": "Notice Board",
+            "description": "Official announcements",
+            "icon": "https://...",
+            "type": "announcement",
+            "memberCount": 150,
+            "adminCount": 2,
+            "createdAt": "2024-02-14T..."
+        }
+    ]
+}
+```

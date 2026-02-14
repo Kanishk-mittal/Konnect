@@ -68,10 +68,10 @@ router.get('/blocked',
 );
 
 // Get groups created by club (requires club authentication)
-router.get('/groups/:clubId',
-    authMiddleware,
-    clubAuthMiddleware,
-    getClubGroupsController
+router.get('/groups',
+    authMiddleware,                   // Authenticate user
+    clubAuthMiddleware,               // Verify user is club
+    getClubGroupsController           // Controller logic
 );
 
 // Add members to club (requires club authentication)
