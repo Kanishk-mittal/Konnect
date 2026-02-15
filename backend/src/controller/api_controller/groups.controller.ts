@@ -5,8 +5,6 @@ import ChatGroupModel from '../../models/chatGroup.model';
 import AnnouncementGroupModel from '../../models/announcementGroup.model';
 import ChatGroupMembershipModel from '../../models/chatGroupMembership.model';
 import AnnouncementGroupMembershipModel from '../../models/announcementGroupMembership.model';
-import StudentModel from '../../models/Student.model';
-import AdminModel from '../../models/admin.model';
 
 import { validateCreateGroupData, CreateGroupData } from '../../inputSchema/group.schema';
 import userModel from '../../models/user.model';
@@ -39,8 +37,8 @@ export const createGroupController = async (req: Request, res: Response): Promis
 
         const creatorId = req.user.id;
 
-        // Get college_code from user model 
-        const user = await userModel.findById(creatorId).select('college_code user_type').lean();
+        // Get college_code and identification ID (roll number) from user model 
+        const user = await userModel.findById(creatorId).select('college_code user_type id').lean();
         if (!user) {
             res.status(404).json({
                 status: false,
@@ -50,9 +48,11 @@ export const createGroupController = async (req: Request, res: Response): Promis
         }
 
         const collegeCode = user.college_code;
+        const creatorRoll = user.id;
 
         // Resolve all involved roll numbers to User ObjectIds
-        const adminRolls = payload.admins;
+        // Automatically add creator as an admin
+        const adminRolls = [...new Set([...payload.admins, creatorRoll])];
         const memberRolls = payload.members.map(m => m.rollNumber);
         const allUniqueRolls = [...new Set([...adminRolls, ...memberRolls])];
 
@@ -268,8 +268,7 @@ export const deleteGroupController = async (req: Request, res: Response): Promis
         }
 
         // Check if user is college admin
-        const admin = await AdminModel.findById(req.user?.id);
-        const isCollegeAdmin = !!admin;
+        const isCollegeAdmin = req.user?.type === 'admin';
 
         // Check if user is group admin for the specified group type
         let isGroupAdmin = false;

@@ -83,3 +83,27 @@ response :-
     }
 }
 ```
+
+### 3. /delete/:groupId
+Method :- `DELETE`
+Description :- Deletes a specific group (Chat, Announcement, or both). Accessible by college admins or group admins.
+Note :- Requires `auth_token` cookie. The request body (containing groupType) must be encrypted.
+Input :-
+```json
+{
+    "groupType": "chat"
+}
+```
+Note :- `groupType` can be `"chat"`, `"announcement"`, or `"both"`.
+controller :- `deleteGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "chat group(s) deleted successfully",
+    "data": {
+        "deletedTypes": ["chat"]
+    }
+}
+```
+```
