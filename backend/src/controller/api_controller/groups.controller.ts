@@ -8,87 +8,63 @@ import AnnouncementGroupMembershipModel from '../../models/announcementGroupMemb
 import StudentModel from '../../models/Student.model';
 import AdminModel from '../../models/admin.model';
 
+import { validateCreateGroupData, CreateGroupData } from '../../inputSchema/group.schema';
+import userModel from '../../models/user.model';
+
 // Export the configured multer upload for groups
 export const upload = groupImageUpload;
 
-// Types for group creation
-type CreateGroupPayload = {
-    groupName: string;
-    description?: string;
-    admins: string[];
-    members?: Array<{ name?: string; rollNumber: string; emailId?: string }> | string[];
-    isAnnouncementGroup?: boolean;
-    isChatGroup?: boolean;
-};
-
-// TODO: Check this route its sus
 // Controller: Create a group
 export const createGroupController = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Expect decrypted body
-        const payload: CreateGroupPayload = req.body;
-
-        // Basic validation
-        if (!payload.groupName || !Array.isArray(payload.admins) || payload.admins.length === 0) {
+        // Validation using Zod
+        const validation = validateCreateGroupData(req.body);
+        if (!validation.status) {
             res.status(400).json({
                 status: false,
-                message: 'groupName and at least one admin are required.'
+                message: validation.message
             });
             return;
         }
 
-        // Get creator type from JWT (already decoded by authMiddleware)
-        const creatorType: 'admin' | 'club' | 'user' = (req.user?.type as 'admin' | 'club' | 'user') || 'admin';
-        const creatorId: string = req.user?.id || '';
+        const payload = validation.data!;
 
-        // Get college_code based on creator type
-        let collegeCode: string;
-
-        if (creatorType === 'admin') {
-            const admin = await AdminModel.findById(creatorId).select('college_code');
-            if (!admin) {
-                res.status(404).json({
-                    status: false,
-                    message: 'Admin not found.'
-                });
-                return;
-            }
-            collegeCode = admin.college_code;
-        } else if (creatorType === 'club') {
-            const ClubModel = (await import('../../models/club.model')).default;
-            const club = await ClubModel.findById(creatorId).select('college_code');
-            if (!club) {
-                res.status(404).json({
-                    status: false,
-                    message: 'Club not found.'
-                });
-                return;
-            }
-            collegeCode = club.college_code;
-        } else {
-            // creatorType === 'user' (student)
-            const student = await StudentModel.findById(creatorId).select('college_code');
-            if (!student) {
-                res.status(404).json({
-                    status: false,
-                    message: 'User not found.'
-                });
-                return;
-            }
-            collegeCode = student.college_code as string;
+        if (!req.user?.id) {
+            res.status(401).json({
+                status: false,
+                message: 'User authentication required.'
+            });
+            return;
         }
 
-        // Normalize members into roll number strings
-        const members: string[] = Array.isArray(payload.members)
-            ? (typeof payload.members[0] === 'string'
-                ? (payload.members as string[])
-                : (payload.members as Array<{ rollNumber: string }>).map(m => m.rollNumber))
-            : [];
+        const creatorId = req.user.id;
+
+        // Get college_code from user model 
+        const user = await userModel.findById(creatorId).select('college_code user_type').lean();
+        if (!user) {
+            res.status(404).json({
+                status: false,
+                message: 'Authenticated user not found.'
+            });
+            return;
+        }
+
+        const collegeCode = user.college_code;
+
+        // Resolve all involved roll numbers to User ObjectIds
+        const adminRolls = payload.admins;
+        const memberRolls = payload.members.map(m => m.rollNumber);
+        const allUniqueRolls = [...new Set([...adminRolls, ...memberRolls])];
+
+        const users = await userModel.find({
+            id: { $in: allUniqueRolls },
+            college_code: collegeCode
+        }).select('_id id').lean();
+
+        const userMap = new Map<string, string>(users.map(u => [u.id, u._id.toString()]));
 
         // Handle optional local file upload (via multer) + optional Cloudinary push
-        let image:
-            | { localPath: string; cloudUrl?: string }
-            | undefined;
+        let image: { localPath: string; cloudUrl?: string } | undefined;
 
         if ((req as any).file) {
             const localPath = (req as any).file.path as string;
@@ -103,155 +79,70 @@ export const createGroupController = async (req: Request, res: Response): Promis
 
         // Choose icon value from cloud URL if available, else local
         const icon = image?.cloudUrl || image?.localPath || undefined;
+        const results: any[] = [];
 
-        // Persist to DB using appropriate model(s)
-        const results: Array<{ id: string; type: 'announcement' | 'chat'; name: string; description?: string; icon?: string; createdAt: Date; membersAdded: number }> = [];
+        // Helper function for mass membership creation
+        const createMemberships = async (groupId: string, isAnnouncement: boolean) => {
+            const membershipDocs = allUniqueRolls
+                .filter(roll => userMap.has(roll))
+                .map(roll => ({
+                    member: userMap.get(roll),
+                    group: groupId,
+                    isAdmin: adminRolls.includes(roll)
+                }));
 
+            if (membershipDocs.length === 0) return 0;
+
+            if (isAnnouncement) {
+                await AnnouncementGroupMembershipModel.insertMany(membershipDocs);
+            } else {
+                await ChatGroupMembershipModel.insertMany(membershipDocs);
+            }
+            return membershipDocs.length;
+        };
+
+        // Create Announcement Group
         if (payload.isAnnouncementGroup) {
-            // Find admin students by roll numbers to get their ObjectIds
-            const adminStudents = await StudentModel.find({
-                roll: { $in: payload.admins }
-            }).select('_id roll');
-
-            const adminIds = adminStudents.map(student => student._id);
-
             const annDoc = await AnnouncementGroupModel.create({
                 name: payload.groupName,
                 description: payload.description || '',
                 icon,
                 college_code: collegeCode,
-                admin: adminIds,
-                adminType: creatorType // 'admin' or 'club' based on who created it
+                created_by: creatorId
             });
 
-            // Add members to announcement group
-            let membersAdded = 0;
-            if (members.length > 0) {
-                // Find students by roll numbers
-                const students = await StudentModel.find({
-                    roll: { $in: members }
-                }).select('_id roll');
-
-                // Create membership entries
-                const membershipPromises = students.map(async (student) => {
-                    const isAdmin = payload.admins.includes(student.roll as string);
-                    return AnnouncementGroupMembershipModel.create({
-                        member: student._id,
-                        group: annDoc._id,
-                        admin: isAdmin
-                    });
-                });
-
-                const createdMemberships = await Promise.all(membershipPromises);
-                membersAdded = createdMemberships.length;
-            }
+            const membersAdded = await createMemberships(annDoc._id.toString(), true);
 
             results.push({
                 id: annDoc._id.toString(),
                 type: 'announcement',
-                name: annDoc.name as string,
-                description: annDoc.description as string,
-                icon: annDoc.icon as string,
-                createdAt: annDoc.createdAt as Date,
+                name: annDoc.name,
+                description: annDoc.description,
+                icon: annDoc.icon,
+                createdAt: (annDoc as any).createdAt,
                 membersAdded
             });
         }
 
-        if (payload.isChatGroup) {
-            // Find admin students by roll numbers to get their ObjectIds
-            const adminStudents = await StudentModel.find({
-                roll: { $in: payload.admins }
-            }).select('_id roll');
-
-            const adminIds = adminStudents.map(student => student._id);
-
+        // Create Chat Group
+        if (payload.isChatGroup || (!payload.isAnnouncementGroup && !payload.isChatGroup)) {
             const chatDoc = await ChatGroupModel.create({
                 name: payload.groupName,
                 description: payload.description || '',
                 icon,
                 college_code: collegeCode,
-                admin: adminIds
+                created_by: creatorId
             });
 
-            // Add members to chat group
-            let membersAdded = 0;
-            if (members.length > 0) {
-                // Find students by roll numbers
-                const students = await StudentModel.find({
-                    roll: { $in: members }
-                }).select('_id roll');
-
-                // Create membership entries
-                const membershipPromises = students.map(async (student) => {
-                    const isAdmin = payload.admins.includes(student.roll as string);
-                    return ChatGroupMembershipModel.create({
-                        member: student._id,
-                        group: chatDoc._id,
-                        isAdmin
-                    });
-                });
-
-                const createdMemberships = await Promise.all(membershipPromises);
-                membersAdded = createdMemberships.length;
-            }
+            const membersAdded = await createMemberships(chatDoc._id.toString(), false);
 
             results.push({
                 id: chatDoc._id.toString(),
                 type: 'chat',
-                name: chatDoc.name as string,
-                description: chatDoc.description as string,
-                icon: chatDoc.icon as string,
-                createdAt: chatDoc.createdAt as Date,
-                membersAdded
-            });
-        }
-
-        // If neither flag set, default to chat group creation
-        if (!payload.isAnnouncementGroup && !payload.isChatGroup) {
-            // Find admin students by roll numbers to get their ObjectIds
-            const adminStudents = await StudentModel.find({
-                roll: { $in: payload.admins }
-            }).select('_id roll');
-
-            const adminIds = adminStudents.map(student => student._id);
-
-            const chatDoc = await ChatGroupModel.create({
-                name: payload.groupName,
-                description: payload.description || '',
-                icon,
-                college_code: collegeCode,
-                admin: adminIds
-            });
-
-            // Add members to chat group
-            let membersAdded = 0;
-            if (members.length > 0) {
-                // Find students by roll numbers
-                const students = await StudentModel.find({
-                    roll: { $in: members }
-                }).select('_id roll');
-
-                // Create membership entries
-                const membershipPromises = students.map(async (student) => {
-                    const isAdmin = payload.admins.includes(student.roll as string);
-                    return ChatGroupMembershipModel.create({
-                        member: student._id,
-                        group: chatDoc._id,
-                        isAdmin
-                    });
-                });
-
-                const createdMemberships = await Promise.all(membershipPromises);
-                membersAdded = createdMemberships.length;
-            }
-
-            results.push({
-                id: chatDoc._id.toString(),
-                type: 'chat',
-                name: chatDoc.name as string,
-                description: chatDoc.description as string,
-                icon: chatDoc.icon as string,
-                createdAt: chatDoc.createdAt as Date,
+                name: chatDoc.name,
+                description: chatDoc.description,
+                icon: chatDoc.icon,
+                createdAt: (chatDoc as any).createdAt,
                 membersAdded
             });
         }
@@ -262,7 +153,7 @@ export const createGroupController = async (req: Request, res: Response): Promis
             data: {
                 created: results,
                 image: image,
-                createdBy: req.user?.id || 'unknown'
+                createdBy: creatorId
             }
         });
     } catch (error) {
@@ -274,26 +165,26 @@ export const createGroupController = async (req: Request, res: Response): Promis
     }
 };
 
-// Controller: Get groups by college code
-export const getGroupsByCollegeCodeController = async (req: Request, res: Response): Promise<void> => {
+// Controller: Get groups created by the authenticated user
+export const getUserGroupsController = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { collegeCode } = req.params;
+        const userId = req.user?.id;
 
-        if (!collegeCode) {
-            res.status(400).json({
+        if (!userId) {
+            res.status(401).json({
                 status: false,
-                message: 'College code is required.'
+                message: 'User authentication required.'
             });
             return;
         }
 
-        // Fetch both chat and announcement groups for the college
+        // Fetch both chat and announcement groups created by the user
         const [chatGroups, announcementGroups] = await Promise.all([
-            ChatGroupModel.find({ college_code: collegeCode })
+            ChatGroupModel.find({ created_by: userId })
                 .select('name description icon createdAt')
                 .lean(),
-            AnnouncementGroupModel.find({ college_code: collegeCode })
-                .select('name description icon admin createdAt')
+            AnnouncementGroupModel.find({ created_by: userId })
+                .select('name description icon createdAt')
                 .lean()
         ]);
 
@@ -333,21 +224,20 @@ export const getGroupsByCollegeCodeController = async (req: Request, res: Respon
             description: group.description || '',
             icon: group.icon || null,
             type: 'announcement',
-            adminCount: Array.isArray(group.admin) ? group.admin.length : 0,
             memberCount: announcementMemberCountMap.get(group._id.toString()) || 0,
             createdAt: group.createdAt
         }));
 
         const allGroups = [...formattedChatGroups, ...formattedAnnouncementGroups]
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
 
         res.status(200).json({
             status: true,
-            message: 'Groups fetched successfully',
+            message: 'User groups fetched successfully',
             data: allGroups
         });
     } catch (error) {
-        console.error('Error in getGroupsByCollegeCodeController:', error);
+        console.error('Error in getUserGroupsController:', error);
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred.'
@@ -383,18 +273,25 @@ export const deleteGroupController = async (req: Request, res: Response): Promis
 
         // Check if user is group admin for the specified group type
         let isGroupAdmin = false;
-        if (!isCollegeAdmin) {
+        if (!isCollegeAdmin && req.user?.id) {
+            const userId = req.user.id;
+
             if (groupType === 'chat' || groupType === 'both') {
-                const chatGroup = await ChatGroupModel.findById(groupId);
-                if (chatGroup && chatGroup.admin) {
-                    isGroupAdmin = chatGroup.admin.some(adminId => adminId.toString() === req.user?.id);
-                }
+                const membership = await ChatGroupMembershipModel.findOne({
+                    group: groupId,
+                    member: userId,
+                    isAdmin: true
+                });
+                if (membership) isGroupAdmin = true;
             }
+
             if (!isGroupAdmin && (groupType === 'announcement' || groupType === 'both')) {
-                const announcementGroup = await AnnouncementGroupModel.findById(groupId);
-                if (announcementGroup && announcementGroup.admin) {
-                    isGroupAdmin = announcementGroup.admin.some(adminId => adminId.toString() === req.user?.id);
-                }
+                const membership = await AnnouncementGroupMembershipModel.findOne({
+                    group: groupId,
+                    member: userId,
+                    isAdmin: true
+                });
+                if (membership) isGroupAdmin = true;
             }
         }
 

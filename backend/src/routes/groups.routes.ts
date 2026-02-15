@@ -1,5 +1,5 @@
-import { Router, Request, Response } from 'express';
-import { createGroupController, getGroupsByCollegeCodeController, deleteGroupController } from '../controller/api_controller/groups.controller';
+import { Router } from 'express';
+import { createGroupController, getUserGroupsController, deleteGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -7,11 +7,10 @@ import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
 
 const router = Router();
 
-// Get groups by college code
-router.get('/:collegeCode',
+// Get groups created by the authenticated user
+router.get('/',
     authMiddleware,                    // authenticate user
-    adminAuthMiddleware,               // verify user is admin
-    getGroupsByCollegeCodeController   // controller logic
+    getUserGroupsController            // controller logic
 );
 
 // Create a group (supports optional image upload) - Accessible by both admin and club
@@ -31,15 +30,5 @@ router.delete('/delete/:groupId',
     decryptRequest,                    // decrypt request body (contains groupType)
     deleteGroupController              // controller logic (checks permissions internally)
 );
-
-// Health check endpoint for groups API (basic status check)
-router.get('/health/check', (req: Request, res: Response) => {
-    res.status(200).json({
-        success: true,
-        message: 'Groups API is running',
-        timestamp: new Date().toISOString(),
-        note: 'Routes will be added as needed'
-    });
-});
 
 export default router;
