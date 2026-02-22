@@ -23,13 +23,20 @@ router.post('/login', decryptRequest, studentLoginController, resolvePublicKey, 
 // Logout endpoint to clear JWT cookie
 router.post('/logout', studentLogoutController);
 
-router.get('/details/:collegeCode', authMiddleware, getStudentByCollegeCode);
-router.get('/blocked/:collegeCode', authMiddleware, getBlockedStudentsByCollegeCode);
+router.get('/list', authMiddleware, getStudentByCollegeCode);
+
+router.get('/blocked', authMiddleware, adminAuthMiddleware, getBlockedStudentsByCollegeCode);
+
 router.post('/addMultiple', authMiddleware, adminAuthMiddleware, decryptRequest, bulkStudentRegistration, encryptResponse);
+
 router.delete('/delete', authMiddleware, adminAuthMiddleware, decryptRequest, deleteStudent);
+
 router.delete('/delete-multiple', authMiddleware, adminAuthMiddleware, decryptRequest, deleteMultipleStudents);
+
 router.post('/toggle-block', authMiddleware, adminAuthMiddleware, decryptRequest, toggleStudentBlockStatus);
+
 router.post('/block-multiple', authMiddleware, adminAuthMiddleware, decryptRequest, blockMultipleStudents);
+
 router.post('/unblock-multiple', authMiddleware, adminAuthMiddleware, decryptRequest, unblockMultipleStudents);
 
 export default router;

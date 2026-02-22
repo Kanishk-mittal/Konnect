@@ -17,3 +17,4 @@ export const validateAdminLoginData = (data: unknown): { status: boolean; messag
     }
     return { status: true, message: 'Validation successful', data: result.data };
 };
+

@@ -37,6 +37,7 @@ export type UserDocument = {
     email_id: string;
     profile_picture: string | null;
     username: string;
+    is_blocked: boolean;
     blocked_users: Types.ObjectId[];
     password_hash: string;
     recovery_password: string;

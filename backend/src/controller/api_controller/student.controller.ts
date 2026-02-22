@@ -1,21 +1,20 @@
 import { Request, Response } from 'express';
 
 // Models
-import studentModel from '../../models/Student.model';
+import StudentModel from '../../models/Student.model';
 import AdminModel from '../../models/admin.model';
+import userModel from '../../models/user.model';
+import BlockedStudentModel from '../../models/blockedStudent.model';
 
 // Utils - Encryption
-import { generateRSAKeyPair } from '../../utils/encryption/rsa.utils';
-import { encryptAES, generateAESKeyFromString } from '../../utils/encryption/aes.utils';
 import { verifyHash, createHash } from '../../utils/encryption/hash.utils';
 
 // Utils - Other
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
-import { sendStudentCredentialsEmail, sendBulkStudentEmails } from '../../utils/mailer.utils';
-import { sendBulkStudentEmailsSmart } from '../../utils/emailProcessor.utils';
+import * as StudentServices from "../../services/studentService";
 
 // Constants
-import { internalAesKey } from '../../constants/keys';
+import { validateBlockStudentsData, validateUnblockStudentsData } from '../../inputSchema/student.schema';
 
 // Types
 type StudentData = {
@@ -93,18 +92,19 @@ const checkForDuplicates = async (students: StudentData[], collegeCode: string):
 
     // Check database duplicates in parallel
     const [existingRolls, existingEmails] = await Promise.all([
-        studentModel.find({
+        userModel.find({
             college_code: collegeCode,
-            roll: { $in: rolls }
-        }).select('roll').lean(),
+            id: { $in: rolls },
+            user_type: 'student'
+        }).select('id').lean(),
 
-        studentModel.find({
+        userModel.find({
             email_id: { $in: emails }
         }).select('email_id').lean()
     ]);
 
     if (existingRolls.length > 0) {
-        const duplicateRolls = existingRolls.map(s => s.roll);
+        const duplicateRolls = existingRolls.map(s => s.id);
         errors.push(`Roll numbers already exist in college: ${duplicateRolls.join(', ')}`);
     }
 
@@ -132,10 +132,11 @@ export const studentLoginController = async (req: Request, res: Response): Promi
             return;
         }
 
-        // Find student by college code and roll
-        const student = await studentModel.findOne({
+        // Find student by college code and roll in the unified user model
+        const student = await userModel.findOne({
             college_code: collegeCode,
-            roll: rollNumber
+            id: rollNumber,
+            user_type: 'student'
         });
 
         if (!student) {
@@ -211,33 +212,65 @@ export const studentLogoutController = async (req: Request, res: Response): Prom
 
 /**
  * Get student details by college code
- * Returns roll number, display name, and profile picture for all students with the given college code
+ * Automatically determines college code from the authenticated user
+ * Returns roll number, display name, and profile picture for all students with the same college code
  */
 export const getStudentByCollegeCode = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { collegeCode } = req.params;
+        // Get user ID from auth middleware
+        const userId = (req as any).user?.id;
 
-        // Validate college code parameter
-        if (!collegeCode) {
-            res.status(400).json({
+        if (!userId) {
+            res.status(401).json({
                 status: false,
-                message: 'College code is required.'
+                message: 'Authentication required.'
             });
             return;
         }
 
-        // Find all students by college code and select required fields including is_blocked
-        const students = await studentModel.find({
-            college_code: collegeCode
-        }).select('_id roll display_name profile_picture is_blocked');
+        // Fetch the current user to get their college code
+        const currentUser = await userModel.findById(userId);
+        if (!currentUser) {
+            res.status(404).json({
+                status: false,
+                message: 'User context not found.'
+            });
+            return;
+        }
+
+        const collegeCode = currentUser.college_code;
+
+        // Find all users of type 'student' by college code and select required fields
+        const students = await userModel.find({
+            college_code: collegeCode,
+            user_type: 'student'
+        }).select('_id id username profile_picture');
+
+        // Fetch blocked students for this college to determine isBlocked status
+        const blockedStudents = await BlockedStudentModel.find({ college_code: collegeCode })
+            .select('student_id');
+        const blockedStudentIds = new Set(blockedStudents.map(bs => bs.student_id ? bs.student_id.toString() : ''));
+
+        // Since student_id in BlockedStudentModel refers to StudentModel._id, we need to map User._id to StudentModel._id
+        // Ideally we would populate or do a lookup. 
+        // For simplicity, let's fetch all StudentProfiles for these users
+        const studentProfiles = await StudentModel.find({
+            user_id: { $in: students.map(s => s._id) }
+        }).select('user_id is_blocked');
+
+        const blockedUserIds = new Set(
+            studentProfiles
+                .filter(sp => sp.is_blocked)
+                .map(sp => sp.user_id.toString())
+        );
 
         // Map students to the desired format
         const studentData = students.map(student => ({
             id: student._id.toString(),
-            rollNumber: student.roll,
-            name: student.display_name,
+            rollNumber: student.id,
+            name: student.username,
             profilePicture: student.profile_picture || null, // Return null if empty, frontend will handle
-            isBlocked: student.is_blocked === true // Ensure boolean
+            isBlocked: blockedUserIds.has(student._id.toString())
         }));
 
         // Return student details (empty array if no students found)
@@ -260,42 +293,84 @@ export const getStudentByCollegeCode = async (req: Request, res: Response): Prom
 
 /**
  * Get blocked student details by college code
- * Returns roll number, display name, and profile picture for all blocked students in the given college
+ * Automatically determines college code from the authenticated admin user
+ * Returns roll number, display name, and profile picture for all blocked students in the same college
  */
 export const getBlockedStudentsByCollegeCode = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { collegeCode } = req.params;
+        // Get user ID from auth middleware
+        const userId = (req as any).user?.id;
 
-        // Validate college code parameter
-        if (!collegeCode) {
-            res.status(400).json({
+        if (!userId) {
+            res.status(401).json({
                 status: false,
-                message: 'College code is required.'
+                message: 'Authentication required.'
             });
             return;
         }
 
-        // Find all blocked students by college code
-        const blockedStudents = await studentModel.find({
-            college_code: collegeCode,
-            is_blocked: true
-        }).select('_id roll display_name profile_picture is_blocked');
+        // Fetch the current user to get their college code
+        const currentUser = await userModel.findById(userId);
+        if (!currentUser) {
+            res.status(404).json({
+                status: false,
+                message: 'User context not found.'
+            });
+            return;
+        }
 
-        // Map students to the desired format (same format as getStudentByCollegeCode)
-        const studentData = blockedStudents.map(student => ({
-            id: student._id.toString(),
-            rollNumber: student.roll,
-            name: student.display_name,
-            profilePicture: student.profile_picture || null,
-            isBlocked: student.is_blocked === true // Will always be true for this endpoint
-        }));
+        const collegeCode = currentUser.college_code;
+
+        // Find all student IDs that are blocked in this college from BlockedStudentModel
+        const blockedEntries = await BlockedStudentModel.find({
+            college_code: collegeCode
+        }).select('student_id reason');
+
+        if (blockedEntries.length === 0) {
+            res.status(200).json({
+                status: true,
+                message: 'No blocked students found with the provided college code.',
+                data: []
+            });
+            return;
+        }
+
+        const blockedStudentIds = blockedEntries.map(entry => entry.student_id);
+
+        // Fetch user details for these blocked students
+        // Note: BlockedStudentModel `student_id` is likely StudentModel._id, not User._id
+        // We first need to find User._ids corresponding to those StudentModel._ids
+        const studentProfiles = await StudentModel.find({
+            _id: { $in: blockedStudentIds }
+        }).select('user_id');
+
+        const userIds = studentProfiles.map(sp => sp.user_id);
+
+        const blockedUsers = await userModel.find({
+            _id: { $in: userIds },
+            user_type: 'student'
+        }).select('_id id username profile_picture');
+
+        // Map students to the desired format, including the block reason if needed
+        const studentData = blockedUsers.map(student => {
+            // Find student profile to get back to the blocked entry
+            const profile = studentProfiles.find(sp => sp.user_id.toString() === student._id.toString());
+            const blockEntry = profile ? blockedEntries.find(entry => entry.student_id.toString() === profile._id.toString()) : null;
+            
+            return {
+                id: student._id.toString(),
+                rollNumber: student.id,
+                name: student.username,
+                profilePicture: student.profile_picture || null,
+                isBlocked: true, // Known to be true because it's in BlockedStudent
+                reason: blockEntry ? blockEntry.reason : null
+            };
+        });
 
         // Return blocked student details
         res.status(200).json({
             status: true,
-            message: studentData.length > 0
-                ? 'Blocked student details retrieved successfully.'
-                : 'No blocked students found with the provided college code.',
+            message: 'Blocked student details retrieved successfully.',
             data: studentData
         });
 
@@ -326,9 +401,9 @@ export const toggleStudentBlockStatus = async (req: Request, res: Response): Pro
             return;
         }
 
-        // Find student by ID
-        const student = await studentModel.findById(studentId);
-        if (!student) {
+        // Find student by ID in userModel
+        const student = await userModel.findById(studentId);
+        if (!student || student.user_type !== 'student') {
             res.status(404).json({
                 status: false,
                 message: 'Student not found.'
@@ -336,17 +411,54 @@ export const toggleStudentBlockStatus = async (req: Request, res: Response): Pro
             return;
         }
 
+        const studentProfile = await StudentModel.findOne({ user_id: student._id });
+        if (!studentProfile) {
+            res.status(404).json({
+                status: false,
+                message: 'Student profile not found.'
+            });
+            return;
+        }
+
         // Toggle the blocked status
-        const newBlockedStatus = !student.is_blocked;
-        student.is_blocked = newBlockedStatus;
-        await student.save();
+        const isCurrentlyBlocked = studentProfile.is_blocked;
+
+        if (isCurrentlyBlocked) {
+            // Unblock logic
+            await BlockedStudentModel.findOneAndDelete({
+                college_code: student.college_code,
+                student_id: studentProfile._id
+            });
+
+            // Update models
+            studentProfile.is_blocked = false;
+        } else {
+            // Block logic
+            await BlockedStudentModel.findOneAndUpdate(
+                {
+                    college_code: student.college_code,
+                    student_id: studentProfile._id
+                },
+                {
+                    college_code: student.college_code,
+                    student_id: studentProfile._id,
+                    reason: "Manually blocked by admin" // Default reason for toggle
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+
+            // Update models
+            studentProfile.is_blocked = true;
+        }
+
+        await studentProfile.save();
 
         res.status(200).json({
             status: true,
-            message: `Student ${newBlockedStatus ? 'blocked' : 'unblocked'} successfully.`,
+            message: `Student ${!isCurrentlyBlocked ? 'blocked' : 'unblocked'} successfully.`,
             data: {
                 id: student._id.toString(),
-                isBlocked: newBlockedStatus
+                isBlocked: !isCurrentlyBlocked
             }
         });
     } catch (error) {
@@ -360,21 +472,22 @@ export const toggleStudentBlockStatus = async (req: Request, res: Response): Pro
 
 /**
  * Block multiple students
- * @param req Request with rollNumbers array in body
+ * @param req Request with students array in body
  * @param res Response with success/failure message
  */
 export const blockMultipleStudents = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { rollNumbers } = req.body;
-
-        // Validate input
-        if (!rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
+        // Validate input using Zod
+        const validation = validateBlockStudentsData(req.body);
+        if (!validation.status || !validation.data) {
             res.status(400).json({
                 status: false,
-                message: 'Roll numbers array is required and cannot be empty.'
+                message: validation.message
             });
             return;
         }
+
+        const { students } = validation.data;
 
         // Get admin details to get college code
         const adminId = (req as any).user?.id;
@@ -387,23 +500,75 @@ export const blockMultipleStudents = async (req: Request, res: Response): Promis
             return;
         }
 
-        // Block all specified students using admin's college code and roll numbers
-        const result = await studentModel.updateMany(
-            {
-                college_code: admin.college_code,
-                roll: { $in: rollNumbers }
-            },
-            { $set: { is_blocked: true } }
-        );
+        const collegeCode = admin.college_code;
+        const blockedResults = [];
+        const errors = [];
+
+        // Process each student
+        for (const studentData of students) {
+            const { rollNumber, reason } = studentData;
+
+            try {
+                // 1. Find user (student) by roll number and college code
+                const user = await userModel.findOne({
+                    id: rollNumber,
+                    college_code: collegeCode,
+                    user_type: 'student'
+                });
+
+                if (!user) {
+                    errors.push({ rollNumber, message: `Student not found in your college` });
+                    continue;
+                }
+
+                // 2. Find corresponding Student model
+                const studentProfile = await StudentModel.findOne({ user_id: user._id });
+
+                if (!studentProfile) {
+                    errors.push({ rollNumber, message: `Student profile not found` });
+                    continue;
+                }
+
+                // 3. Add entry to BlockedStudentModel and update Student model
+                // Upsert to handle re-blocking or updating reason
+                const blockedEntry = await BlockedStudentModel.findOneAndUpdate(
+                    {
+                        college_code: collegeCode,
+                        student_id: studentProfile._id
+                    },
+                    {
+                        college_code: collegeCode,
+                        student_id: studentProfile._id,
+                        reason: reason
+                    },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+
+                // Update is_blocked in Student.model
+                studentProfile.is_blocked = true;
+                await studentProfile.save();
+
+                blockedResults.push({
+                    rollNumber,
+                    studentId: studentProfile._id,
+                    reason: blockedEntry.reason
+                });
+
+            } catch (innerError) {
+                console.error(`Error blocking student ${rollNumber}:`, innerError);
+                errors.push({ rollNumber, message: 'Internal error processing block' });
+            }
+        }
 
         res.status(200).json({
             status: true,
-            message: `Successfully blocked ${result.modifiedCount} student(s).`,
+            message: `Processed ${students.length} requests. Blocked: ${blockedResults.length}, Failed: ${errors.length}`,
             data: {
-                blockedCount: result.modifiedCount,
-                totalRequested: rollNumbers.length
+                blocked: blockedResults,
+                failed: errors
             }
         });
+
     } catch (error) {
         console.error('Error blocking multiple students:', error);
         res.status(500).json({
@@ -420,16 +585,17 @@ export const blockMultipleStudents = async (req: Request, res: Response): Promis
  */
 export const unblockMultipleStudents = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { rollNumbers } = req.body;
-
-        // Validate input
-        if (!rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
+        // Validate input using Zod
+        const validation = validateUnblockStudentsData(req.body);
+        if (!validation.status || !validation.data) {
             res.status(400).json({
                 status: false,
-                message: 'Roll numbers array is required and cannot be empty.'
+                message: validation.message
             });
             return;
         }
+
+        const { rollNumbers } = validation.data;
 
         // Get admin details to get college code
         const adminId = (req as any).user?.id;
@@ -442,23 +608,67 @@ export const unblockMultipleStudents = async (req: Request, res: Response): Prom
             return;
         }
 
-        // Unblock all specified students using admin's college code and roll numbers
-        const result = await studentModel.updateMany(
-            {
-                college_code: admin.college_code,
-                roll: { $in: rollNumbers }
-            },
-            { $set: { is_blocked: false } }
-        );
+        const collegeCode = admin.college_code;
+        const unblockedResults = [];
+        const errors = [];
+
+        for (const rollNumber of rollNumbers) {
+            try {
+                // 1. Find user (student) by roll number and college code
+                const user = await userModel.findOne({
+                    id: rollNumber,
+                    college_code: collegeCode,
+                    user_type: 'student'
+                });
+
+                if (!user) {
+                    errors.push({ rollNumber, message: `Student not found in your college` });
+                    continue;
+                }
+
+                // 2. Find corresponding Student model
+                const studentProfile = await StudentModel.findOne({ user_id: user._id });
+
+                if (!studentProfile) {
+                    errors.push({ rollNumber, message: `Student profile not found` });
+                    continue;
+                }
+
+                // 3. Remove entry from BlockedStudentModel and update Student model
+                const deleteResult = await BlockedStudentModel.findOneAndDelete({
+                    college_code: collegeCode,
+                    student_id: studentProfile._id
+                });
+
+                if (deleteResult) {
+                    // Update is_blocked in Student.model
+                    studentProfile.is_blocked = false;
+                    await studentProfile.save();
+
+                    unblockedResults.push({
+                        rollNumber,
+                        studentId: studentProfile._id
+                    });
+                } else {
+                    // It's possible the student wasn't blocked, but we can consider it "unblocked" or note it
+                    errors.push({ rollNumber, message: 'Student was not in the blocked list' });
+                }
+
+            } catch (innerError) {
+                console.error(`Error unblocking student ${rollNumber}:`, innerError);
+                errors.push({ rollNumber, message: 'Internal error processing unblock' });
+            }
+        }
 
         res.status(200).json({
             status: true,
-            message: `Successfully unblocked ${result.modifiedCount} student(s).`,
+            message: `Processed ${rollNumbers.length} requests. Unblocked: ${unblockedResults.length}, Failed/Not Blocked: ${errors.length}`,
             data: {
-                unblockedCount: result.modifiedCount,
-                totalRequested: rollNumbers.length
+                unblocked: unblockedResults,
+                failed: errors
             }
         });
+
     } catch (error) {
         console.error('Error unblocking multiple students:', error);
         res.status(500).json({
@@ -469,85 +679,7 @@ export const unblockMultipleStudents = async (req: Request, res: Response): Prom
 };
 
 /**
- * Helper function to create multiple student documents in parallel
- * @param students - Array of student data
- * @param collegeCode - College code from admin
- * @returns Promise with array of student documents and passwords
- */
-const createStudentDocumentsParallel = async (
-    students: StudentData[],
-    collegeCode: string
-): Promise<Array<{ studentDoc: any; password: string; email: string; name: string; roll: string }>> => {
-    // Process all students in parallel for much better performance
-    const studentPromises = students.map(async (studentData) => {
-        // Generate random 8-character password
-        const password = generateRandomPassword();
-
-        // Hash the password
-        const passwordHash = await createHash(password);
-
-        // Generate RSA key pair for the student
-        const [privateKey, publicKey] = generateRSAKeyPair();
-
-        // Encrypt private key with user's password
-        const encryptedPrivateKey = encryptAES(privateKey, generateAESKeyFromString(password));
-
-        // Encrypt public key with server's internal key
-        const encryptedPublicKey = encryptAES(publicKey, internalAesKey);
-
-        // Create student document
-        const studentDoc = {
-            profile_picture: null,
-            roll: studentData.roll,
-            display_name: studentData.name,
-            college_code: collegeCode,
-            email_id: studentData.email,
-            password_hash: passwordHash,
-            fullname: studentData.name,
-            recovery: '', // Empty string as specified
-            private_key: encryptedPrivateKey,
-            public_key: encryptedPublicKey,
-            blocked_user: [] // Empty array as specified
-        };
-
-        return {
-            studentDoc,
-            password,
-            email: studentData.email,
-            name: studentData.name,
-            roll: studentData.roll
-        };
-    });
-
-    // Wait for all student documents to be created in parallel
-    return await Promise.all(studentPromises);
-};
-
-// Split students into batches of given size
-const splitIntoBatches = (students: StudentData[], batchSize: number): StudentData[][] => {
-    const batches: StudentData[][] = [];
-    for (let i = 0; i < students.length; i += batchSize) {
-        batches.push(students.slice(i, i + batchSize));
-    }
-    return batches;
-};
-
-// Generate random 8-character password
-const generateRandomPassword = (): string => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 8; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-};
-
-// ...previous batch-processing helper removed per request. The controller
-// will now simply decrypt and display the whole payload for inspection.
-
-/**
- * Bulk student registration controller - Currently only decrypts and displays data
- * for testing encryption/decryption flow
+ * Bulk student registration controller
  */
 export const bulkStudentRegistration = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -616,76 +748,34 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
             return;
         }
 
-        // All validations passed — process students in batches
-        const BATCH_SIZE = 100;
-        const batches = splitIntoBatches(studentsArray, BATCH_SIZE);
-        const allInserted: any[] = [];
-
+        // All validations passed — process students using the service
         try {
-            for (let b = 0; b < batches.length; b++) {
-                const batch = batches[b]!; // non-null assertion: batches created from students array
+            const results = await StudentServices.bulkCreateStudents(
+                studentsArray.map(s => ({
+                    name: s.name,
+                    roll: s.roll,
+                    email: s.email,
+                    collegeCode: collegeCode
+                })),
+                collegeCode
+            );
 
-                // 1) Prepare documents for this batch
-                const prepared = await createStudentDocumentsParallel(batch, collegeCode);
-
-                // Extract raw student documents for DB insertion
-                const docsToInsert = prepared.map(p => p.studentDoc);
-
-                // 2) Insert this batch into DB
-                let inserted: any[] = [];
-                try {
-                    inserted = await studentModel.insertMany(docsToInsert, { ordered: false });
-                    allInserted.push(...inserted);
-                } catch (insertErr) {
-                    // insertMany may throw for duplicates or other errors; capture inserted docs if any
-                    console.error(`Error inserting batch ${b}:`, insertErr);
-
-                    if ((insertErr as any).insertedDocs && Array.isArray((insertErr as any).insertedDocs)) {
-                        inserted = (insertErr as any).insertedDocs;
-                        allInserted.push(...inserted);
-                    }
-                    // Continue to sending emails for successfully inserted docs in this batch
-                }
-
-                // 3) Send credential emails for this batch in parallel for those that were inserted
-                try {
-                    const emailPromises = prepared
-                        .filter(p => inserted.find(i => i.roll === p.roll || i.email_id === p.email))
-                        .map(p => sendStudentCredentialsEmail(
-                            p.email,
-                            p.name,
-                            collegeCode,
-                            p.roll,
-                            p.password
-                        ).then(() => ({ email: p.email, status: 'sent' })).catch(err => ({ email: p.email, status: 'failed', error: err instanceof Error ? err.message : String(err) })));
-
-                    const emailResults = await Promise.allSettled(emailPromises);
-                } catch (emailErr) {
-                    console.error(`Error sending emails for batch ${b}:`, emailErr);
-                    // Continue to next batch despite email errors
-                }
-            }
-
-            // After all batches processed, return summary
+            // After all students processed, return summary
             res.status(200).json({
                 status: true,
-                message: `Bulk registration completed. Registered: ${allInserted.length} students`,
-                registered: allInserted.length,
-                failed: studentsArray.length - allInserted.length,
+                message: `Bulk registration completed. Registered: ${results.successful.length} students`,
+                registered: results.successful.length,
+                failed: results.failed.length,
                 details: {
-                    successful: allInserted.map(student => ({
-                        name: student.name,
-                        collegeCode: student.college_code,
-                        email: student.email_id
-                    })),
-                    failed: [] // Could be enhanced to track failed registrations
+                    successful: results.successful,
+                    failed: results.failed
                 }
             });
         } catch (e) {
-            console.error('Error processing batches:', e);
+            console.error('Error in bulkCreateStudents call:', e);
             res.status(500).json({
                 status: false,
-                message: 'Failed while processing student batches.',
+                message: 'Failed while processing student registrations.',
                 error: e instanceof Error ? e.message : String(e)
             });
         }
@@ -733,9 +823,9 @@ export const deleteStudent = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // Find the student to verify college code matches
-        const student = await studentModel.findById(studentId);
-        if (!student) {
+        // Find the student in userModel to verify college code matches
+        const student = await userModel.findById(studentId);
+        if (!student || student.user_type !== 'student') {
             res.status(404).json({
                 status: false,
                 message: 'Student not found.'
@@ -752,13 +842,16 @@ export const deleteStudent = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // Delete the student
-        await studentModel.findByIdAndDelete(studentId);
+        // Delete the student from both collections
+        await Promise.all([
+            userModel.findByIdAndDelete(studentId),
+            StudentModel.findOneAndDelete({ user_id: studentId })
+        ]);
 
         // Return success response
         res.status(200).json({
             status: true,
-            message: `Student ${student.display_name} (${student.roll}) has been successfully deleted.`
+            message: `Student ${student.username} (${student.id}) has been successfully deleted.`
         });
     } catch (error) {
         console.error('Error deleting student:', error);
@@ -808,11 +901,12 @@ export const deleteMultipleStudents = async (req: Request, res: Response): Promi
             return;
         }
 
-        // Find all students matching the roll numbers in this college
-        const students = await studentModel.find({
+        // Find all students matching the roll numbers in this college using userModel
+        const students = await userModel.find({
             college_code: collegeCode,
-            roll: { $in: rollNumbers }
-        }).select('_id roll display_name');
+            id: { $in: rollNumbers },
+            user_type: 'student'
+        }).select('_id id username');
 
         if (students.length === 0) {
             res.status(404).json({
@@ -825,10 +919,11 @@ export const deleteMultipleStudents = async (req: Request, res: Response): Promi
         // Extract student IDs for deletion
         const studentIds = students.map(student => student._id);
 
-        // Delete all found students
-        const deleteResult = await studentModel.deleteMany({
-            _id: { $in: studentIds }
-        });
+        // Delete all found students from both collections
+        const [deleteResult] = await Promise.all([
+            userModel.deleteMany({ _id: { $in: studentIds } }),
+            StudentModel.deleteMany({ user_id: { $in: studentIds } })
+        ]);
 
         // Return success response with simplified information about removed students
         res.status(200).json({
@@ -836,7 +931,7 @@ export const deleteMultipleStudents = async (req: Request, res: Response): Promi
             message: `Successfully removed ${deleteResult.deletedCount} student(s).`,
             removedCount: deleteResult.deletedCount,
             notFound: rollNumbers.filter(roll =>
-                !students.some(student => student.roll === roll)
+                !students.some(student => student.id === roll)
             )
         });
     } catch (error) {
