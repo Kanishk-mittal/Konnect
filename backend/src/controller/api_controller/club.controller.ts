@@ -25,77 +25,7 @@ type CreateClubPayload = {
     password: string;
 };
 
-// Club Login Controller
-export const clubLoginController = async (req: Request, res: Response): Promise<void> => {
-    try {
-        // The middleware has already decrypted the request data
-        const validation = validateClubLoginData(req.body);
-
-        if (!validation.status || !validation.data) {
-            res.status(400).json({
-                status: false,
-                message: validation.message
-            });
-            return;
-        }
-
-        const loginData = validation.data;
-
-        // Client's public key (if provided) is stored by decryptRequest middleware
-        const clientPublicKey = (req as any).clientPublicKey;
-
-        // Find user by college code and club name (which is passed as 'clubName' in login input)
-        const user = await UserModel.findOne({
-            user_type: 'club',
-            college_code: loginData.collegeCode,
-            id: loginData.clubName
-        });
-
-        if (!user) {
-            res.status(404).json({
-                status: false,
-                message: 'Club not found.'
-            });
-            return;
-        }
-
-        // Verify password
-        const isPasswordValid = await verifyHash(loginData.password, user.password_hash);
-        if (!isPasswordValid) {
-            res.status(401).json({
-                status: false,
-                message: 'Invalid password.'
-            });
-            return;
-        }
-
-        // Set JWT token (this will overwrite any existing auth_token cookie)
-        const jwtPayload = { type: 'club', id: user._id.toString() };
-        setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
-
-        // Decrypt private key from database using the provided password
-        const privateKey = decryptAES(user.private_key, generateAESKeyFromString(loginData.password));
-
-        // Return success response with sensitive data
-        // The encryptResponse middleware will automatically encrypt this if a public key is available
-        res.status(200).json({
-            status: true,
-            message: 'Login successful!',
-            data: {
-                id: user._id.toString(),
-                privateKey: privateKey
-            },
-            // Include public key in response so resolvePublicKey middleware can use it
-            publicKey: clientPublicKey
-        });
-    } catch (error) {
-        console.error('Error in club login:', error);
-        res.status(500).json({
-            status: false,
-            message: 'An unexpected error occurred.'
-        });
-    }
-};
+// Club Login Controller - Removed
 
 // Create Club Controller
 export const createClubController = async (req: Request, res: Response): Promise<void> => {
@@ -311,27 +241,7 @@ export const deleteClubController = async (req: Request, res: Response): Promise
     }
 };
 
-// Club Logout Controller
-export const clubLogoutController = async (req: Request, res: Response): Promise<void> => {
-    try {
-        // Clear the auth_token cookie
-        res.clearCookie('auth_token', {
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
-        });
-        res.status(200).json({
-            status: true,
-            message: 'Logged out successfully.'
-        });
-    } catch (error) {
-        console.error('Error during club logout:', error);
-        res.status(500).json({
-            status: false,
-            message: 'An error occurred during logout.'
-        });
-    }
-};
+// Club Logout Controller - Removed
 
 /**
  * Get all members (students) for a specific club

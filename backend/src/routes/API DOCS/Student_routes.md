@@ -4,48 +4,7 @@ This Document contains all information regarding student.routes.ts
 ## Endpoints 
 baseURL: `/api/student`
 
-### 1. /login
-Method :- `POST`
-Description :- Authenticates a student and sets a JWT cookie (`auth_token`). The request body must be encrypted.
-Note :- Requires middleware to decrypt request and optionally encrypt response.
-Input (Decrypted) :- 
-```json
-{
-    "collegeCode": "COLLEGE123",
-    "rollNumber": "2021CS101",
-    "password": "securePassword",
-    "publicKey": "student-generated-rsa-public-key"
-}
-```
-controller :- `studentLoginController`
-response (Encrypted if publicKey provided) :- 
-```json
-{
-    "privateKey": "student-private-key-from-db",
-    "studentId": "65cad..."
-}
-```
-Standard response (if no publicKey) :-
-```json
-{
-    "status": true,
-    "message": "Login successful!"
-}
-```
-
-### 2. /logout
-Method :- `POST`
-Description :- Logs out the student by clearing the `auth_token` cookie.
-controller :- `studentLogoutController`
-response :-
-```json
-{
-    "status": true,
-    "message": "Logged out successfully."
-}
-```
-
-### 3. /list
+### 1. /list
 Method :- `GET`
 Description :- Returns details for all students in the same college as the currently authenticated user.
 Note :- Requires `auth_token` cookie.
@@ -67,7 +26,7 @@ response :-
 }
 ```
 
-### 4. /blocked
+### 2. /blocked
 Method :- `GET`
 Description :- Returns details for all blocked students in the same college as the currently authenticated admin.
 Note :- Requires `auth_token` cookie and admin privileges.
@@ -90,7 +49,7 @@ response :-
 }
 ```
 
-### 5. /block-multiple
+### 3. /block-multiple
 Method :- `POST`
 Description :- Blocks multiple students by adding them to the blocked list with a reason.
 Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.
@@ -128,7 +87,7 @@ response :-
 }
 ```
 
-### 6. /unblock-multiple
+### 4. /unblock-multiple
 Method :- `POST`
 Description :- Unblocks multiple students by removing them from the blocked list.
 Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.

@@ -4,8 +4,10 @@ import { isCloudinaryConfigured, uploadAndCleanup } from '../../utils/cloudinary
 import { sendOTPEmail } from '../../utils/mailer.utils';
 import { OTP } from '../../utils/otp.utils';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
-import { validateChangePasswordData } from '../../inputSchema/user.schema';
+import { validateChangePasswordData, validateLoginData } from '../../inputSchema/user.schema';
 import { updateCryptographicFields } from '../../services/user.services';
+import { setJwtCookie } from '../../utils/jwt/jwt.utils';
+import { decryptAES, generateAESKeyFromString } from '../../utils/encryption/aes.utils';
 
 /**
  * Get profile picture for a specific user by their ID
@@ -347,6 +349,120 @@ export const changePasswordWithOTP = async (req: Request, res: Response): Promis
         res.status(500).json({
             status: false,
             message: 'An unexpected error occurred while changing password.'
+        });
+    }
+};
+
+/**
+ * Unified Login Controller
+ * Handles login for all user types (Student, Club, Admin, Faculty)
+ */
+export const loginUser = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Data might be decrypted by middleware if coming from encrypted route
+        // But unified login probably won't be using decryptRequest unless we enforce it like others
+        // For now, assume req.body has the data directly or middleware handled it
+        
+        const validation = validateLoginData(req.body);
+
+        if (!validation.status || !validation.data) {
+            res.status(400).json({
+                status: false,
+                message: validation.message
+            });
+            return;
+        }
+
+        const { id, collegeCode, password } = validation.data;
+        const clientPublicKey = (req as any).clientPublicKey; // From middleware if present
+
+        // Find user by college code and ID
+        const user = await UserModel.findOne({
+            college_code: collegeCode,
+            id: id
+        });
+
+        if (!user) {
+            res.status(404).json({
+                status: false,
+                message: 'User not found.'
+            });
+            return;
+        }
+
+        // Verify password
+        const isPasswordValid = await verifyHash(password, user.password_hash);
+        if (!isPasswordValid) {
+            res.status(401).json({
+                status: false,
+                message: 'Invalid password.'
+            });
+            return;
+        }
+
+        // Set JWT token
+        const jwtPayload = { type: user.user_type, id: user._id.toString() };
+        setJwtCookie(res, jwtPayload, 'auth_token', 30 * 24 * 60 * 60); // 1 month expiry
+
+        // Handle Private Key Decryption
+        let privateKey: string;
+        try {
+            // Decrypt private key from database using the provided password
+            privateKey = decryptAES(user.private_key, generateAESKeyFromString(password));
+        } catch (error) {
+            console.error('Error decrypting private key:', error);
+            res.status(500).json({
+                status: false,
+                message: 'Error processing security credentials.'
+            });
+            return;
+        }
+
+        // Return success response
+        // encryptResponse middleware (if used) will handle encryption of data
+        res.status(200).json({
+            status: true,
+            message: 'Login successful!',
+            data: {
+                id: user._id.toString(),
+                userType: user.user_type,
+                username: user.username,
+                email: user.email_id,
+                privateKey: privateKey
+            },
+            publicKey: clientPublicKey // For resolvePublicKey middleware
+        });
+
+    } catch (error) {
+        console.error('Error in user login:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred during login.'
+        });
+    }
+};
+
+/**
+ * Unified Logout Controller
+ * Clears the auth token cookie
+ */
+export const logoutUser = async (req: Request, res: Response): Promise<void> => {
+    try {
+        res.clearCookie('auth_token', {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+        });
+        
+        res.status(200).json({
+            status: true,
+            message: 'Logout successful.'
+        });
+    } catch (error) {
+        console.error('Error in user logout:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred during logout.'
         });
     }
 };

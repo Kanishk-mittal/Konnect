@@ -1,7 +1,5 @@
 import { Router } from 'express';
 import {
-    clubLoginController,
-    clubLogoutController,
     createClubController,
     getClubsByCollegeCodeController,
     deleteClubController,
@@ -25,12 +23,15 @@ import { Request, Response } from 'express';
 const router = Router();
 
 // Routes with encryption middleware
-router.post('/login',
-    decryptRequest,        // Decrypt incoming encrypted request
-    clubLoginController,   // Controller logic
-    resolvePublicKey,      // Resolve public key for response encryption
-    encryptResponse        // Encrypt sensitive response data
-);
+// router.post('/login',
+//     decryptRequest,        // Decrypt incoming encrypted request
+//     clubLoginController,   // Controller logic
+//     resolvePublicKey,      // Resolve public key for response encryption
+//     encryptResponse        // Encrypt sensitive response data
+// );
+//    resolvePublicKey,      // Resolve public key for response encryption
+//    encryptResponse        // Encrypt sensitive response data
+// );
 
 // Create club route (requires admin authentication)
 router.post('/create',
@@ -50,7 +51,7 @@ router.delete('/delete/:clubId',
 );
 
 // Logout endpoint to clear JWT cookie
-router.post('/logout', clubLogoutController);
+// router.post('/logout', clubLogoutController);
 
 
 // Get club members (requires club authentication)

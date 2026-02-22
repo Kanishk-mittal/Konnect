@@ -30,3 +30,30 @@ export const validateChangePasswordData = (data: unknown): { status: boolean; me
     }
     return { status: true, message: 'Validation successful', data: result.data };
 };
+
+/**
+ * Schema for user login
+ */
+const loginSchema = z.object({
+    id: z.string().min(1, 'Login ID is required'),
+    password: z.string().min(1, 'Password is required'),
+    collegeCode: z.string().min(1, 'College Code is required')
+});
+
+/**
+ * Type inferred from the schema
+ */
+export type LoginData = z.infer<typeof loginSchema>;
+
+/**
+ * Utility function to validate login data
+ */
+export const validateLoginData = (data: unknown): { status: boolean; message: string; data?: LoginData } => {
+    const result = loginSchema.safeParse(data);
+    if (!result.success) {
+        // Collect all error messages
+        const errorDetails = result.error.issues.map(issue => issue.message).join(', ');
+        return { status: false, message: errorDetails || 'Invalid input.' };
+    }
+    return { status: true, message: 'Validation successful', data: result.data };
+};

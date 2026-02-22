@@ -5,10 +5,13 @@ import {
     getMyDetails,
     updateProfilePicture,
     requestPasswordChangeOTP,
-    changePasswordWithOTP
+    changePasswordWithOTP,
+    loginUser,
+    logoutUser
 } from '../controller/api_controller/user.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { decryptRequest } from '../middleware/encryption.middleware';
+import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
 
 const router = Router();
@@ -39,5 +42,16 @@ router.post('/password/change',
     decryptRequest,
     changePasswordWithOTP
 );
+
+// Unified Login Route (encrypted request/response)
+router.post('/login', 
+    decryptRequest, 
+    loginUser, 
+    resolvePublicKey, 
+    encryptResponse
+);
+
+// Unified Logout Route
+router.post('/logout', logoutUser);
 
 export default router;

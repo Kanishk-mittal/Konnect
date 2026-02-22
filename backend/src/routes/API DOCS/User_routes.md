@@ -112,3 +112,43 @@ response :-
     }
 }
 ```
+
+### 7. /login
+Method :- `POST`
+Description :- Authenticates a user (Student, Club, Admin, or Faculty).
+Note :- The request body must be encrypted. Returns JWT `auth_token` cookie and encrypted credentials.
+Input :-
+```json
+{
+    "id": "rollNumber_or_email",
+    "password": "userPassword",
+    "collegeCode": "COLLEGE_CODE"
+}
+```
+controller :- `loginUser`
+response :- 
+```json
+{
+    "status": true,
+    "message": "Login successful!",
+    "data": {
+        "id": "65cad...",
+        "userType": "student",
+        "username": "JohnDoe",
+        "email": "john@example.com",
+        "privateKey": "decrypted_private_key_pem..."
+    }
+}
+```
+
+### 8. /logout
+Method :- `POST`
+Description :- Logs out the current user by clearing the `auth_token` cookie.
+controller :- `logoutUser`
+response :-
+```json
+{
+    "status": true,
+    "message": "Logout successful."
+}
+```
