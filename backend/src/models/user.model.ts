@@ -1,9 +1,24 @@
-import { Schema, Types, model } from 'mongoose';
+import { Schema, Types, model, Document } from 'mongoose';
 
-const userSchema = new Schema({
+export interface IUser extends Document {
+    user_type: 'admin' | 'student' | 'club' | 'faculty';
+    id: string; // The user's ID
+    college_code: string;
+    email_id: string;
+    profile_picture: string | null;
+    username: string;
+    blocked_users?: Types.ObjectId[];
+    password_hash: string;
+    recovery_password: string;
+    private_key: string;
+    public_key: string;
+    recovery_key_hash: string;
+}
+
+const userSchema = new Schema<IUser>({
     // identification fields
     user_type: { type: String, enum: ['admin', 'student', 'club', 'faculty'], required: true },
-    id: { type: String, required: true, unique: true },
+    id: { type: String, required: true },
     college_code: { type: String, required: true },
 
     // personal information
@@ -27,7 +42,7 @@ const userSchema = new Schema({
 
 userSchema.index({ id: 1, college_code: 1 }, { unique: true });
 
-export default model('User', userSchema);
+export default model<IUser>('User', userSchema);
 
 export type UserDocument = {
     _id: Types.ObjectId;

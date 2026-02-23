@@ -1,16 +1,22 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Types, Document } from 'mongoose';
 
-const adminSchema = new Schema({
+export interface IAdmin extends Document {
+  user_id: Types.ObjectId;
+  is_root_admin: boolean;
+  created_by?: Types.ObjectId;
+}
+
+const adminSchema = new Schema<IAdmin>({
   user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   is_root_admin: { type: Boolean, default: false },
-  created_by: { type: Schema.Types.ObjectId, ref: 'Admin'},
+  created_by: { type: Schema.Types.ObjectId, ref: 'Admin' },
 },
   {
     timestamps: true,
   }
 );
 
-export default model('Admin', adminSchema);
+export default model<IAdmin>('Admin', adminSchema);
 
 export type AdminDocument = {
   user_id: string;

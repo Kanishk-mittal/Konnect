@@ -1,13 +1,20 @@
-import { Schema, model, Types } from 'mongoose';
+import { Schema, model, Types, Document } from 'mongoose';
 
-const studentSchema = new Schema({
-  user_id: { type: Types.ObjectId, required: true, ref: 'User' }, 
+export interface IStudent extends Document {
+  user_id: Types.ObjectId;
+  fullname: string;
+  blocked_user?: Types.ObjectId[];
+  is_blocked?: boolean;
+}
+
+const studentSchema = new Schema<IStudent>({
+  user_id: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
   fullname: { type: String, required: true },
-  blocked_user: [{ type: Types.ObjectId, ref: 'User' }],
+  blocked_user: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   is_blocked: { type: Boolean, default: false },
 });
 
-export default model('Student', studentSchema);
+export default model<IStudent>('Student', studentSchema);
 
 export type StudentDocument = {
   user_id: string;
