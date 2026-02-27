@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { generateAESKeyFromString, decryptAES } from '../../utils/encryption/aes.utils';
 import ClubModel from '../../models/club.model';
@@ -499,7 +500,7 @@ export const addClubMembersController = async (req: Request, res: Response): Pro
             return;
         }
 
-        const clubId = club._id;
+        const clubId = club._id as Types.ObjectId;
 
         // Validate each member using the service
         const { validMembers, validationErrors } = await validateClubMembers(members, collegeCode, clubId);
