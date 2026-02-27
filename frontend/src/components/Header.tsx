@@ -2,9 +2,7 @@ import Title from "./Title"
 import Logo from "../assets/Logo.png"
 import ProfileIcon from "../assets/profile_icon.png"
 import ThemeButton from "./ThemeButton"
-import EditAdminProfileModal from "./EditAdminProfileModal"
-import EditStudentProfileModal from "./EditStudentProfileModal"
-import EditClubProfileModal from "./EditClubProfileModal"
+import EditProfileModal from "./EditProfileModal"
 import { postData } from "../api/requests"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
@@ -27,7 +25,6 @@ const Header = () => {
     const [loading, setLoading] = useState(false)
     const [showTooltip, setShowTooltip] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
-    const [userStatus, setUserStatus] = useState<'Student' | 'Club' | 'Admin' | 'logged out'>('logged out')
     const tooltipRef = useRef<HTMLDivElement>(null)
 
     // Check if we're on a login page
@@ -42,19 +39,9 @@ const Header = () => {
 
         setLoading(true)
         try {
-            // First, get the user status
-            const statusResponse = await getData('/general/status')
-            if (statusResponse.status && statusResponse.userStatus) {
-                setUserStatus(statusResponse.userStatus)
-
-                // Then fetch profile picture based on user type
-                const userType = statusResponse.userStatus.toLowerCase()
-                if (userType !== 'logged out') {
-                    const response = await getData(`/${userType}/profile/picture/${userId}`)
-                    if (response.status) {
-                        setProfilePicture(response.profilePicture)
-                    }
-                }
+            const response = await getData(`/user/profile-picture/${userId}`)
+            if (response.status) {
+                setProfilePicture(response.profilePicture)
             }
         } catch (error) {
             // Error fetching profile picture or status
@@ -68,10 +55,6 @@ const Header = () => {
         fetchProfilePicture()
     }, [isAuthenticated, userId, isLoginPage])
 
-    const handleProfileUpdate = () => {
-        // Refresh profile picture after update
-        fetchProfilePicture()
-    }
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
@@ -95,11 +78,7 @@ const Header = () => {
     }
 
     const handleLogout = () => {
-        // Determine logout endpoint based on user type
-        const logoutEndpoint = userStatus === 'logged out' ? '/admin/logout' : `/${userStatus.toLowerCase()}/logout`
-
-        // Call backend to clear JWT token using postData helper
-        postData(logoutEndpoint, {})
+        postData('/user/logout', {})
             .finally(() => {
                 // Always clear Redux state and navigate even if logout fails
                 navigate('/');
@@ -164,29 +143,12 @@ const Header = () => {
                 </div>
             </div>
 
-            {/* Edit Profile Modals - Conditionally render based on user type */}
-            {isAuthenticated && userId && userStatus === 'Admin' && (
-                <EditAdminProfileModal
+            {isAuthenticated && userId && (
+                <EditProfileModal
                     isOpen={showEditModal}
                     onClose={() => setShowEditModal(false)}
                     userId={userId}
-                    onProfileUpdate={handleProfileUpdate}
-                />
-            )}
-            {isAuthenticated && userId && userStatus === 'Student' && (
-                <EditStudentProfileModal
-                    isOpen={showEditModal}
-                    onClose={() => setShowEditModal(false)}
-                    userId={userId}
-                    onProfileUpdate={handleProfileUpdate}
-                />
-            )}
-            {isAuthenticated && userId && userStatus === 'Club' && (
-                <EditClubProfileModal
-                    isOpen={showEditModal}
-                    onClose={() => setShowEditModal(false)}
-                    userId={userId}
-                    onProfileUpdate={handleProfileUpdate}
+                    onProfileUpdate={fetchProfilePicture}
                 />
             )}
         </header>

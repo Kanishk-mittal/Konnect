@@ -214,6 +214,62 @@ export const updateProfilePicture = async (req: Request, res: Response): Promise
 };
 
 /**
+ * Update current user's username
+ * Requires authentication only - no encryption needed
+ */
+export const updateUsername = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        const { username } = req.body;
+
+        if (!username || typeof username !== 'string' || !username.trim()) {
+            res.status(400).json({
+                status: false,
+                message: 'Username is required.'
+            });
+            return;
+        }
+
+        const updatedUser = await UserModel.findByIdAndUpdate(
+            userId,
+            { username: username.trim() },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            res.status(404).json({
+                status: false,
+                message: 'User not found.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Username updated successfully.',
+            data: {
+                username: updatedUser.username
+            }
+        });
+    } catch (error) {
+        console.error('Error updating username:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating username.'
+        });
+    }
+};
+
+/**
  * Request OTP for password change
  * Requires authentication - sends OTP to user's registered email
  */
@@ -362,7 +418,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
         // Data might be decrypted by middleware if coming from encrypted route
         // But unified login probably won't be using decryptRequest unless we enforce it like others
         // For now, assume req.body has the data directly or middleware handled it
-        
+
         const validation = validateLoginData(req.body);
 
         if (!validation.status || !validation.data) {
@@ -453,7 +509,7 @@ export const logoutUser = async (req: Request, res: Response): Promise<void> => 
             sameSite: 'lax',
             secure: process.env.NODE_ENV === 'production',
         });
-        
+
         res.status(200).json({
             status: true,
             message: 'Logout successful.'

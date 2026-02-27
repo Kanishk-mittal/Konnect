@@ -152,3 +152,25 @@ response :-
     "message": "Logout successful."
 }
 ```
+
+### 9. /profile/username
+Method :- `POST`
+Description :- Updates the username for the currently authenticated user. No encryption required.
+Note :- Requires `auth_token` cookie.
+Input :-
+```json
+{
+    "username": "newUsername"
+}
+```
+controller :- `updateUsername`
+response :-
+```json
+{
+    "status": true,
+    "message": "Username updated successfully.",
+    "data": {
+        "username": "newUsername"
+    }
+}
+```

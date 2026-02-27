@@ -4,6 +4,7 @@ import {
     getUserDetails,
     getMyDetails,
     updateProfilePicture,
+    updateUsername,
     requestPasswordChangeOTP,
     changePasswordWithOTP,
     loginUser,
@@ -33,6 +34,9 @@ router.post('/profile-picture',
     updateProfilePicture                // Controller
 );
 
+// Route to update username (authenticated, no encryption)
+router.post('/profile/username', authMiddleware, updateUsername);
+
 // Route to request password change OTP (authenticated)
 router.get('/password/request-otp', authMiddleware, requestPasswordChangeOTP);
 
@@ -44,10 +48,10 @@ router.post('/password/change',
 );
 
 // Unified Login Route (encrypted request/response)
-router.post('/login', 
-    decryptRequest, 
-    loginUser, 
-    resolvePublicKey, 
+router.post('/login',
+    decryptRequest,
+    loginUser,
+    resolvePublicKey,
     encryptResponse
 );
 
