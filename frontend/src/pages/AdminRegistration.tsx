@@ -67,19 +67,22 @@ const AdminRegistration = () => {
       if (response && response.status === true) {
         setSuccessMessage(response.message || 'Registration successful!');
 
-        // Save to Redux store (primary storage)
-        if (response.privateKey && response.id) {
-          dispatch(setPrivateKey(response.privateKey));
-          dispatch(setUserId(response.id));
+        // Sensitive data is nested inside response.data by the backend
+        const { privateKey, id, recoveryKey: resRecoveryKey } = response.data || {};
+
+        if (privateKey && id) {
+          // Save to Redux store (primary storage)
+          dispatch(setPrivateKey(privateKey));
+          dispatch(setUserId(id));
           dispatch(setUserType('admin'));
           dispatch(setEmail(formData.emailId));
 
           // Save to localStorage as backup
-          await savePrivateKey(response.privateKey, 'admin', response.id);
+          await savePrivateKey(privateKey, 'admin', id);
 
           // Set recovery key for popup if available
-          if (response.recoveryKey) {
-            setRecoveryKey(response.recoveryKey);
+          if (resRecoveryKey) {
+            setRecoveryKey(resRecoveryKey);
           }
 
           dispatch(setAuthenticated(true));

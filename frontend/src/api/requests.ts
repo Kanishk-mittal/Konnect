@@ -31,7 +31,11 @@ const getServerPublicKey = async (): Promise<{ publicKey: string; keyId: string 
 };
 
 /**
- * Decrypts a server response using client's private key
+ * Decrypts a server response using client's private key.
+ * 
+ * The backend's encryptResponse middleware encrypts the entire response JSON
+ * into a single AES-encrypted `data` field, with the AES key RSA-encrypted in `key`.
+ * This function reverses that process and returns the original parsed response object.
  */
 const decryptServerResponse = (encryptedResponse: any, clientPrivateKey: string): any => {
     try {
@@ -44,7 +48,19 @@ const decryptServerResponse = (encryptedResponse: any, clientPrivateKey: string)
         // Decrypt the AES key using client's private key
         const aesKey = decryptRSA(encryptedResponse.key, clientPrivateKey);
 
-        // Decrypt each field in the response (except 'key' and 'keyId')
+        // The server encrypts the entire response JSON into the 'data' field.
+        // Decrypt it and parse back to an object.
+        if (encryptedResponse.data && typeof encryptedResponse.data === 'string') {
+            const decryptedString = decryptAES(encryptedResponse.data, aesKey);
+            try {
+                return JSON.parse(decryptedString);
+            } catch {
+                // If JSON parsing fails, return the raw string wrapped in an object
+                return { data: decryptedString };
+            }
+        }
+
+        // Fallback: decrypt individual fields (for non-standard encrypted responses)
         const decryptedResponse: any = {};
 
         for (const [key, value] of Object.entries(encryptedResponse)) {
@@ -56,7 +72,12 @@ const decryptServerResponse = (encryptedResponse: any, clientPrivateKey: string)
             if (typeof value === 'string' && value.includes(':')) {
                 // This looks like encrypted data, try to decrypt it
                 try {
-                    decryptedResponse[key] = decryptAES(value, aesKey);
+                    const decrypted = decryptAES(value, aesKey);
+                    try {
+                        decryptedResponse[key] = JSON.parse(decrypted);
+                    } catch {
+                        decryptedResponse[key] = decrypted;
+                    }
                 } catch {
                     // If decryption fails, keep original value
                     decryptedResponse[key] = value;
