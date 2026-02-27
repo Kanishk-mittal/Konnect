@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { groupImageUpload } from '../../utils/multer.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
 import ChatGroupModel from '../../models/chatGroup.model';
@@ -111,10 +112,11 @@ export const createGroupController = async (req: Request, res: Response): Promis
                 created_by: creatorId
             });
 
-            const membersAdded = await createMemberships(annDoc._id.toString(), true);
+            const annId = annDoc._id as Types.ObjectId;
+            const membersAdded = await createMemberships(annId.toString(), true);
 
             results.push({
-                id: annDoc._id.toString(),
+                id: annId.toString(),
                 type: 'announcement',
                 name: annDoc.name,
                 description: annDoc.description,
@@ -134,10 +136,11 @@ export const createGroupController = async (req: Request, res: Response): Promis
                 created_by: creatorId
             });
 
-            const membersAdded = await createMemberships(chatDoc._id.toString(), false);
+            const chatId = chatDoc._id as Types.ObjectId;
+            const membersAdded = await createMemberships(chatId.toString(), false);
 
             results.push({
-                id: chatDoc._id.toString(),
+                id: chatId.toString(),
                 type: 'chat',
                 name: chatDoc.name,
                 description: chatDoc.description,
@@ -215,7 +218,7 @@ export const getUserGroupsController = async (req: Request, res: Response): Prom
             icon: group.icon || null,
             type: 'chat',
             memberCount: chatMemberCountMap.get(group._id.toString()) || 0,
-            createdAt: group.createdAt
+            createdAt: (group as any).createdAt
         }));
 
         const formattedAnnouncementGroups = announcementGroups.map(group => ({
@@ -225,7 +228,7 @@ export const getUserGroupsController = async (req: Request, res: Response): Prom
             icon: group.icon || null,
             type: 'announcement',
             memberCount: announcementMemberCountMap.get(group._id.toString()) || 0,
-            createdAt: group.createdAt
+            createdAt: (group as any).createdAt
         }));
 
         const allGroups = [...formattedChatGroups, ...formattedAnnouncementGroups]
