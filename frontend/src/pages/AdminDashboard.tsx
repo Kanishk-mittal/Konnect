@@ -86,15 +86,7 @@ const AdminDashboard = () => {
       }
 
       try {
-        let response;
-
-        if (userId) {
-          // If userId is available, use the existing endpoint
-          response = await getData(`/admin/details/${userId}`);
-        } else {
-          // If userId is not available, get admin details from JWT
-          response = await getData(`/admin/details`);
-        }
+        const response = await getData(`/user/details`);
 
         if (response.status) {
           // Store admin details in Redux
@@ -104,7 +96,7 @@ const AdminDashboard = () => {
             collegeCode: response.data.collegeCode
           }));
 
-          // If userId wasn't available but we got it from JWT, store it too
+          // Store userId from response if not already in Redux
           if (!userId && response.data.userId) {
             dispatch(setUserId(response.data.userId));
           }
@@ -126,7 +118,7 @@ const AdminDashboard = () => {
 
       setStudentsLoading(true);
       try {
-        const response = await getData(`/student/details/${adminDetails.collegeCode}`);
+        const response = await getData(`/student/list`);
         if (response.status) {
           setStudents(response.data);
         }
@@ -143,7 +135,7 @@ const AdminDashboard = () => {
 
       setBlockedStudentsLoading(true);
       try {
-        const response = await getData(`/student/blocked/${adminDetails.collegeCode}`);
+        const response = await getData(`/student/blocked`);
         if (response.status) {
           setBlockedStudents(response.data);
         }
@@ -160,7 +152,7 @@ const AdminDashboard = () => {
 
       setGroupsLoading(true);
       try {
-        const response = await getData(`/groups/${adminDetails.collegeCode}`);
+        const response = await getData(`/groups/`);
         if (response.status) {
           setGroups(response.data);
         }
@@ -224,7 +216,7 @@ const AdminDashboard = () => {
       background: backgroundGradient
     }}>
       <div style={headerBackground}>
-        <Header editProfileUrl="/admin/edit-profile" />
+        <Header />
       </div>
 
       {loading ? (
