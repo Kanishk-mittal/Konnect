@@ -5,7 +5,7 @@
  */
 export const getAdminId = async (userId: string): Promise<string | null> => {
     const admin = await AdminModel.findOne({ user_id: userId }).select('_id');
-    return admin ? admin._id.toString() : null;
+    return admin ? (admin._id as any).toString() : null;
 };
 
 import UserModel from '../models/user.model';
@@ -21,7 +21,7 @@ export type RootAdminInput = {
 
 export type NormalAdminInput = {
     adminUsername: string;
-    collegeCode: string; // The ObjectId of the college
+    collegeCode: string;
     emailId: string;
     password: string;
     createdBy: string;

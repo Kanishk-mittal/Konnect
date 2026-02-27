@@ -164,22 +164,22 @@ export const getStudentByCollegeCode = async (req: Request, res: Response): Prom
         // Ideally we would populate or do a lookup. 
         // For simplicity, let's fetch all StudentProfiles for these users
         const studentProfiles = await StudentModel.find({
-            user_id: { $in: students.map(s => s._id) }
+            user_id: { $in: students.map(s => (s._id as any)) }
         }).select('user_id is_blocked');
 
         const blockedUserIds = new Set(
             studentProfiles
                 .filter(sp => sp.is_blocked)
-                .map(sp => sp.user_id.toString())
+                .map(sp => (sp.user_id as any).toString())
         );
 
         // Map students to the desired format
         const studentData = students.map(student => ({
-            id: student._id.toString(),
+            id: (student._id as any).toString(),
             rollNumber: student.id,
             name: student.username,
             profilePicture: student.profile_picture || null, // Return null if empty, frontend will handle
-            isBlocked: blockedUserIds.has(student._id.toString())
+            isBlocked: blockedUserIds.has((student._id as any).toString())
         }));
 
         // Return student details (empty array if no students found)
@@ -265,7 +265,7 @@ export const getBlockedStudentsByCollegeCode = async (req: Request, res: Respons
             // Find student profile to get back to the blocked entry
             const profile = studentProfiles.find(sp => sp.user_id.toString() === student._id.toString());
             const blockEntry = profile ? blockedEntries.find(entry => entry.student_id.toString() === profile._id.toString()) : null;
-            
+
             return {
                 id: student._id.toString(),
                 rollNumber: student.id,
@@ -400,8 +400,8 @@ export const blockMultipleStudents = async (req: Request, res: Response): Promis
 
         // Get admin details to get college code
         const adminId = (req as any).user?.id;
-        const admin = await AdminModel.findById(adminId);
-        if (!admin) {
+        const adminUser = await userModel.findById(adminId);
+        if (!adminUser || adminUser.user_type !== 'admin') {
             res.status(403).json({
                 status: false,
                 message: 'Admin not found.'
@@ -409,7 +409,7 @@ export const blockMultipleStudents = async (req: Request, res: Response): Promis
             return;
         }
 
-        const collegeCode = admin.college_code;
+        const collegeCode = adminUser.college_code;
         const blockedResults = [];
         const errors = [];
 
@@ -508,8 +508,8 @@ export const unblockMultipleStudents = async (req: Request, res: Response): Prom
 
         // Get admin details to get college code
         const adminId = (req as any).user?.id;
-        const admin = await AdminModel.findById(adminId);
-        if (!admin) {
+        const adminUser = await userModel.findById(adminId);
+        if (!adminUser || adminUser.user_type !== 'admin') {
             res.status(403).json({
                 status: false,
                 message: 'Admin not found.'
@@ -517,7 +517,7 @@ export const unblockMultipleStudents = async (req: Request, res: Response): Prom
             return;
         }
 
-        const collegeCode = admin.college_code;
+        const collegeCode = adminUser.college_code;
         const unblockedResults = [];
         const errors = [];
 
@@ -637,7 +637,12 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
                 res.status(404).json({ status: false, message: 'Admin not found.' });
                 return;
             }
-            collegeCode = admin.college_code;
+            const adminUserRecord = await userModel.findById(admin.user_id);
+            if (!adminUserRecord) {
+                res.status(404).json({ status: false, message: 'Admin user record not found.' });
+                return;
+            }
+            collegeCode = adminUserRecord.college_code;
         } catch (e) {
             console.error('Error fetching admin for duplicate check:', e);
             res.status(500).json({ status: false, message: 'Failed to validate admin.' });
@@ -659,29 +664,22 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
 
         // All validations passed — process students using the service
         try {
-            const results = await StudentServices.bulkCreateStudents(
-                studentsArray.map(s => ({
-                    name: s.name,
-                    roll: s.roll,
-                    email: s.email,
-                    collegeCode: collegeCode
-                })),
-                collegeCode
+            const results = await StudentServices.StudentService.bulkRegisterStudents(
+                studentsArray,
+                adminId
             );
 
             // After all students processed, return summary
             res.status(200).json({
-                status: true,
-                message: `Bulk registration completed. Registered: ${results.successful.length} students`,
-                registered: results.successful.length,
-                failed: results.failed.length,
-                details: {
-                    successful: results.successful,
-                    failed: results.failed
-                }
+                status: results.success,
+                message: `Bulk registration completed. Registered: ${results.studentsRegistered} students`,
+                registered: results.studentsRegistered,
+                emailsSent: results.emailsSent,
+                emailsFailed: results.emailsFailed,
+                errors: results.errors
             });
         } catch (e) {
-            console.error('Error in bulkCreateStudents call:', e);
+            console.error('Error in bulkRegisterStudents call:', e);
             res.status(500).json({
                 status: false,
                 message: 'Failed while processing student registrations.',
@@ -723,8 +721,8 @@ export const deleteStudent = async (req: Request, res: Response): Promise<void> 
 
         // Get admin college code to ensure they only delete students from their college
         const adminId = (req as any).user?.id;
-        const admin = await AdminModel.findById(adminId);
-        if (!admin) {
+        const adminUser = await userModel.findById(adminId);
+        if (!adminUser || adminUser.user_type !== 'admin') {
             res.status(403).json({
                 status: false,
                 message: 'Admin not found.'
@@ -743,7 +741,7 @@ export const deleteStudent = async (req: Request, res: Response): Promise<void> 
         }
 
         // Verify student belongs to admin's college
-        if (student.college_code !== admin.college_code) {
+        if (student.college_code !== adminUser.college_code) {
             res.status(403).json({
                 status: false,
                 message: 'You do not have permission to delete students from other colleges.'
@@ -801,8 +799,17 @@ export const deleteMultipleStudents = async (req: Request, res: Response): Promi
             return;
         }
 
+        const adminUserRecord = await userModel.findById(admin.user_id);
+        if (!adminUserRecord) {
+            res.status(404).json({
+                status: false,
+                message: 'Admin user record not found.'
+            });
+            return;
+        }
+
         // Verify the college code matches the admin's college code
-        if (collegeCode !== admin.college_code) {
+        if (collegeCode !== adminUserRecord.college_code) {
             res.status(403).json({
                 status: false,
                 message: 'You do not have permission to delete students from other colleges.'

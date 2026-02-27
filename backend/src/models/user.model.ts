@@ -1,6 +1,7 @@
 import { Schema, Types, model, Document } from 'mongoose';
 
 export interface IUser extends Document {
+    _id: Types.ObjectId;
     user_type: 'admin' | 'student' | 'club' | 'faculty';
     id: string; // The user's ID
     college_code: string;

@@ -1,6 +1,7 @@
 import { Schema, model, Types, Document } from 'mongoose';
 
 export interface IStudent extends Document {
+  _id: Types.ObjectId;
   user_id: Types.ObjectId;
   fullname: string;
   blocked_user?: Types.ObjectId[];
