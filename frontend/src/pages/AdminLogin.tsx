@@ -25,7 +25,7 @@ const AdminLogin = () => {
 
   const [formData, setFormData] = useState({
     collegeCode: '',
-    username: '',
+    emailId: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -47,16 +47,16 @@ const AdminLogin = () => {
       // Clear Redux state
       dispatch(clearAuth());
 
-      // Create the data object to send
+      // Create the data object to send (unified login uses 'id' field)
       const dataToSend = {
         collegeCode: formData.collegeCode,
-        username: formData.username,
+        id: formData.emailId,
         password: formData.password,
       };
 
       // Use postEncryptedData to handle encryption automatically
       const response = await postEncryptedData(
-        '/admin/login',
+        '/user/login',
         dataToSend,
         { expectEncryptedResponse: true }
       );
@@ -65,14 +65,17 @@ const AdminLogin = () => {
         setSuccessMessage(response.message || 'Login successful!');
 
         // The response is already decrypted by postEncryptedData
-        if (response.privateKey && response.id) {
+        // Sensitive data is nested inside response.data by the backend
+        const { privateKey, id, userType } = response.data || {};
+
+        if (privateKey && id) {
           // Save to Redux store (primary storage)
-          dispatch(setPrivateKey(response.privateKey));
-          dispatch(setUserId(response.id));
-          dispatch(setUserType('admin'));
+          dispatch(setPrivateKey(privateKey));
+          dispatch(setUserId(id));
+          dispatch(setUserType(userType || 'admin'));
 
           // Save to localStorage as backup
-          await savePrivateKey(response.privateKey, 'admin', response.id);
+          await savePrivateKey(privateKey, 'admin', id);
         }
 
         dispatch(setAuthenticated(true));
@@ -138,9 +141,9 @@ const AdminLogin = () => {
                 width={100}
                 state={formData}
                 setState={setFormData}
-                keyName="username"
-                label="Username"
-                type="text"
+                keyName="emailId"
+                label="Email ID"
+                type="email"
               />
               <InputComponent
                 width={100}
