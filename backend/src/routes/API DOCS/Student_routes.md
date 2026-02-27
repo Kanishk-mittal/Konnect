@@ -49,7 +49,41 @@ response :-
 }
 ```
 
-### 3. /block-multiple
+### 3. /addMultiple
+Method :- `POST`
+Description :- Registers multiple students in bulk under the authenticated admin's college. Validates data, checks for duplicates, and sends registration emails.
+Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body. Response is encrypted.
+Input (Decrypted) :-
+```json
+{
+    "students": [
+        {
+            "name": "John Doe",
+            "roll": "2021CS101",
+            "email": "john@example.com"
+        },
+        {
+            "name": "Jane Doe",
+            "roll": "2021CS102",
+            "email": "jane@example.com"
+        }
+    ]
+}
+```
+controller :- `bulkStudentRegistration`
+response (Encrypted) :-
+```json
+{
+    "status": true,
+    "message": "Bulk registration completed. Registered: 2 students",
+    "registered": 2,
+    "emailsSent": 2,
+    "emailsFailed": 0,
+    "errors": []
+}
+```
+
+### 4. /block-multiple
 Method :- `POST`
 Description :- Blocks multiple students by adding them to the blocked list with a reason.
 Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.
@@ -87,7 +121,7 @@ response :-
 }
 ```
 
-### 4. /unblock-multiple
+### 5. /unblock-multiple
 Method :- `POST`
 Description :- Unblocks multiple students by removing them from the blocked list.
 Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.

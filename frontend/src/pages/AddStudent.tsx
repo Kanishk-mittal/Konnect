@@ -84,7 +84,7 @@ const AddStudent = () => {
         const response = await postEncryptedData(
           '/student/addMultiple',
           { students: studentsForBackend },
-          { expectEncryptedResponse: false }
+          { expectEncryptedResponse: true }
         );
 
         if (response && response.status === true) {
@@ -107,7 +107,7 @@ const AddStudent = () => {
             const response = await postEncryptedData(
               '/student/addMultiple',
               { students: batch },
-              { expectEncryptedResponse: false }
+              { expectEncryptedResponse: true }
             );
 
             return {
@@ -115,7 +115,7 @@ const AddStudent = () => {
               batchSize: batch.length,
               success: response?.status === true,
               message: response?.message,
-              insertedCount: response?.insertedCount || 0
+              registered: response?.registered || 0
             };
           } catch (error: any) {
             return {
@@ -141,7 +141,7 @@ const AddStudent = () => {
             const batchResult = result.value;
             if (batchResult.success) {
               successfulBatches++;
-              totalSuccessful += batchResult.insertedCount || batchResult.batchSize;
+              totalSuccessful += batchResult.registered || batchResult.batchSize;
             } else {
               totalFailed += batchResult.batchSize;
               errorMessages.push(`Batch ${index + 1}: ${batchResult.message || batchResult.error}`);
@@ -187,7 +187,7 @@ const AddStudent = () => {
     <div className="flex flex-col" style={{ background: backgroundGradient }}>
       {/* Header */}
       <div style={headerBackground}>
-        <Header editProfileUrl="/admin/edit-profile" />
+        <Header />
       </div>
       {/* Main Content */}
       <div className="flex-grow flex flex-col p-6">
@@ -203,8 +203,8 @@ const AddStudent = () => {
         {/* Message Display */}
         {(errorMessage || successMessage) && (
           <div className={`p-4 rounded-lg text-center font-medium mb-4 ${errorMessage
-              ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
-              : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
+            ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
+            : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
             }`}>
             {errorMessage || successMessage}
           </div>

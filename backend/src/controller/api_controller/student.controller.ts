@@ -623,69 +623,36 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
             return;
         }
 
-        // Retrieve admin college code from authenticated user to check DB duplicates
+        // Get admin user_id from token
         const adminId = (req as any).user?.id;
         if (!adminId) {
             res.status(401).json({ status: false, message: 'Admin authentication required.' });
             return;
         }
 
-        let collegeCode: string;
-        try {
-            const admin = await AdminModel.findById(adminId);
-            if (!admin) {
-                res.status(404).json({ status: false, message: 'Admin not found.' });
-                return;
-            }
-            const adminUserRecord = await userModel.findById(admin.user_id);
-            if (!adminUserRecord) {
-                res.status(404).json({ status: false, message: 'Admin user record not found.' });
-                return;
-            }
-            collegeCode = adminUserRecord.college_code;
-        } catch (e) {
-            console.error('Error fetching admin for duplicate check:', e);
-            res.status(500).json({ status: false, message: 'Failed to validate admin.' });
-            return;
-        }
+        // Delegate all further processing (college lookup, duplicate check, creation, emails) to service
+        const results = await StudentServices.StudentService.bulkRegisterStudents(
+            studentsArray,
+            adminId
+        );
 
-        // Check for duplicates using existing function
-        try {
-            const duplicateErrors = await checkForDuplicates(studentsArray, collegeCode);
-            if (duplicateErrors.length > 0) {
-                res.status(400).json({ status: false, message: 'Duplicate entries found', errors: duplicateErrors });
-                return;
-            }
-        } catch (e) {
-            console.error('Error during duplicate check:', e);
-            res.status(500).json({ status: false, message: 'Error while checking duplicates.' });
-            return;
-        }
-
-        // All validations passed — process students using the service
-        try {
-            const results = await StudentServices.StudentService.bulkRegisterStudents(
-                studentsArray,
-                adminId
-            );
-
-            // After all students processed, return summary
-            res.status(200).json({
-                status: results.success,
-                message: `Bulk registration completed. Registered: ${results.studentsRegistered} students`,
-                registered: results.studentsRegistered,
-                emailsSent: results.emailsSent,
-                emailsFailed: results.emailsFailed,
+        if (!results.success) {
+            res.status(400).json({
+                status: false,
+                message: results.errors.length > 0 ? results.errors[0] : 'Bulk registration failed.',
                 errors: results.errors
             });
-        } catch (e) {
-            console.error('Error in bulkRegisterStudents call:', e);
-            res.status(500).json({
-                status: false,
-                message: 'Failed while processing student registrations.',
-                error: e instanceof Error ? e.message : String(e)
-            });
+            return;
         }
+
+        res.status(200).json({
+            status: true,
+            message: `Bulk registration completed. Registered: ${results.studentsRegistered} students`,
+            registered: results.studentsRegistered,
+            emailsSent: results.emailsSent,
+            emailsFailed: results.emailsFailed,
+            errors: results.errors
+        });
     } catch (error) {
         console.error('Error in bulk student registration:', error);
         res.status(500).json({

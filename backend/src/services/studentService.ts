@@ -24,29 +24,34 @@ export interface BulkRegistrationResult {
 export class StudentService {
 
     /**
-     * Create a single student document with all encryption
+     * Create a user + student document pair with all encryption
      */
     private static async createStudentDocument(
         studentData: StudentData,
         collegeCode: string
-    ): Promise<{ studentDoc: any; password: string }> {
+    ): Promise<{ userDoc: any; studentDoc: any; password: string }> {
         const password = generateRandomPassword(12);
         const passwordHash = await createHash(password);
+        const recoveryPassword = generateRandomPassword(12);
+        const recoveryHash = await createHash(recoveryPassword);
         const [privateKey, publicKey] = generateRSAKeyPair();
 
         return {
-            studentDoc: {
-                profile_picture: null,
-                roll: studentData.roll,
-                display_name: studentData.name,
+            userDoc: {
+                user_type: 'student',
+                id: studentData.roll,
                 college_code: collegeCode,
                 email_id: studentData.email,
+                username: studentData.name,
+                profile_picture: null,
                 password_hash: passwordHash,
-                fullname: studentData.name,
-                recovery: '',
+                recovery_password: recoveryPassword,
+                recovery_key_hash: recoveryHash,
                 private_key: encryptAES(privateKey, generateAESKeyFromString(password)),
                 public_key: encryptAES(publicKey, internalAesKey),
-                blocked_user: []
+            },
+            studentDoc: {
+                fullname: studentData.name,
             },
             password
         };
@@ -122,8 +127,8 @@ export class StudentService {
             };
         }
 
-        // Get admin's college code
-        const admin = await AdminModel.findById(adminId);
+        // Get admin's college code — adminId is the user_id from the auth token
+        const admin = await AdminModel.findOne({ user_id: adminId });
         if (!admin) {
             return {
                 success: false,
@@ -134,7 +139,7 @@ export class StudentService {
             };
         }
 
-        const adminUser = await userModel.findById(admin.user_id);
+        const adminUser = await userModel.findById(adminId);
         if (!adminUser) {
             return {
                 success: false,
@@ -165,13 +170,22 @@ export class StudentService {
         );
 
         const processedStudents = await Promise.all(studentPromises);
-        const studentDocuments = processedStudents.map(p => p.studentDoc);
+
+        // Insert user documents first to get their _ids
+        const userDocuments = processedStudents.map(p => p.userDoc);
+        const insertedUsers = await userModel.insertMany(userDocuments);
+
+        // Build student documents linked to their corresponding user _ids
+        const studentDocuments = processedStudents.map((p, index) => ({
+            ...p.studentDoc,
+            user_id: insertedUsers[index]!._id,
+        }));
 
         // Database insertion
         const insertedStudents = await studentModel.insertMany(studentDocuments);
 
         // Prepare email data
-        const emailData = insertedStudents.map((student, index) => {
+        const emailData = insertedUsers.map((user, index) => {
             const originalStudent = students[index];
             const processedStudent = processedStudents[index];
 
@@ -183,7 +197,7 @@ export class StudentService {
                 email: originalStudent.email,
                 name: originalStudent.name,
                 collegeCode: collegeCode,
-                rollNumber: student.roll,
+                rollNumber: originalStudent.roll,
                 password: processedStudent.password
             };
         });
