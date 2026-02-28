@@ -29,7 +29,6 @@ const RemoveStudent = () => {
     // Navigation and theme
     const navigate = useNavigate();
     const theme = useSelector((state: RootState) => state.theme.theme);
-    const adminDetails = useSelector((state: RootState) => state.auth.adminDetails);
 
     // Table column for roll number entry (simplified compared to AddStudent)
     const tableColumns = [
@@ -63,12 +62,6 @@ const RemoveStudent = () => {
             return;
         }
 
-        if (!adminDetails?.collegeCode) {
-            setErrorMessage('Admin details not available. Please log in again.');
-            setIsLoading(false);
-            return;
-        }
-
         try {
             // Extract roll numbers
             const rollNumbers = students
@@ -81,13 +74,10 @@ const RemoveStudent = () => {
                 return;
             }
 
-            // Send request to backend
+            // Send request to backend (college code resolved server-side from auth token)
             const response = await deleteEncryptedData(
                 '/student/delete-multiple',
-                {
-                    collegeCode: adminDetails.collegeCode,
-                    rollNumbers
-                }
+                { rollNumbers }
             );
 
             if (response && response.status === true) {
@@ -138,7 +128,7 @@ const RemoveStudent = () => {
         <div className="flex flex-col" style={{ background: backgroundGradient }}>
             {/* Header */}
             <div style={headerBackground}>
-                <Header editProfileUrl="/admin/edit-profile" />
+                <Header />
             </div>
             {/* Main Content */}
             <div className="flex-grow flex flex-col p-6">

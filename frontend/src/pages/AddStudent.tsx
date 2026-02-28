@@ -9,7 +9,7 @@ import { checkEmptyValues, filterCharacters } from '../utils/validator/studentDa
 import { postEncryptedData } from '../api/requests';
 
 // Unified Student type for all components
-export type Student = { name: string; rollNumber: string; emailId: string };
+export type Student = { name: string; rollNumber: string; emailId: string; reason?: string };
 export type WrongValue = { row: number; invalidColumns?: string[]; emptyColumns?: string[] };
 
 const AddStudent = () => {

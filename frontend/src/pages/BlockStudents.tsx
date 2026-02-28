@@ -10,7 +10,7 @@ import { postEncryptedData } from '../api/requests';
 // Reuse Student type from AddStudent for consistency with components
 import type { Student, WrongValue } from './AddStudent';
 
-// Simple validator to check that roll numbers are provided
+// Simple validator to check that roll numbers and reasons are provided
 const checkEmptyValues = (students: Student[]): WrongValue[] => {
     return students
         .map((student, index) => {
@@ -18,6 +18,9 @@ const checkEmptyValues = (students: Student[]): WrongValue[] => {
 
             if (!student.rollNumber?.trim()) {
                 emptyColumns.push('rollNumber');
+            }
+            if (!student.reason?.trim()) {
+                emptyColumns.push('reason');
             }
 
             return emptyColumns.length > 0 ? { row: index, emptyColumns } : null;
@@ -29,18 +32,19 @@ const BlockStudents = () => {
     // Navigation and theme
     const navigate = useNavigate();
     const theme = useSelector((state: RootState) => state.theme.theme);
-    const adminDetails = useSelector((state: RootState) => state.auth.adminDetails);
 
-    // Table column for roll number entry (simplified similar to RemoveStudent)
+    // Table columns for roll number and block reason
     const tableColumns = [
-        { key: 'rollNumber' as keyof Student, label: 'Roll Number', type: 'text' as const }
+        { key: 'rollNumber' as keyof Student, label: 'Roll Number', type: 'text' as const },
+        { key: 'reason' as keyof Student, label: 'Reason', type: 'text' as const }
     ];
 
     // Student data state
     const [students, setStudents] = useState<Student[]>([{
         rollNumber: '',
-        name: '', // Required by Student type but not used for blocking
-        emailId: '' // Required by Student type but not used for blocking
+        reason: '',
+        name: '',
+        emailId: ''
     }]);
     const [wrongValues, setWrongValues] = useState<WrongValue[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -49,11 +53,6 @@ const BlockStudents = () => {
 
     // Handle student blocking
     const handleBlockStudents = async () => {
-        if (!adminDetails?.collegeCode) {
-            setErrorMessage('Admin college code not found. Please log in again.');
-            return;
-        }
-
         // Clear previous messages
         setErrorMessage('');
         setSuccessMessage('');
@@ -63,7 +62,7 @@ const BlockStudents = () => {
         const validationErrors = checkEmptyValues(students);
         if (validationErrors.length > 0) {
             setWrongValues(validationErrors);
-            setErrorMessage(`Please fill in all required fields for the highlighted rows.`);
+            setErrorMessage('Please fill in all required fields for the highlighted rows.');
             return;
         }
 
@@ -77,23 +76,21 @@ const BlockStudents = () => {
         setIsLoading(true);
 
         try {
-            // Extract roll numbers from valid students
-            const rollNumbers = validStudents.map(s => s.rollNumber.trim());
+            // Build payload matching backend schema: { students: [{ rollNumber, reason }] }
+            const studentsPayload = validStudents.map(s => ({
+                rollNumber: s.rollNumber.trim(),
+                reason: s.reason?.trim() || ''
+            }));
 
-            // Block the students using encrypted API
             const response = await postEncryptedData('/student/block-multiple', {
-                rollNumbers: rollNumbers
+                students: studentsPayload
             });
 
             if (response.status) {
-                setSuccessMessage(`Successfully blocked ${response.data.blockedCount} student(s).`);
+                const blockedCount = response.data?.blocked?.length ?? 0;
+                setSuccessMessage(`Successfully blocked ${blockedCount} student(s).`);
                 // Clear the form
-                setStudents([{
-                    rollNumber: '',
-                    name: '',
-                    emailId: ''
-                }]);
-                // Navigate back to admin dashboard after a short delay
+                setStudents([{ rollNumber: '', reason: '', name: '', emailId: '' }]);
                 setTimeout(() => {
                     navigate('/admin/dashboard');
                 }, 1500);
@@ -143,19 +140,19 @@ const BlockStudents = () => {
                         <div>
                             <h2 className={`text-xl font-semibold mb-3 ${textColor}`}>Upload CSV File</h2>
                             <CsvUploader
-                                columns={['Roll Number']}
+                                columns={['Roll Number', 'Reason']}
                                 setStudents={(uploadedData) => {
-                                    // Make TypeScript happy by checking if it's an array
                                     if (Array.isArray(uploadedData)) {
                                         const formattedData = uploadedData.map((item: any) => ({
                                             rollNumber: item.rollNumber || '',
-                                            name: '', // Required by Student type but not used for blocking
-                                            emailId: '' // Required by Student type but not used for blocking
+                                            reason: item.reason || '',
+                                            name: '',
+                                            emailId: ''
                                         }));
                                         setStudents(formattedData);
                                     }
                                 }}
-                                message="Upload a CSV file with column 'Roll Number' (column header must match exactly)"
+                                message="Upload a CSV file with columns 'Roll Number', 'Reason' (column headers must match exactly)"
                                 theme={theme as 'light' | 'dark'}
                             />
                         </div>
