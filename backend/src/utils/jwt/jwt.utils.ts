@@ -13,7 +13,7 @@ export function getJwtSecret(): string {
 /**
  * Generates a JWT token and sets it as a cookie in the response
  * @param res Express response object
- * @param payload Object to encode in JWT (TODO: Define payload type/interface)
+ * @param payload Object to encode in JWT 
  * @param cookieName Name of the cookie to set
  * @param expiresIn Expiry duration (in seconds)
  */

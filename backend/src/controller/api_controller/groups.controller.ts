@@ -248,57 +248,25 @@ export const getUserGroupsController = async (req: Request, res: Response): Prom
     }
 };
 
-// Controller: Delete a group
-export const deleteGroupController = async (req: Request, res: Response): Promise<void> => {
+// Controller: Delete a chat group
+export const deleteChatGroupController = async (req: Request, res: Response): Promise<void> => {
     try {
         const { groupId } = req.params;
-        const { groupType } = req.body; // 'chat', 'announcement', or 'both'
+        const userId = req.user?.id;
 
-        if (!groupId) {
-            res.status(400).json({
-                status: false,
-                message: 'Group ID is required.'
-            });
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
             return;
         }
 
-        if (!groupType) {
-            res.status(400).json({
-                status: false,
-                message: 'Group type is required.'
-            });
-            return;
-        }
+        // User must be a member AND an admin of the group
+        const membership = await ChatGroupMembershipModel.findOne({
+            group: groupId,
+            member: userId,
+            isAdmin: true
+        });
 
-        // Check if user is college admin
-        const isCollegeAdmin = req.user?.type === 'admin';
-
-        // Check if user is group admin for the specified group type
-        let isGroupAdmin = false;
-        if (!isCollegeAdmin && req.user?.id) {
-            const userId = req.user.id;
-
-            if (groupType === 'chat' || groupType === 'both') {
-                const membership = await ChatGroupMembershipModel.findOne({
-                    group: groupId,
-                    member: userId,
-                    isAdmin: true
-                });
-                if (membership) isGroupAdmin = true;
-            }
-
-            if (!isGroupAdmin && (groupType === 'announcement' || groupType === 'both')) {
-                const membership = await AnnouncementGroupMembershipModel.findOne({
-                    group: groupId,
-                    member: userId,
-                    isAdmin: true
-                });
-                if (membership) isGroupAdmin = true;
-            }
-        }
-
-        // If user is neither college admin nor group admin, deny access
-        if (!isCollegeAdmin && !isGroupAdmin) {
+        if (!membership) {
             res.status(403).json({
                 status: false,
                 message: 'You do not have permission to delete this group.'
@@ -306,52 +274,68 @@ export const deleteGroupController = async (req: Request, res: Response): Promis
             return;
         }
 
-        const deletionResults: string[] = [];
+        // Delete all memberships first, then the group
+        await ChatGroupMembershipModel.deleteMany({ group: groupId });
+        const deletedGroup = await ChatGroupModel.findByIdAndDelete(groupId);
 
-        // Delete chat group if specified
-        if (groupType === 'chat' || groupType === 'both') {
-            // Delete all memberships first
-            await ChatGroupMembershipModel.deleteMany({ group: groupId });
-
-            // Delete the group
-            const deletedChatGroup = await ChatGroupModel.findByIdAndDelete(groupId);
-            if (deletedChatGroup) {
-                deletionResults.push('chat');
-            }
-        }
-
-        // Delete announcement group if specified
-        if (groupType === 'announcement' || groupType === 'both') {
-            // Delete all memberships first
-            await AnnouncementGroupMembershipModel.deleteMany({ group: groupId });
-
-            // Delete the group
-            const deletedAnnouncementGroup = await AnnouncementGroupModel.findByIdAndDelete(groupId);
-            if (deletedAnnouncementGroup) {
-                deletionResults.push('announcement');
-            }
-        }
-
-        if (deletionResults.length === 0) {
-            res.status(404).json({
-                status: false,
-                message: 'Group not found.'
-            });
+        if (!deletedGroup) {
+            res.status(404).json({ status: false, message: 'Chat group not found.' });
             return;
         }
 
         res.status(200).json({
             status: true,
-            message: `${deletionResults.join(' and ')} group(s) deleted successfully`,
-            data: {
-                deletedTypes: deletionResults
-            }
+            message: 'Chat group deleted successfully',
+            data: { id: groupId, type: 'chat' }
         });
     } catch (error) {
-        console.error('Error in deleteGroupController:', error);
-        res.status(500).json({
-            status: false,
-            message: 'An unexpected error occurred.'
+        console.error('Error in deleteChatGroupController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};
+
+// Controller: Delete an announcement group
+export const deleteAnnouncementGroupController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        // User must be a member AND an admin of the group
+        const membership = await AnnouncementGroupMembershipModel.findOne({
+            group: groupId,
+            member: userId,
+            isAdmin: true
         });
+
+        if (!membership) {
+            res.status(403).json({
+                status: false,
+                message: 'You do not have permission to delete this group.'
+            });
+            return;
+        }
+
+        // Delete all memberships first, then the group
+        await AnnouncementGroupMembershipModel.deleteMany({ group: groupId });
+        const deletedGroup = await AnnouncementGroupModel.findByIdAndDelete(groupId);
+
+        if (!deletedGroup) {
+            res.status(404).json({ status: false, message: 'Announcement group not found.' });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Announcement group deleted successfully',
+            data: { id: groupId, type: 'announcement' }
+        });
+    } catch (error) {
+        console.error('Error in deleteAnnouncementGroupController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
     }
 };

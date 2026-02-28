@@ -16,7 +16,7 @@ import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
 import { sendOTPEmail } from '../../utils/mailer.utils';
 import { OTP } from '../../utils/otp.utils';
-import { validateClubLoginData, validateAddClubMembersData } from '../../inputSchema/club.schema';
+import { validateCreateClubData, validateAddClubMembersData } from '../../inputSchema/club.schema';
 import { getAdminId } from '../../services/admin.services';
 
 // Types
@@ -34,8 +34,8 @@ export const createClubController = async (req: Request, res: Response): Promise
         // The middleware has already decrypted the request data
         const payload: CreateClubPayload = req.body;
 
-        // Validate input using validateClubLoginData
-        const validation = validateClubLoginData(payload);
+        // Validate input using validateCreateClubData
+        const validation = validateCreateClubData(payload);
         if (!validation.status || !validation.data) {
             res.status(400).json({
                 status: false,

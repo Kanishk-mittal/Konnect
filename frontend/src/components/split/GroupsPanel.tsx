@@ -1,7 +1,6 @@
 import React from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import GroupTab from '../GroupTab';
-import { deleteEncryptedData } from '../../api/requests';
 
 interface Group {
     id: string;
@@ -57,17 +56,8 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
         navigate(`/admin/edit-group/${groupId}`);
     };
 
-    const handleDelete = async (groupId: string, groupType: 'chat' | 'announcement' | 'both') => {
-        try {
-            await deleteEncryptedData(`/groups/delete/${groupId}`, {
-                groupType: groupType
-            });
-            alert('Group deleted successfully!');
-            window.location.reload();
-        } catch (error: any) {
-            console.error('Error deleting group:', error);
-            alert(`Failed to delete group: ${error.response?.data?.message || 'Unknown error'}`);
-        }
+    const handleDelete = () => {
+        window.location.reload();
     };
     return (
         <div className="rounded-lg p-4 h-full w-full flex flex-col panel-minimized overflow-hidden" style={{ backgroundColor }}>
@@ -90,11 +80,13 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
                             <GroupTab
                                 key={group.id}
                                 id={group.id}
+                                chatId={group.chatId}
+                                announcementId={group.announcementId}
                                 name={group.name}
                                 icon={group.icon}
                                 type={group.type}
                                 onEdit={() => handleEdit(group.id)}
-                                onDelete={() => handleDelete(group.id, group.type)}
+                                onDelete={() => handleDelete()}
                             />
                         ))
                     )}

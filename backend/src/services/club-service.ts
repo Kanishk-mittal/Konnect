@@ -77,7 +77,10 @@ export const createClub = async (clubData: {
     // Step 2: Create the club record
     try {
         const clubDoc = new ClubModel({
-            club_user_id: userResult.user._id,
+            user_id: userResult.user._id,
+            Club_name: clubData.clubName,
+            email: clubData.email,
+            college_code: clubData.collegeCode,
             created_by: clubData.adminId,
             blocked_users: []
         });

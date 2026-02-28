@@ -15,6 +15,32 @@ export const clubLoginSchema = z.object({
 export type ClubLoginData = z.infer<typeof clubLoginSchema>;
 
 /**
+ * Schema for creating a new club
+ */
+export const createClubSchema = z.object({
+    clubName: z.string().min(1, 'Club name is required'),
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+/**
+ * Type inferred from the create club schema
+ */
+export type CreateClubData = z.infer<typeof createClubSchema>;
+
+/**
+ * Utility function to validate create club data
+ */
+export const validateCreateClubData = (data: unknown): { status: boolean; message: string; data?: CreateClubData } => {
+    const result = createClubSchema.safeParse(data);
+    if (!result.success) {
+        const errorMessage = result.error.issues[0]?.message || 'Invalid input.';
+        return { status: false, message: errorMessage };
+    }
+    return { status: true, message: 'Validation successful', data: result.data };
+};
+
+/**
  * Schema for adding club members validation
  */
 export const addClubMembersSchema = z.object({

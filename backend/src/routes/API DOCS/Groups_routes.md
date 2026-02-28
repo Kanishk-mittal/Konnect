@@ -50,7 +50,7 @@ Input :-
     "description": "A group for tech lovers",
     "admins": ["21001", "21002"],
     "members": [
-        { "rollNumber": "21001", "name": "John Doe" },
+        { "rollNumber": "21001" },
         { "rollNumber": "21003" }
     ],
     "isAnnouncementGroup": false,
@@ -84,26 +84,38 @@ response :-
 }
 ```
 
-### 3. /delete/:groupId
+### 3. /chat/delete/:groupId
 Method :- `DELETE`
-Description :- Deletes a specific group (Chat, Announcement, or both). Accessible by college admins or group admins.
-Note :- Requires `auth_token` cookie. The request body (containing groupType) must be encrypted.
-Input :-
-```json
-{
-    "groupType": "chat"
-}
-```
-Note :- `groupType` can be `"chat"`, `"announcement"`, or `"both"`.
-controller :- `deleteGroupController`
+Description :- Deletes a specific chat group. The authenticated user must be a member and an admin of the group.
+Note :- Requires `auth_token` cookie. No request body needed.
+Input :- None (groupId is in the URL path)
+controller :- `deleteChatGroupController`
 response :-
 ```json
 {
     "status": true,
-    "message": "chat group(s) deleted successfully",
+    "message": "Chat group deleted successfully",
     "data": {
-        "deletedTypes": ["chat"]
+        "id": "65cad...",
+        "type": "chat"
     }
 }
 ```
+
+### 4. /announcement/delete/:groupId
+Method :- `DELETE`
+Description :- Deletes a specific announcement group. The authenticated user must be a member and an admin of the group.
+Note :- Requires `auth_token` cookie. No request body needed.
+Input :- None (groupId is in the URL path)
+controller :- `deleteAnnouncementGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Announcement group deleted successfully",
+    "data": {
+        "id": "65cad...",
+        "type": "announcement"
+    }
+}
 ```

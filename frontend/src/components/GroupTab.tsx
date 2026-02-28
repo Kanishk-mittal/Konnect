@@ -6,18 +6,23 @@ import announcementIcon from '../assets/announcement.png';
 import sendIcon from '../assets/send.png';
 import editIcon from '../assets/edit.png';
 import deleteIcon from '../assets/delete.png';
+import { deleteEncryptedData } from '../api/requests';
 
 interface GroupTabProps {
   id: string;
+  chatId?: string;
+  announcementId?: string;
   name: string;
   icon: string | null;
   type: 'chat' | 'announcement' | 'both';
   onEdit?: () => void;
-  onDelete?: (groupType: 'chat' | 'announcement' | 'both') => void;
+  onDelete?: () => void;
 }
 
 const GroupTab: React.FC<GroupTabProps> = ({
   id,
+  chatId,
+  announcementId,
   name,
   icon,
   type,
@@ -58,11 +63,22 @@ const GroupTab: React.FC<GroupTabProps> = ({
     setIsDeleting(true);
     setShowDeleteModal(false);
     try {
-      if (onDelete) {
-        await onDelete(groupType);
+      if (groupType === 'both') {
+        await Promise.all([
+          deleteEncryptedData(`/groups/chat/delete/${chatId || id}`, {}),
+          deleteEncryptedData(`/groups/announcement/delete/${announcementId || id}`, {}),
+        ]);
+      } else if (groupType === 'chat') {
+        await deleteEncryptedData(`/groups/chat/delete/${chatId || id}`, {});
+      } else {
+        await deleteEncryptedData(`/groups/announcement/delete/${announcementId || id}`, {});
       }
-    } catch (error) {
+      if (onDelete) {
+        onDelete();
+      }
+    } catch (error: any) {
       console.error('Error deleting group:', error);
+      alert(`Failed to delete group: ${error.response?.data?.message || 'Unknown error'}`);
     } finally {
       setIsDeleting(false);
     }

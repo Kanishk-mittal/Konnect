@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteGroupController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -24,11 +24,16 @@ router.post('/create',
     encryptResponse                    // encrypt response if public key present
 );
 
-// Delete a group - Accessible by admin or group admin
-router.delete('/delete/:groupId',
+// Delete a chat group - only group admin members can delete
+router.delete('/chat/delete/:groupId',
     authMiddleware,                    // authenticate user
-    decryptRequest,                    // decrypt request body (contains groupType)
-    deleteGroupController              // controller logic (checks permissions internally)
+    deleteChatGroupController          // controller logic
+);
+
+// Delete an announcement group - only group admin members can delete
+router.delete('/announcement/delete/:groupId',
+    authMiddleware,                    // authenticate user
+    deleteAnnouncementGroupController  // controller logic
 );
 
 export default router;

@@ -34,7 +34,7 @@ const AddClub = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
-    const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
+    const [createdClubData, setCreatedClubData] = useState<{ id: string; clubName: string; email: string; userId: string } | null>(null);
 
     // Define theme-specific colors
     const backgroundGradient = theme === 'dark'
@@ -131,11 +131,14 @@ const AddClub = () => {
 
             if (response.data && response.data.status) {
                 setSuccessMessage(response.data.message || 'Club created successfully!');
+                if (response.data.data) {
+                    setCreatedClubData(response.data.data);
+                }
 
                 // Navigate to dashboard after successful creation
                 setTimeout(() => {
                     navigate('/admin/dashboard');
-                }, 1500);
+                }, 3000);
             } else {
                 setErrorMessage(response.data?.message || 'Failed to create club');
             }
@@ -158,7 +161,7 @@ const AddClub = () => {
     return (
         <div className="min-h-screen flex flex-col" style={{ background: backgroundGradient }}>
             <div style={headerBackground}>
-                <Header editProfileUrl="/admin/edit-profile" />
+                <Header />
             </div>
 
             <div className="flex-grow p-6">
@@ -166,12 +169,23 @@ const AddClub = () => {
                     <h1 className={`text-3xl font-bold mb-8 ${textColor}`}>Add New Club</h1>
 
                     {/* Error/Success Messages */}
-                    {(errorMessage || successMessage) && (
-                        <div className={`mb-6 p-4 rounded-lg text-center font-medium ${errorMessage
-                            ? (theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300')
-                            : (theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300')
-                            }`}>
-                            {errorMessage || successMessage}
+                    {errorMessage && (
+                        <div className={`mb-6 p-4 rounded-lg text-center font-medium ${theme === 'dark' ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-300'}`}>
+                            {errorMessage}
+                        </div>
+                    )}
+                    {successMessage && (
+                        <div className={`mb-6 p-4 rounded-lg font-medium ${theme === 'dark' ? 'bg-green-900/30 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-300'}`}>
+                            <p className="text-center mb-3">{successMessage}</p>
+                            {createdClubData && (
+                                <div className={`mt-2 p-3 rounded text-sm ${theme === 'dark' ? 'bg-green-900/20' : 'bg-green-50'}`}>
+                                    <p><span className="font-semibold">Club ID:</span> {createdClubData.id}</p>
+                                    <p><span className="font-semibold">Club Name:</span> {createdClubData.clubName}</p>
+                                    <p><span className="font-semibold">Email:</span> {createdClubData.email}</p>
+                                    <p><span className="font-semibold">User ID:</span> {createdClubData.userId}</p>
+                                </div>
+                            )}
+                            <p className="text-center text-xs mt-2 opacity-70">Redirecting to dashboard...</p>
                         </div>
                     )}
 
