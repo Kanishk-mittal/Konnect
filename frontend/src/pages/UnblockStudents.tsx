@@ -86,7 +86,11 @@ const UnblockStudents = () => {
             });
 
             if (response.status) {
-                setSuccessMessage(`Successfully unblocked ${response.data.unblockedCount} student(s).`);
+                const unblocked = response.data?.unblocked?.length ?? 0;
+                const failed = response.data?.failed?.length ?? 0;
+                setSuccessMessage(
+                    `Processed ${validStudents.length} request(s). Unblocked: ${unblocked}, Failed: ${failed}.`
+                );
                 // Clear the form
                 setStudents([{
                     rollNumber: '',
@@ -123,7 +127,7 @@ const UnblockStudents = () => {
     return (
         <div className="flex flex-col" style={{ background: backgroundGradient, minHeight: '100vh' }}>
             <div style={headerBackground}>
-                <Header editProfileUrl="/admin/edit-profile" />
+                <Header />
             </div>
 
             <div className="flex-grow flex flex-col p-4">

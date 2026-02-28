@@ -15,7 +15,7 @@ const Header = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const dispatch = useDispatch();
-    const { isAuthenticated, userId } = useSelector((state: RootState) => state.auth)
+    const { isAuthenticated, userId, userType } = useSelector((state: RootState) => state.auth)
 
     // Debug: Log authentication state
     useEffect(() => {
@@ -89,7 +89,11 @@ const Header = () => {
     return (
         <header className="flex justify-center items-center select-none pt-1">
             <div className="flex justify-between items-center h-[10vh] w-[90%]">
-                <div onClick={() => navigate("/")} className="flex items-center cursor-pointer">
+                <div onClick={() => {
+                    if (userType === 'admin') navigate('/admin/dashboard');
+                    else if (userType === 'club') navigate('/club/dashboard');
+                    else navigate('/');
+                }} className="flex items-center cursor-pointer">
                     <img src={Logo} alt="Logo" className="h-18 object-contain" />
                     <Title style="text-3xl md:text-4xl font-bold ml-4" />
                 </div>

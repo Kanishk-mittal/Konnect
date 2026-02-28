@@ -83,7 +83,73 @@ response (Encrypted) :-
 }
 ```
 
-### 4. /block-multiple
+### 4. /delete
+Method :- `DELETE`
+Description :- Deletes a single student by their user ID. Only deletes students belonging to the admin's own college.
+Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.
+Input (Decrypted) :-
+```json
+{
+    "studentId": "65cad..."
+}
+```
+controller :- `deleteStudent`
+response :-
+```json
+{
+    "status": true,
+    "message": "Student John Doe (2021CS101) has been successfully deleted."
+}
+```
+
+### 5. /delete-multiple
+Method :- `DELETE`
+Description :- Deletes multiple students by roll numbers. The college code must match the admin's own college.
+Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.
+Input (Decrypted) :-
+```json
+{
+    "collegeCode": "CLG001",
+    "rollNumbers": ["2021CS101", "2021CS102"]
+}
+```
+controller :- `deleteMultipleStudents`
+response :-
+```json
+{
+    "status": true,
+    "message": "Successfully removed 2 student(s).",
+    "removedCount": 2,
+    "notFound": []
+}
+```
+
+### 6. /toggle-block
+Method :- `POST`
+Description :- Toggles a student's blocked status. If currently unblocked, blocks them (with an optional reason); if currently blocked, unblocks them.
+Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.
+Input (Decrypted) :-
+```json
+{
+    "studentId": "65cad...",
+    "reason": "Disciplinary Action"
+}
+```
+Note :- `reason` is optional and only applied when blocking. Defaults to `"Manually blocked by admin"` if omitted.
+controller :- `toggleStudentBlockStatus`
+response :-
+```json
+{
+    "status": true,
+    "message": "Student blocked successfully.",
+    "data": {
+        "id": "65cad...",
+        "isBlocked": true
+    }
+}
+```
+
+### 7. /block-multiple
 Method :- `POST`
 Description :- Blocks multiple students by adding them to the blocked list with a reason.
 Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.
@@ -121,7 +187,7 @@ response :-
 }
 ```
 
-### 5. /unblock-multiple
+### 8. /unblock-multiple
 Method :- `POST`
 Description :- Unblocks multiple students by removing them from the blocked list.
 Note :- Requires `auth_token` cookie, admin privileges, and decrypted request body.

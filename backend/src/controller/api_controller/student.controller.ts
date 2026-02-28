@@ -60,65 +60,6 @@ const validateStudentData = (students: StudentData[]): string[] => {
     return errors;
 };
 
-// Check for duplicates efficiently
-const checkForDuplicates = async (students: StudentData[], collegeCode: string): Promise<string[]> => {
-    const errors: string[] = [];
-
-    // Extract unique rolls and emails for efficient querying
-    const rolls = [...new Set(students.map(s => s.roll))];
-    const emails = [...new Set(students.map(s => s.email))];
-
-    // Check internal duplicates first
-    const rollCounts = new Map();
-    const emailCounts = new Map();
-
-    students.forEach((student, index) => {
-        const rollKey = student.roll;
-        const emailKey = student.email;
-
-        if (rollCounts.has(rollKey)) {
-            errors.push(`Duplicate roll number '${rollKey}' found at indexes ${rollCounts.get(rollKey)} and ${index}`);
-        } else {
-            rollCounts.set(rollKey, index);
-        }
-        if (emailCounts.has(emailKey)) {
-            errors.push(`Duplicate email '${emailKey}' found at indexes ${emailCounts.get(emailKey)} and ${index}`);
-        } else {
-            emailCounts.set(emailKey, index);
-        }
-    });
-
-    if (errors.length > 0) return errors;
-
-    // Check database duplicates in parallel
-    const [existingRolls, existingEmails] = await Promise.all([
-        userModel.find({
-            college_code: collegeCode,
-            id: { $in: rolls },
-            user_type: 'student'
-        }).select('id').lean(),
-
-        userModel.find({
-            email_id: { $in: emails }
-        }).select('email_id').lean()
-    ]);
-
-    if (existingRolls.length > 0) {
-        const duplicateRolls = existingRolls.map(s => s.id);
-        errors.push(`Roll numbers already exist in college: ${duplicateRolls.join(', ')}`);
-    }
-
-    if (existingEmails.length > 0) {
-        const duplicateEmails = existingEmails.map(s => s.email_id);
-        errors.push(`Email addresses already exist: ${duplicateEmails.join(', ')}`);
-    }
-
-    return errors;
-};
-
-// Student Login Controller - Removed
-// Student Logout Controller - Removed
-
 /**
  * Get student details by college code
  * Automatically determines college code from the authenticated user
@@ -207,10 +148,10 @@ export const getStudentByCollegeCode = async (req: Request, res: Response): Prom
  */
 export const getBlockedStudentsByCollegeCode = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Get user ID from auth middleware
-        const userId = (req as any).user?.id;
+        // Get admin ID from auth middleware
+        const adminId = (req as any).user?.id;
 
-        if (!userId) {
+        if (!adminId) {
             res.status(401).json({
                 status: false,
                 message: 'Authentication required.'
@@ -218,17 +159,17 @@ export const getBlockedStudentsByCollegeCode = async (req: Request, res: Respons
             return;
         }
 
-        // Fetch the current user to get their college code
-        const currentUser = await userModel.findById(userId);
-        if (!currentUser) {
-            res.status(404).json({
+        // Fetch the admin user and validate they are an admin
+        const adminUser = await userModel.findById(adminId);
+        if (!adminUser || adminUser.user_type !== 'admin') {
+            res.status(403).json({
                 status: false,
-                message: 'User context not found.'
+                message: 'Admin not found.'
             });
             return;
         }
 
-        const collegeCode = currentUser.college_code;
+        const collegeCode = adminUser.college_code;
 
         // Find all student IDs that are blocked in this college from BlockedStudentModel
         const blockedEntries = await BlockedStudentModel.find({
@@ -299,13 +240,24 @@ export const getBlockedStudentsByCollegeCode = async (req: Request, res: Respons
  */
 export const toggleStudentBlockStatus = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { studentId } = req.body;
+        const { studentId, reason } = req.body;
 
         // Validate student ID
         if (!studentId) {
             res.status(400).json({
                 status: false,
                 message: 'Student ID is required.'
+            });
+            return;
+        }
+
+        // Get admin details to validate they are an admin
+        const adminId = (req as any).user?.id;
+        const adminUser = await userModel.findById(adminId);
+        if (!adminUser || adminUser.user_type !== 'admin') {
+            res.status(403).json({
+                status: false,
+                message: 'Admin not found.'
             });
             return;
         }
@@ -343,6 +295,7 @@ export const toggleStudentBlockStatus = async (req: Request, res: Response): Pro
             studentProfile.is_blocked = false;
         } else {
             // Block logic
+            const blockReason = reason || 'Manually blocked by admin';
             await BlockedStudentModel.findOneAndUpdate(
                 {
                     college_code: student.college_code,
@@ -351,7 +304,7 @@ export const toggleStudentBlockStatus = async (req: Request, res: Response): Pro
                 {
                     college_code: student.college_code,
                     student_id: studentProfile._id,
-                    reason: "Manually blocked by admin" // Default reason for toggle
+                    reason: blockReason
                 },
                 { upsert: true, new: true, setDefaultsOnInsert: true }
             );
