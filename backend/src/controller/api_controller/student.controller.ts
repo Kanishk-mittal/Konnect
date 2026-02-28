@@ -697,21 +697,21 @@ export const deleteStudent = async (req: Request, res: Response): Promise<void> 
  */
 export const deleteMultipleStudents = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { collegeCode, rollNumbers } = req.body;
+        const { rollNumbers } = req.body;
 
         // Validate input
-        if (!collegeCode || !rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
+        if (!rollNumbers || !Array.isArray(rollNumbers) || rollNumbers.length === 0) {
             res.status(400).json({
                 status: false,
-                message: 'College code and at least one roll number are required.'
+                message: 'At least one roll number is required.'
             });
             return;
         }
 
-        // Get admin college code to ensure they only delete students from their college
+        // Get admin details to derive college code from token
         const adminId = (req as any).user?.id;
-        const admin = await AdminModel.findById(adminId);
-        if (!admin) {
+        const adminUser = await userModel.findById(adminId);
+        if (!adminUser || adminUser.user_type !== 'admin') {
             res.status(403).json({
                 status: false,
                 message: 'Admin not found.'
@@ -719,23 +719,7 @@ export const deleteMultipleStudents = async (req: Request, res: Response): Promi
             return;
         }
 
-        const adminUserRecord = await userModel.findById(admin.user_id);
-        if (!adminUserRecord) {
-            res.status(404).json({
-                status: false,
-                message: 'Admin user record not found.'
-            });
-            return;
-        }
-
-        // Verify the college code matches the admin's college code
-        if (collegeCode !== adminUserRecord.college_code) {
-            res.status(403).json({
-                status: false,
-                message: 'You do not have permission to delete students from other colleges.'
-            });
-            return;
-        }
+        const collegeCode = adminUser.college_code;
 
         // Find all students matching the roll numbers in this college using userModel
         const students = await userModel.find({

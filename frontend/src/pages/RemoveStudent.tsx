@@ -29,6 +29,7 @@ const RemoveStudent = () => {
     // Navigation and theme
     const navigate = useNavigate();
     const theme = useSelector((state: RootState) => state.theme.theme);
+    const adminDetails = useSelector((state: RootState) => state.auth.adminDetails);
 
     // Table column for roll number entry (simplified compared to AddStudent)
     const tableColumns = [
@@ -48,6 +49,11 @@ const RemoveStudent = () => {
 
     // Handle student removal
     const handleSubmit = async () => {
+        if (!adminDetails?.collegeCode) {
+            setErrorMessage('Admin college code not found. Please log in again.');
+            return;
+        }
+
         setIsLoading(true);
         setErrorMessage('');
         setSuccessMessage('');
@@ -74,10 +80,10 @@ const RemoveStudent = () => {
                 return;
             }
 
-            // Send request to backend (college code resolved server-side from auth token)
+            // Send request to backend
             const response = await deleteEncryptedData(
                 '/student/delete-multiple',
-                { rollNumbers }
+                { collegeCode: adminDetails.collegeCode, rollNumbers }
             );
 
             if (response && response.status === true) {
