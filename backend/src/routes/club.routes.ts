@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import {
     createClubController,
     getClubsByCollegeCodeController,
@@ -18,7 +18,6 @@ import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware, clubAuthMiddleware } from '../middleware/auth.middleware';
 import { groupImageUpload, handleMulterError } from '../utils/multer.utils';
-import { Request, Response } from 'express';
 
 const router = Router();
 
@@ -130,6 +129,18 @@ router.post('/students/unblock-bulk',
     decryptRequest,
     unblockClubStudentsBulkController
 );
+
+// Endpoint to check if club is logged in
+router.get('/userID', authMiddleware, clubAuthMiddleware, (req: Request, res: Response): void => {
+    if (!req.user) {
+        res.status(401).json({
+            status: false,
+            message: 'User not authenticated'
+        });
+        return;
+    }
+    res.json({ userId: req.user.id });
+});
 
 // Get clubs by college code (admin only) - Must be last due to dynamic parameter
 router.get('/:collegeCode',

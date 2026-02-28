@@ -70,23 +70,22 @@ const ClubDashboard = () => {
 
     useEffect(() => {
         const fetchClubDetails = async () => {
-            try {
-                let response;
+            // If clubId already exists, no need to fetch
+            if (clubId) {
+                setLoading(false);
+                return;
+            }
 
-                if (userId) {
-                    // If userId is available, use the existing endpoint
-                    response = await getData(`/club/details/${userId}`);
-                } else {
-                    // If userId is not available, get club details from JWT
-                    response = await getData(`/club/details`);
-                }
+            try {
+                const response = await getData(`/user/details`);
 
                 if (response.status) {
-                    setClubId(response.data.clubId || userId);
+                    const id = response.data.userId;
+                    setClubId(id);
 
-                    // If userId wasn't available but we got it from JWT, store it too
-                    if (!userId && response.data.clubId) {
-                        dispatch(setUserId(response.data.clubId));
+                    // Store userId in Redux if not already set
+                    if (!userId && id) {
+                        dispatch(setUserId(id));
                     }
                 }
             } catch (error) {
@@ -97,7 +96,7 @@ const ClubDashboard = () => {
         };
 
         fetchClubDetails();
-    }, [userId, dispatch]);
+    }, [userId, clubId, dispatch]);
 
     // Fetch data when club details are available
     useEffect(() => {
@@ -106,7 +105,7 @@ const ClubDashboard = () => {
 
             setMembersLoading(true);
             try {
-                const response = await getData(`/club/members/${clubId}`);
+                const response = await getData(`/club/members`);
                 if (response.status) {
                     setMembers(response.data);
                 }
@@ -123,7 +122,7 @@ const ClubDashboard = () => {
 
             setBlockedStudentsLoading(true);
             try {
-                const response = await getData(`/club/blocked/${clubId}`);
+                const response = await getData(`/club/blocked`);
                 if (response.status) {
                     setBlockedStudents(response.data);
                 }
@@ -139,8 +138,7 @@ const ClubDashboard = () => {
             if (!clubId) return;
             setGroupsLoading(true);
             try {
-                const response = await getData(`/club/groups/${clubId}`);
-                console.log('Groups response:', response);
+                const response = await getData(`/club/groups`);
                 if (response.status) {
                     setGroups(response.data);
                 }

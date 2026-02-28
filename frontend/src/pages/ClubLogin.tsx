@@ -25,7 +25,7 @@ const ClubLogin = () => {
 
   const [formData, setFormData] = useState({
     collegeCode: '',
-    clubName: '',
+    email: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -48,19 +48,19 @@ const ClubLogin = () => {
       dispatch(clearAuth());
 
       // Validate required fields
-      if (!formData.collegeCode || !formData.clubName || !formData.password) {
+      if (!formData.collegeCode || !formData.email || !formData.password) {
         setErrorMessage('All fields are required');
         setIsLoading(false);
         return;
       }
 
-      // Use postEncryptedData for simplified encryption handling
+      // Use the common user login route as per User_routes.md
       const response = await postEncryptedData(
-        '/club/login',
+        '/user/login',
         {
-          collegeCode: formData.collegeCode,
-          clubName: formData.clubName,
-          password: formData.password
+          id: formData.email,
+          password: formData.password,
+          collegeCode: formData.collegeCode
         },
         { expectEncryptedResponse: true }
       );
@@ -73,10 +73,10 @@ const ClubLogin = () => {
           // Save to Redux store (primary storage)
           dispatch(setPrivateKey(response.data.privateKey));
           dispatch(setUserId(response.data.id));
-          dispatch(setUserType('club'));
+          dispatch(setUserType(response.data.userType || 'club'));
 
           // Save to localStorage as backup
-          await savePrivateKey(response.data.privateKey, 'club', response.data.id);
+          await savePrivateKey(response.data.privateKey, response.data.userType || 'club', response.data.id);
         }
 
         dispatch(setAuthenticated(true));
@@ -142,9 +142,9 @@ const ClubLogin = () => {
                 width={100}
                 state={formData}
                 setState={setFormData}
-                keyName="clubName"
-                label="Club Name"
-                type="text"
+                keyName="email"
+                label="Email"
+                type="email"
               />
               <InputComponent
                 width={100}
