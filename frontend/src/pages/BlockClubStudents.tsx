@@ -13,8 +13,6 @@ export type WrongValue = { row: number; invalidColumns?: string[]; emptyColumns?
 const BlockClubStudents = () => {
     const navigate = useNavigate();
     const theme = useSelector((state: RootState) => state.theme.theme);
-    const authState = useSelector((state: RootState) => state.auth);
-    const { userId } = authState;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
@@ -146,10 +144,7 @@ const BlockClubStudents = () => {
 
             const response = await postEncryptedData(
                 '/club/students/block-bulk',
-                {
-                    students: studentsForBackend,
-                    clubId: userId // Club ID from authenticated user
-                },
+                { students: studentsForBackend },
                 { expectEncryptedResponse: false }
             );
 

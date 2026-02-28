@@ -263,6 +263,7 @@ const AdminDashboard = () => {
               groups={groups}
               groupsLoading={groupsLoading}
               textColor={textColor}
+              basePath="admin"
             />
           }
         />

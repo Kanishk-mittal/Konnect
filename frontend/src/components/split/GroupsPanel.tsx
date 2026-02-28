@@ -20,6 +20,7 @@ interface GroupsPanelProps {
     groups: Group[];
     groupsLoading: boolean;
     textColor: string;
+    basePath: 'admin' | 'club';
 }
 
 const GroupsPanel: React.FC<GroupsPanelProps> = ({
@@ -28,7 +29,8 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
     navigate,
     groups,
     groupsLoading,
-    textColor
+    textColor,
+    basePath
 }) => {
     // Group groups by name to handle both chat and announcement types
     const groupedGroups = groups.reduce((acc, group) => {
@@ -53,7 +55,7 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
     }, [] as Array<Group & { type: 'chat' | 'announcement' | 'both'; chatId?: string; announcementId?: string }>);
 
     const handleEdit = (groupId: string) => {
-        navigate(`/admin/edit-group/${groupId}`);
+        navigate(`/${basePath}/edit-group/${groupId}`);
     };
 
     const handleDelete = () => {
@@ -96,7 +98,7 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
                     <button
                         className="px-6 py-2 rounded-full text-white font-medium hover:opacity-80 transition-opacity"
                         style={{ backgroundColor: '#22C55E' }}
-                        onClick={() => navigate('/admin/add-group')}
+                        onClick={() => navigate(`/${basePath}/add-group`)}
                     >
                         Add Group
                     </button>

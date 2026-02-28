@@ -14,7 +14,4 @@ const clubMembershipSchema = new Schema<IClubMembership>({
     timestamps: true,
 });
 
-// Create compound index for better query performance
-clubMembershipSchema.index({ club_id: 1, member_id: 1 }, { unique: true });
-
 export default model<IClubMembership>('ClubMembership', clubMembershipSchema);

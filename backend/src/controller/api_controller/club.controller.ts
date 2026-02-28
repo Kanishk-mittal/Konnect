@@ -790,7 +790,7 @@ export const removeClubMembersBulkController = async (req: Request, res: Respons
 
 /**
  * Block multiple students for a club by roll numbers
- * Adds students to club's blocked_students array, sorted by roll number
+ * Adds students to club's blocked_users array, sorted by roll number
  * Avoids duplicate entries
  */
 export const blockClubStudentsBulkController = async (req: Request, res: Response): Promise<void> => {
@@ -859,19 +859,19 @@ export const blockClubStudentsBulkController = async (req: Request, res: Respons
             return;
         }
 
-        // Get validated roll numbers of found students (using 'id' field which stores roll number)
-        const validRollNumbers: string[] = foundStudents.map(s => s.id as string);
+        // Get validated student ObjectIds
+        const validStudentIds: string[] = foundStudents.map(s => s._id.toString());
 
-        // Get current blocked students
-        const currentBlockedRolls: string[] = club.blocked_students || [];
-        const currentBlockedSet = new Set<string>(currentBlockedRolls);
+        // Get current blocked user IDs as strings for comparison
+        const currentBlockedIds: string[] = (club.blocked_users || []).map(id => id.toString());
+        const currentBlockedSet = new Set<string>(currentBlockedIds);
 
         // Filter out already blocked students
-        const newRollsToBlock: string[] = validRollNumbers.filter(
-            roll => !currentBlockedSet.has(roll)
+        const newIdsToBlock: string[] = validStudentIds.filter(
+            id => !currentBlockedSet.has(id)
         );
 
-        if (newRollsToBlock.length === 0) {
+        if (newIdsToBlock.length === 0) {
             res.status(200).json({
                 status: true,
                 message: 'All provided students are already blocked.',
@@ -880,20 +880,17 @@ export const blockClubStudentsBulkController = async (req: Request, res: Respons
             return;
         }
 
-        // Add new roll numbers and sort in ascending order
-        const updatedBlockedRolls: string[] = [...currentBlockedRolls, ...newRollsToBlock].sort((a, b) => {
-            // Natural sort for roll numbers
-            return a.localeCompare(b, undefined, { numeric: true });
-        });
+        // Add new ObjectIds to blocked_users
+        const updatedBlockedIds: string[] = [...currentBlockedIds, ...newIdsToBlock];
 
-        // Update club with sorted blocked students list
-        club.blocked_students = updatedBlockedRolls;
+        // Update club with blocked users list
+        club.blocked_users = updatedBlockedIds.map(id => new Types.ObjectId(id));
         await club.save();
 
         res.status(200).json({
             status: true,
-            message: `Successfully blocked ${newRollsToBlock.length} student(s).`,
-            blockedCount: newRollsToBlock.length
+            message: `Successfully blocked ${newIdsToBlock.length} student(s).`,
+            blockedCount: newIdsToBlock.length
         });
     } catch (error) {
         console.error('Error blocking club students:', error);
@@ -906,7 +903,7 @@ export const blockClubStudentsBulkController = async (req: Request, res: Respons
 
 /**
  * Unblock a student from a club
- * Removes student from club's blocked_students array
+ * Removes student from club's blocked_users array
  */
 export const unblockClubStudentController = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -939,8 +936,8 @@ export const unblockClubStudentController = async (req: Request, res: Response):
             return;
         }
 
-        // Get student's roll number from UserModel
-        const student = await UserModel.findById(studentId).select('id'); // 'id' field is roll for students
+        // Verify student exists
+        const student = await UserModel.findById(studentId).select('_id');
         if (!student) {
             res.status(404).json({
                 status: false,
@@ -949,9 +946,9 @@ export const unblockClubStudentController = async (req: Request, res: Response):
             return;
         }
 
-        // Check if student is in blocked list
-        const currentBlockedRolls: string[] = club.blocked_students || [];
-        const isBlocked = currentBlockedRolls.includes(student.id as string);
+        // Check if student is in blocked list (compare ObjectIds as strings)
+        const currentBlockedIds: string[] = (club.blocked_users || []).map(id => id.toString());
+        const isBlocked = currentBlockedIds.includes(studentId);
 
         if (!isBlocked) {
             res.status(404).json({
@@ -962,7 +959,7 @@ export const unblockClubStudentController = async (req: Request, res: Response):
         }
 
         // Remove student from blocked list
-        club.blocked_students = currentBlockedRolls.filter(roll => roll !== student.id as string);
+        club.blocked_users = (club.blocked_users || []).filter(id => id.toString() !== studentId);
         await club.save();
 
         res.status(200).json({
@@ -1026,7 +1023,7 @@ export const unblockClubStudentsBulkController = async (req: Request, res: Respo
             id: { $in: rollNumbers }, // 'id' field is roll for students
             college_code: club.college_code,
             user_type: 'student'
-        }).select('id');
+        }).select('_id');
 
         if (foundStudents.length === 0) {
             res.status(404).json({
@@ -1036,16 +1033,16 @@ export const unblockClubStudentsBulkController = async (req: Request, res: Respo
             return;
         }
 
-        // Get validated roll numbers
-        const validRollNumbers: string[] = foundStudents.map(s => s.id as string);
+        // Get validated student ObjectIds
+        const validStudentIds: string[] = foundStudents.map(s => s._id.toString());
 
-        // Filter blocked list to remove students
-        const currentBlockedRolls: string[] = club.blocked_students || [];
-        const updatedBlockedList: string[] = currentBlockedRolls.filter(
-            roll => !validRollNumbers.includes(roll)
+        // Filter blocked list to remove students (compare as strings)
+        const currentBlockedIds: string[] = (club.blocked_users || []).map(id => id.toString());
+        const updatedBlockedIds: string[] = currentBlockedIds.filter(
+            id => !validStudentIds.includes(id)
         );
 
-        const unblockedCount = currentBlockedRolls.length - updatedBlockedList.length;
+        const unblockedCount = currentBlockedIds.length - updatedBlockedIds.length;
 
         if (unblockedCount === 0) {
             res.status(404).json({
@@ -1056,7 +1053,7 @@ export const unblockClubStudentsBulkController = async (req: Request, res: Respo
         }
 
         // Update club's blocked list
-        club.blocked_students = updatedBlockedList;
+        club.blocked_users = updatedBlockedIds.map(id => new Types.ObjectId(id));
         await club.save();
 
         res.status(200).json({

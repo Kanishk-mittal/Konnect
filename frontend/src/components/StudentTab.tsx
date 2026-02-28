@@ -94,13 +94,8 @@ const StudentTab: React.FC<StudentTabProps> = ({
           if (context === 'club') {
             if (isBlocked) {
               // Unblock student for club (remove from club's blocked list)
-              if (!clubId) {
-                alert('Club ID is required');
-                return;
-              }
               postEncryptedData('/club/students/unblock', {
-                studentId: id,
-                clubId: clubId
+                studentId: id
               })
                 .then(() => {
                   alert(`Student ${name} unblocked successfully!`);
@@ -176,8 +171,7 @@ const StudentTab: React.FC<StudentTabProps> = ({
                 if (context === 'club' && clubId) {
                   // Remove from club membership
                   deleteEncryptedData('/club/members/remove', {
-                    studentId: id,
-                    clubId: clubId
+                    studentId: id
                   })
                     .then(() => {
                       alert(`Member ${name} removed from club successfully!`);

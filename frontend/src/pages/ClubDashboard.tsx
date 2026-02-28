@@ -8,7 +8,7 @@ import Header from "../components/Header";
 import ThreePanelSplitLayout from '../components/split/ThreePanelSplitLayout';
 import ClubMembersPanel from '../components/split/ClubMembersPanel';
 import ClubBlockedStudentsPanel from '../components/split/ClubBlockedStudentsPanel';
-import ClubGroupsPanel from '../components/split/ClubGroupsPanel';
+import GroupsPanel from '../components/split/GroupsPanel';
 
 interface Member {
     id: string;
@@ -212,17 +212,17 @@ const ClubDashboard = () => {
                             theme={theme as 'light' | 'dark'}
                             navigate={navigate}
                             topRightSectionColor={topRightSectionColor}
-                            clubId={clubId || undefined}
                         />
                     }
                     rightBottomPanel={
-                        <ClubGroupsPanel
+                        <GroupsPanel
                             theme={theme as 'light' | 'dark'}
                             backgroundColor={bottomRightSectionColor}
                             navigate={navigate}
                             groups={groups}
                             groupsLoading={groupsLoading}
                             textColor={textColor}
+                            basePath="club"
                         />
                     }
                 />
