@@ -13,8 +13,6 @@ export type WrongValue = { row: number; invalidColumns?: string[]; emptyColumns?
 const AddClubMember = () => {
     const navigate = useNavigate();
     const theme = useSelector((state: RootState) => state.theme.theme);
-    const authState = useSelector((state: RootState) => state.auth);
-    const { userId } = authState;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
@@ -138,10 +136,7 @@ const AddClubMember = () => {
 
             const response = await postEncryptedData(
                 '/club/members/add',
-                {
-                    members: membersForBackend,
-                    clubId: userId // Club ID from authenticated user
-                },
+                { members: membersForBackend },
                 { expectEncryptedResponse: false }
             );
 

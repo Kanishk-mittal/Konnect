@@ -517,7 +517,7 @@ export const addClubMembersController = async (req: Request, res: Response): Pro
         // Insert all valid members
         const membershipDocs = validMembers.map(m => ({
             club_id: clubId,
-            student_id: m.studentId,
+            member_id: m.studentId, // ClubMembershipModel uses member_id referencing User
             position: m.position
         }));
 

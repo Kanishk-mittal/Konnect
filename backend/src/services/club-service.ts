@@ -112,11 +112,24 @@ export const validateClubMembers = async (
     const validMembers: Array<{ studentId: string; position: string; roll: string }> = [];
 
     for (const [index, member] of members.entries()) {
-        // Check if student exists in the college
-        const student = await StudentModel.findOne({
-            roll: member.roll,
-            college_code: collegeCode
+        // Roll number is stored as `id` on UserModel; college_code is also on UserModel
+        const user = await UserModel.findOne({
+            id: member.roll,
+            college_code: collegeCode,
+            user_type: 'student'
         });
+
+        if (!user) {
+            validationErrors.push({
+                row: index + 1,
+                roll: member.roll,
+                error: 'Student not found in college'
+            });
+            continue;
+        }
+
+        // Find the Student document linked to this user
+        const student = await StudentModel.findOne({ user_id: user._id });
 
         if (!student) {
             validationErrors.push({
@@ -127,10 +140,10 @@ export const validateClubMembers = async (
             continue;
         }
 
-        // Check if already a member
+        // Check if already a member (member_id refs User, not Student)
         const existingMembership = await ClubMembershipModel.findOne({
             club_id: clubId,
-            student_id: student._id
+            member_id: user._id
         });
 
         if (existingMembership) {
@@ -139,7 +152,7 @@ export const validateClubMembers = async (
         }
 
         validMembers.push({
-            studentId: student._id.toString(),
+            studentId: user._id.toString(), // member_id refs User._id
             position: member.position.trim(),
             roll: member.roll
         });
