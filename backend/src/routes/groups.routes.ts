@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -11,6 +11,34 @@ const router = Router();
 router.get('/',
     authMiddleware,                    // authenticate user
     getUserGroupsController            // controller logic
+);
+
+// Get chat group info
+router.get('/chat/info/:groupId',
+    authMiddleware,
+    getChatGroupInfoController
+);
+
+// Get announcement group info
+router.get('/announcement/info/:groupId',
+    authMiddleware,
+    getAnnouncementGroupInfoController
+);
+
+// Update a chat group - only group admin members can update
+router.put('/chat/update/:groupId',
+    authMiddleware,
+    groupImageUpload.single('image'),
+    handleMulterError,
+    updateChatGroupController
+);
+
+// Update an announcement group - only group admin members can update
+router.put('/announcement/update/:groupId',
+    authMiddleware,
+    groupImageUpload.single('image'),
+    handleMulterError,
+    updateAnnouncementGroupController
 );
 
 // Create a group (supports optional image upload) - Accessible by both admin and club

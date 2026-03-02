@@ -119,3 +119,135 @@ response :-
     }
 }
 ```
+
+### 5. /chat/info/:groupId
+Method :- `GET`
+Description :- Fetches detailed information about a specific chat group, including a list of its members. The authenticated user must be a member of the group.
+Note :- Requires `auth_token` cookie.
+controller :- `getChatGroupInfoController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Chat group information fetched successfully.",
+    "data": {
+        "name": "Tech Enthusiasts",
+        "icon": "http://cloudinary.com/...",
+        "description": "A group for tech lovers",
+        "members": [
+            {
+                "user_id": "65cad...",
+                "id": "21001",
+                "username": "john_doe",
+                "isAdmin": true
+            },
+            {
+                "user_id": "65cad...",
+                "id": "21003",
+                "username": "jane_doe",
+                "isAdmin": false
+            }
+        ]
+    }
+}
+```
+
+### 6. /announcement/info/:groupId
+Method :- `GET`
+Description :- Fetches detailed information about a specific announcement group, including a list of its members. The authenticated user must be a member of the group.
+Note :- Requires `auth_token` cookie.
+controller :- `getAnnouncementGroupInfoController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Announcement group information fetched successfully.",
+    "data": {
+        "name": "Exam Updates",
+        "icon": null,
+        "description": "Official exam announcements",
+        "members": [
+            {
+                "user_id": "65cad...",
+                "id": "21001",
+                "username": "john_doe",
+                "isAdmin": true
+            },
+            {
+                "user_id": "65cad...",
+                "id": "21004",
+                "username": "test_user",
+                "isAdmin": false
+            }
+        ]
+    }
+}
+```
+
+### 7. /chat/update/:groupId
+Method :- `PUT`
+Description :- Updates details for a specific chat group. The authenticated user must be an admin of the group.
+Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).
+Input :- 
+* `image` (File, Optional) - Sent as multipart/form-data.
+* `JSON Payload`:
+```json
+{
+    "groupName": "Updated Chat Group Name",
+    "description": "New description for the chat group.",
+    "admins": ["21001", "21005"],
+    "members": [
+        { "rollNumber": "21001" },
+        { "rollNumber": "21003" },
+        { "rollNumber": "21005" }
+    ]
+}
+```
+controller :- `updateChatGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Chat group updated successfully.",
+    "data": {
+        "id": "65cad...",
+        "name": "Updated Chat Group Name",
+        "description": "New description for the chat group.",
+        "icon": "http://cloudinary.com/..."
+    }
+}
+```
+
+### 8. /announcement/update/:groupId
+Method :- `PUT`
+Description :- Updates details for a specific announcement group. The authenticated user must be an admin of the group.
+Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).
+Input :- 
+* `image` (File, Optional) - Sent as multipart/form-data.
+* `JSON Payload`:
+```json
+{
+    "groupName": "Updated Announcement Group Name",
+    "description": "New description for the announcement group.",
+    "admins": ["21001", "21006"],
+    "members": [
+        { "rollNumber": "21001" },
+        { "rollNumber": "21004" },
+        { "rollNumber": "21006" }
+    ]
+}
+```
+controller :- `updateAnnouncementGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Announcement group updated successfully.",
+    "data": {
+        "id": "65cad...",
+        "name": "Updated Announcement Group Name",
+        "description": "New description for the announcement group.",
+        "icon": "http://cloudinary.com/..."
+    }
+}
+```
