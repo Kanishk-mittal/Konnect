@@ -75,7 +75,25 @@ response :-
 }
 ```
 
-### 5. /password/request-otp
+### 5. /email/:userId
+Method :- `GET`
+Description :- Returns the email id for a specific user, verifying that the requesting user belongs to the same college.
+Parameters :-
+* `userId`: The MongoDB `_id` of the user.
+Note :- Requires `auth_token` cookie.
+controller :- `getUserEmailById`
+response :-
+```json
+{
+    "status": true,
+    "message": "Email retrieved successfully.",
+    "data": {
+        "email": "john@example.com"
+    }
+}
+```
+
+### 6. /password/request-otp
 Method :- `GET`
 Description :- Requests an OTP for password change. The OTP is sent to the user's primary email address.
 Note :- Requires `auth_token` cookie.
@@ -88,7 +106,7 @@ response :-
 }
 ```
 
-### 6. /password/change
+### 7. /password/change
 Method :- `POST`
 Description :- Changes the user's password after verifying the OTP.
 Note :- Requires `auth_token` cookie. The request should be encrypted.
@@ -113,7 +131,7 @@ response :-
 }
 ```
 
-### 7. /login
+### 8. /login
 Method :- `POST`
 Description :- Authenticates a user (Student, Club, Admin, or Faculty).
 Note :- The request body must be encrypted. Returns JWT `auth_token` cookie and encrypted credentials.
@@ -141,7 +159,7 @@ response :-
 }
 ```
 
-### 8. /logout
+### 9. /logout
 Method :- `POST`
 Description :- Logs out the current user by clearing the `auth_token` cookie.
 controller :- `logoutUser`
@@ -153,7 +171,7 @@ response :-
 }
 ```
 
-### 9. /profile/username
+### 10. /profile/username
 Method :- `POST`
 Description :- Updates the username for the currently authenticated user. No encryption required.
 Note :- Requires `auth_token` cookie.

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
     getUserProfilePicture,
     getUserDetails,
+    getUserEmailById,
     getMyDetails,
     updateProfilePicture,
     updateUsername,
@@ -22,6 +23,9 @@ router.get('/profile-picture/:userId', getUserProfilePicture);
 
 // Route to get public details by user ID
 router.get('/details/:userId', getUserDetails);
+
+// Route to get email by user ID (authenticated, same college check)
+router.get('/email/:userId', authMiddleware, getUserEmailById);
 
 // Route to get current user details (from JWT)
 router.get('/details', authMiddleware, getMyDetails);

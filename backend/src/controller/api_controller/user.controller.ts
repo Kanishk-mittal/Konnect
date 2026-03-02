@@ -93,6 +93,76 @@ export const getUserDetails = async (req: Request, res: Response): Promise<void>
 };
 
 /**
+ * Get email for a specific user by their ID
+ * Requires auth and checks if both users share the same college code
+ */
+export const getUserEmailById = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const targetUserId = req.params.userId;
+        const requestingUserId = req.user?.id;
+
+        if (!targetUserId) {
+            res.status(400).json({
+                status: false,
+                message: 'Target User ID is required.'
+            });
+            return;
+        }
+
+        if (!requestingUserId) {
+            res.status(401).json({
+                status: false,
+                message: 'Unauthorized access.'
+            });
+            return;
+        }
+
+        const [targetUser, requestingUser] = await Promise.all([
+            UserModel.findById(targetUserId).select('email_id college_code'),
+            UserModel.findById(requestingUserId).select('college_code')
+        ]);
+
+        if (!targetUser) {
+            res.status(404).json({
+                status: false,
+                message: 'Target user not found.'
+            });
+            return;
+        }
+
+        if (!requestingUser) {
+            res.status(404).json({
+                status: false,
+                message: 'Requesting user not found.'
+            });
+            return;
+        }
+
+        if (targetUser.college_code !== requestingUser.college_code) {
+            res.status(403).json({
+                status: false,
+                message: 'Access denied. College code mismatch.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Email retrieved successfully.',
+            data: {
+                email: targetUser.email_id
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching user email by ID:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching user email.'
+        });
+    }
+};
+
+/**
  * Get current user details from JWT token
  */
 export const getMyDetails = async (req: Request, res: Response): Promise<void> => {
