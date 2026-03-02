@@ -18,6 +18,7 @@ import RemoveClubMember from './pages/RemoveClubMember'
 import BlockClubStudents from './pages/BlockClubStudents'
 import UnblockClubStudents from './pages/UnblockClubStudents'
 import NotFound from './pages/NotFound'
+import EditGroupPage from './pages/EditGroup'
 
 
 const App = () => {
@@ -77,6 +78,7 @@ const App = () => {
       <Route path="/club/unblock-students"
         element={<UnblockClubStudents />}
       />
+      <Route path="/group/edit" element={<EditGroupPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )

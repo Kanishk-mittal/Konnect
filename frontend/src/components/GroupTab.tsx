@@ -15,7 +15,7 @@ interface GroupTabProps {
   name: string;
   icon: string | null;
   type: 'chat' | 'announcement' | 'both';
-  onEdit?: () => void;
+  onEdit?: (chatId?: string, announcementId?: string) => void;
   onDelete?: () => void;
 }
 
@@ -139,7 +139,7 @@ const GroupTab: React.FC<GroupTabProps> = ({
 
       {/* Edit Button */}
       <button
-        onClick={onEdit}
+        onClick={() => onEdit?.(chatId, announcementId)}
         className="flex-shrink-0 p-2 rounded-md hover:opacity-80 transition-opacity"
         disabled={isDeleting}
         style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}

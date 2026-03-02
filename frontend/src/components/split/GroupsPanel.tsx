@@ -29,7 +29,6 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
     navigate,
     groups,
     groupsLoading,
-    textColor,
     basePath
 }) => {
     // Group groups by name to handle both chat and announcement types
@@ -52,10 +51,10 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
             });
         }
         return acc;
-    }, [] as Array<Group & { type: 'chat' | 'announcement' | 'both'; chatId?: string; announcementId?: string }>);
+    }, [] as Array<Omit<Group, 'type'> & { type: 'chat' | 'announcement' | 'both'; chatId?: string; announcementId?: string }>);
 
-    const handleEdit = (groupId: string) => {
-        navigate(`/${basePath}/edit-group/${groupId}`);
+    const handleEdit = (chatId?: string, announcementId?: string) => {
+        navigate(`/group/edit?chatGroupId=${chatId || ''}&announcementGroupId=${announcementId || ''}`);
     };
 
     const handleDelete = () => {
@@ -87,7 +86,7 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
                                 name={group.name}
                                 icon={group.icon}
                                 type={group.type}
-                                onEdit={() => handleEdit(group.id)}
+                                onEdit={handleEdit}
                                 onDelete={() => handleDelete()}
                             />
                         ))
