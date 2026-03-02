@@ -5,13 +5,13 @@ import profileIcon from '../assets/profile_icon.png';
 import sendIcon from '../assets/send.png';
 import editIcon from '../assets/edit.png';
 import deleteIcon from '../assets/delete.png';
+import EditClubModal from './EditClubModal';
 
 interface ClubTabProps {
     id: string;
     name: string;
     email: string;
     icon?: string;
-    onEdit?: () => void;
     onDelete?: () => void;
     onSendMessage?: () => void;
 }
@@ -21,12 +21,12 @@ const ClubTab: React.FC<ClubTabProps> = ({
     name,
     email,
     icon,
-    onEdit,
     onDelete,
     onSendMessage
 }) => {
     const theme = useSelector((state: RootState) => state.theme.theme);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     // Define theme-specific styles
     const backgroundColor = theme === 'light'
@@ -58,52 +58,52 @@ const ClubTab: React.FC<ClubTabProps> = ({
     };
 
     return (
-        <div
-            className="flex flex-row justify-around items-center gap-2 p-1 rounded-lg m-1"
-            style={{
-                backgroundColor: backgroundColor,
-                border: `${borderWidth} solid ${borderColor}`,
-                color: textColor,
-            }}
-        >
-            {/* Club Picture */}
-            <div className="flex-shrink-0">
-                <img
-                    src={icon || profileIcon}
-                    alt="Club"
-                    className="w-12 h-12 rounded-full object-cover"
-                />
-            </div>
+        <>
+            <div
+                className="flex flex-row justify-around items-center gap-2 p-1 rounded-lg m-1"
+                style={{
+                    backgroundColor: backgroundColor,
+                    border: `${borderWidth} solid ${borderColor}`,
+                    color: textColor,
+                }}
+            >
+                {/* Club Picture */}
+                <div className="flex-shrink-0">
+                    <img
+                        src={icon || profileIcon}
+                        alt="Club"
+                        className="w-12 h-12 rounded-full object-cover"
+                    />
+                </div>
 
-            {/* Club Name and Email */}
-            <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{name}</div>
-                <div className="text-xs opacity-75 truncate">{email}</div>
-            </div>
+                {/* Club Name and Email */}
+                <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{name}</div>
+                    <div className="text-xs opacity-75 truncate">{email}</div>
+                </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-shrink-0 gap-1">
-                {/* Send Message Button */}
-                {onSendMessage && (
+                {/* Action Buttons */}
+                <div className="flex flex-shrink-0 gap-1">
+                    {/* Send Message Button */}
+                    {onSendMessage && (
+                        <button
+                            onClick={onSendMessage}
+                            className="p-2 rounded-md hover:opacity-80 transition-opacity"
+                            style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+                            title="Send Message"
+                        >
+                            <img
+                                src={sendIcon}
+                                alt="Send Message"
+                                className="w-5 h-5"
+                                style={{ filter: iconFilter }}
+                            />
+                        </button>
+                    )}
+
+                    {/* Edit Button */}
                     <button
-                        onClick={onSendMessage}
-                        className="p-2 rounded-md hover:opacity-80 transition-opacity"
-                        style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                        title="Send Message"
-                    >
-                        <img
-                            src={sendIcon}
-                            alt="Send Message"
-                            className="w-5 h-5"
-                            style={{ filter: iconFilter }}
-                        />
-                    </button>
-                )}
-
-                {/* Edit Button */}
-                {onEdit && (
-                    <button
-                        onClick={onEdit}
+                        onClick={() => setIsEditModalOpen(true)}
                         className="p-2 rounded-md hover:opacity-80 transition-opacity"
                         style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
                         title="Edit Club"
@@ -115,27 +115,39 @@ const ClubTab: React.FC<ClubTabProps> = ({
                             style={{ filter: iconFilter }}
                         />
                     </button>
-                )}
 
-                {/* Delete Button */}
-                {onDelete && (
-                    <button
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="p-2 rounded-md hover:opacity-80 transition-opacity disabled:opacity-50"
-                        style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                        title="Delete Club"
-                    >
-                        <img
-                            src={deleteIcon}
-                            alt="Delete"
-                            className="w-5 h-5"
-                            style={{ filter: iconFilter }}
-                        />
-                    </button>
-                )}
+                    {/* Delete Button */}
+                    {onDelete && (
+                        <button
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="p-2 rounded-md hover:opacity-80 transition-opacity disabled:opacity-50"
+                            style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+                            title="Delete Club"
+                        >
+                            <img
+                                src={deleteIcon}
+                                alt="Delete"
+                                className="w-5 h-5"
+                                style={{ filter: iconFilter }}
+                            />
+                        </button>
+                    )}
+                </div>
             </div>
-        </div>
+
+            <EditClubModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                clubId={id}
+                currentName={name}
+                currentEmail={email}
+                onSuccess={() => {
+                    alert('Club details updated successfully!');
+                    window.location.reload(); // Or update state to reflect changes
+                }}
+            />
+        </>
     );
 };
 

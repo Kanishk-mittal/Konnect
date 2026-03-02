@@ -1,6 +1,35 @@
 import { z } from 'zod';
 
 /**
+ * Schema for updating club details
+ */
+export const updateClubDetailsSchema = z.object({
+    clubId: z.string().min(1, 'Club ID is required'),
+    newName: z.string().min(1, 'New club name cannot be empty').optional(),
+    newEmail: z.string().email('Invalid email address').optional(),
+}).refine(data => data.newName !== undefined || data.newEmail !== undefined, {
+    message: 'At least one of newName or newEmail must be provided.',
+    path: ['newName', 'newEmail'],
+});
+
+/**
+ * Type inferred from the schema
+ */
+export type UpdateClubDetailsData = z.infer<typeof updateClubDetailsSchema>;
+
+/**
+ * Utility function to validate update club details data
+ */
+export const validateUpdateClubDetailsData = (data: unknown): { status: boolean; message: string; data?: UpdateClubDetailsData } => {
+    const result = updateClubDetailsSchema.safeParse(data);
+    if (!result.success) {
+        const errorMessage = result.error.issues[0]?.message || 'Invalid input.';
+        return { status: false, message: errorMessage };
+    }
+    return { status: true, message: 'Validation successful', data: result.data };
+};
+
+/**
  * Schema for club login data validation
  */
 export const clubLoginSchema = z.object({

@@ -16,7 +16,7 @@ import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { uploadAndCleanup, isCloudinaryConfigured } from '../../utils/cloudinary.utils';
 import { sendOTPEmail } from '../../utils/mailer.utils';
 import { OTP } from '../../utils/otp.utils';
-import { validateCreateClubData, validateAddClubMembersData } from '../../inputSchema/club.schema';
+import { validateCreateClubData, validateAddClubMembersData, validateUpdateClubDetailsData, UpdateClubDetailsData } from '../../inputSchema/club.schema';
 import { getAdminId } from '../../services/admin.services';
 
 // Types
@@ -1073,3 +1073,109 @@ export const unblockClubStudentsBulkController = async (req: Request, res: Respo
         });
     }
 };
+
+/**
+ * Update a club's details (name and email)
+ * Accessible only by an admin.
+ */
+export const updateClubDetailsController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Validate input using Zod
+        const validation = validateUpdateClubDetailsData(req.body);
+        if (!validation.status || !validation.data) {
+            res.status(400).json({
+                status: false,
+                message: validation.message
+            });
+            return;
+        }
+
+        const { clubId, newName, newEmail } = validation.data;
+
+        const adminId = req.user?.id;
+        if (!adminId) {
+            res.status(401).json({ status: false, message: 'Admin authentication required.' });
+            return;
+        }
+
+        // Get admin's college code
+        const adminUser = await UserModel.findById(adminId).select('college_code');
+        if (!adminUser) {
+            res.status(404).json({ status: false, message: 'Admin user not found.' });
+            return;
+        }
+        const collegeCode = adminUser.college_code;
+
+        // Find the club and its associated user
+        const club = await ClubModel.findById(clubId);
+        if (!club) {
+            res.status(404).json({ status: false, message: 'Club not found.' });
+            return;
+        }
+
+        // Verify club is in the same college as the admin
+        if (club.college_code !== collegeCode) {
+            res.status(403).json({
+                status: false,
+                message: 'Admins can only update clubs in their own college.'
+            });
+            return;
+        }
+
+        const clubUser = await UserModel.findById(club.user_id);
+        if (!clubUser) {
+            res.status(404).json({ status: false, message: 'Associated club user account not found.' });
+            return;
+        }
+
+        // Check for uniqueness if newName is provided
+        if (newName && newName !== club.Club_name) {
+            const existingClub = await ClubModel.findOne({ Club_name: newName, college_code: collegeCode });
+            if (existingClub) {
+                res.status(409).json({
+                    status: false,
+                    message: `A club with the name "${newName}" already exists in this college.`
+                });
+                return;
+            }
+            club.Club_name = newName;
+            clubUser.username = newName;
+        }
+
+        // Check for uniqueness if newEmail is provided
+        if (newEmail && newEmail !== club.email) {
+            const existingUser = await UserModel.findOne({ id: newEmail, college_code: collegeCode, user_type: 'club' });
+            if (existingUser) {
+                res.status(409).json({
+                    status: false,
+                    message: `A club with the email "${newEmail}" already exists in this college.`
+                });
+                return;
+            }
+            club.email = newEmail;
+            clubUser.email_id = newEmail;
+            clubUser.id = newEmail; // For clubs, user.id is the email
+        }
+
+        await club.save();
+        await clubUser.save();
+
+        res.status(200).json({
+            status: true,
+            message: 'Club details updated successfully.',
+            data: {
+                clubId: club._id,
+                clubName: club.Club_name,
+                email: club.email
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in updateClubDetailsController:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating club details.'
+        });
+    }
+};
+

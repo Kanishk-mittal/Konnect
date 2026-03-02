@@ -3,6 +3,7 @@ import {
     createClubController,
     getClubsByCollegeCodeController,
     deleteClubController,
+    updateClubDetailsController,
     getClubMembersController,
     getClubBlockedStudentsController,
     getClubGroupsController,
@@ -47,6 +48,14 @@ router.delete('/delete/:clubId',
     authMiddleware,                   // Authenticate user
     adminAuthMiddleware,              // Verify user is admin
     deleteClubController              // Controller logic
+);
+
+// Update club details (requires admin authentication)
+router.put('/update-details',
+    authMiddleware,
+    adminAuthMiddleware,
+    decryptRequest,
+    updateClubDetailsController
 );
 
 // Logout endpoint to clear JWT cookie

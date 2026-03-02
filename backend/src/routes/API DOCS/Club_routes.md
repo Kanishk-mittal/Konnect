@@ -48,7 +48,32 @@ response :- Confirms the deletion of the club and its associated user.
 }
 ```
 
-### 4. /members
+### 4. /update-details
+Method :- `PUT`
+Description :- Updates a club's name and/or email. This is accessible only by an admin. The request must be encrypted.
+input :-
+```json
+{
+    "clubId": "65cad...",
+    "newName": "New Tech Club Name",
+    "newEmail": "newtechclub@exuni.edu"
+}
+```
+controller :- `updateClubDetailsController`
+response :- Returns the updated club details.
+```json
+{
+    "status": true,
+    "message": "Club details updated successfully.",
+    "data": {
+        "clubId": "65cad...",
+        "clubName": "New Tech Club Name",
+        "email": "newtechclub@exuni.edu"
+    }
+}
+```
+
+### 5. /members
 Method :- `GET`
 Description :- Fetches all members (students) for the authenticated club.
 input :- None (Uses authenticated club's credentials).
