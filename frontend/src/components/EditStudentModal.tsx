@@ -62,8 +62,8 @@ const EditStudentModal: React.FC<EditStudentModalProps> = ({
 
         try {
             const response = await postData('/student/update', {
-                id: studentId,
-                name: name.trim(),
+                userId: studentId,
+                fullName: name.trim(),
                 rollNumber: rollNumber.trim(),
                 email: email.trim()
             });

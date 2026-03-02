@@ -214,3 +214,32 @@ response :-
     }
 }
 ```
+
+### 9. /update
+Method :- `POST`
+Description :- Updates student details (email, full name, roll number). Only students belonging to the admin's own college can be updated.
+Note :- Requires `auth_token` cookie and admin privileges.
+Input :- 
+```json
+{
+    "userId": "65cad...",
+    "email": "newemail@example.com",
+    "fullName": "New Full Name",
+    "rollNumber": "NEWROLL001"
+}
+```
+Note :- `userId` is required. `email`, `fullName`, and `rollNumber` are optional.
+controller :- `updateStudentDetails`
+response :- 
+```json
+{
+    "status": true,
+    "message": "Student details updated successfully.",
+    "data": {
+        "userId": "65cad...",
+        "rollNumber": "NEWROLL001",
+        "email": "newemail@example.com",
+        "fullName": "New Full Name"
+    }
+}
+```

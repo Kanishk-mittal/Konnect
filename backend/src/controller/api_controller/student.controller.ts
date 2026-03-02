@@ -14,7 +14,7 @@ import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import * as StudentServices from "../../services/studentService";
 
 // Constants
-import { validateBlockStudentsData, validateUnblockStudentsData } from '../../inputSchema/student.schema';
+import { validateBlockStudentsData, validateUnblockStudentsData, validateUpdateStudentData } from '../../inputSchema/student.schema';
 
 // Types
 type StudentData = {
@@ -763,3 +763,106 @@ export const deleteMultipleStudents = async (req: Request, res: Response): Promi
         });
     }
 }
+
+/**
+ * Update student details by an admin
+ * @param req Request with userId (required), email, fullName, rollNumber (optional) in body
+ * @param res Response with success/failure message
+ */
+export const updateStudentDetails = async (req: Request, res: Response): Promise<void> => {
+    try {
+        // Validate input
+        const validation = validateUpdateStudentData(req.body);
+        if (!validation.status || !validation.data) {
+            res.status(400).json({
+                status: false,
+                message: validation.message
+            });
+            return;
+        }
+
+        const { userId, email, fullName, rollNumber } = validation.data;
+
+        // Get admin details to check college code
+        const adminId = (req as any).user?.id;
+        const adminUser = await userModel.findById(adminId);
+        if (!adminUser || adminUser.user_type !== 'admin') {
+            res.status(403).json({
+                status: false,
+                message: 'Admin not found or unauthorized.'
+            });
+            return;
+        }
+
+        const collegeCode = adminUser.college_code;
+
+        // Find the student in userModel
+        const student = await userModel.findById(userId);
+        if (!student || student.user_type !== 'student') {
+            res.status(404).json({
+                status: false,
+                message: 'Student not found.'
+            });
+            return;
+        }
+
+        // Verify student belongs to the admin's college
+        if (student.college_code !== collegeCode) {
+            res.status(403).json({
+                status: false,
+                message: 'You do not have permission to update students from other colleges.'
+            });
+            return;
+        }
+
+        // If rollNumber is being updated, check for uniqueness within the college
+        if (rollNumber && rollNumber !== student.id) {
+            const existingStudent = await userModel.findOne({
+                id: rollNumber,
+                college_code: collegeCode
+            });
+
+            if (existingStudent) {
+                res.status(400).json({
+                    status: false,
+                    message: `Roll number ${rollNumber} is already in use in your college.`
+                });
+                return;
+            }
+            student.id = rollNumber;
+        }
+
+        // Update fields in userModel
+        if (email) student.email_id = email;
+        if (fullName) student.username = fullName;
+
+        await student.save();
+
+        // Update StudentModel if fullName is provided
+        if (fullName) {
+            await StudentModel.findOneAndUpdate(
+                { user_id: student._id },
+                { fullname: fullName }
+            );
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Student details updated successfully.',
+            data: {
+                userId: student._id.toString(),
+                rollNumber: student.id,
+                email: student.email_id,
+                fullName: student.username
+            }
+        });
+
+    } catch (error) {
+        console.error('Error updating student details:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while updating student details.',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+};
