@@ -169,6 +169,7 @@ const CsvUploader: React.FC<CsvUploaderProps> = ({
           
           {/* Upload Button */}
           <button
+            type="button"
             onClick={handleClick}
             className={`
               px-6 py-3 rounded-lg font-medium transition-all duration-300
@@ -214,6 +215,7 @@ const CsvUploader: React.FC<CsvUploaderProps> = ({
                   <span className={theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}>({(file.size / 1024).toFixed(1)} KB)</span>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setFiles(files.filter((_, i) => i !== index))}
                   className="text-red-500 hover:text-red-700 transition-colors"
                 >
@@ -229,6 +231,7 @@ const CsvUploader: React.FC<CsvUploaderProps> = ({
           {files.length > 0 && (
             <div className="mt-4 flex justify-center">
               <button
+                type="button"
                 onClick={handleCsvSubmit}
                 className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

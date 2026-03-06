@@ -143,28 +143,38 @@ const EditGroupPage: React.FC<EditGroupProps> = ({ redirectUrl }) => {
                 members: validMembers.map(m => ({ rollNumber: m.rollNumber }))
             };
 
-            const formDataToSend = new FormData();
-            formDataToSend.append('groupData', JSON.stringify(groupData));
-            
-            if (groupIconFile) {
-                formDataToSend.append('image', groupIconFile);
+            const axiosConfig = {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                withCredentials: true
+            };
+
+            // Function to create a fresh FormData instance for each request
+            const createFormData = () => {
+                const fd = new FormData();
+                fd.append('groupData', JSON.stringify(groupData));
+                if (groupIconFile) {
+                    fd.append('image', groupIconFile);
+                }
+                return fd;
+            };
+
+            const updateRequests = [];
+            if (chatGroupId) {
+                updateRequests.push(
+                    axios.put(`${API_BASE_URL}/groups/chat/update/${chatGroupId}`, createFormData(), axiosConfig)
+                );
+            }
+            if (announcementGroupId) {
+                updateRequests.push(
+                    axios.put(`${API_BASE_URL}/groups/announcement/update/${announcementGroupId}`, createFormData(), axiosConfig)
+                );
             }
 
-            const endpoint = isChatType 
-                ? `${API_BASE_URL}/groups/chat/update/${chatGroupId}`
-                : `${API_BASE_URL}/groups/announcement/update/${announcementGroupId}`;
+            const responses = await Promise.all(updateRequests);
+            const allSuccessful = responses.every(res => res.data && res.data.status);
 
-            const response = await axios.put(
-                endpoint,
-                formDataToSend,
-                {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                    withCredentials: true
-                }
-            );
-
-            if (response.data && response.data.status) {
-                setSuccessMessage(response.data.message || 'Group updated successfully!');
+            if (allSuccessful) {
+                setSuccessMessage('Group(s) updated successfully!');
                 setTimeout(() => {
                     if (redirectUrl) {
                         navigate(redirectUrl);
@@ -173,7 +183,8 @@ const EditGroupPage: React.FC<EditGroupProps> = ({ redirectUrl }) => {
                     }
                 }, 2000);
             } else {
-                setErrorMessage(response.data?.message || 'Failed to update group');
+                const failedResponse = responses.find(res => !res.data.status);
+                setErrorMessage(failedResponse?.data?.message || 'Failed to update one or more groups');
             }
         } catch (error: any) {
             console.error('Error updating group:', error);
