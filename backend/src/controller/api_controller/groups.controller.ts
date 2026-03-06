@@ -7,7 +7,7 @@ import AnnouncementGroupModel from '../../models/announcementGroup.model';
 import ChatGroupMembershipModel from '../../models/chatGroupMembership.model';
 import AnnouncementGroupMembershipModel from '../../models/announcementGroupMembership.model';
 
-import { validateCreateGroupData, CreateGroupData } from '../../inputSchema/group.schema';
+import { validateCreateGroupData, CreateGroupData, validateUpdateGroupData } from '../../inputSchema/group.schema';
 import userModel from '../../models/user.model';
 
 // Export the configured multer upload for groups
@@ -518,14 +518,15 @@ export const updateChatGroupController = async (req: Request, res: Response): Pr
             return;
         }
 
-        // 2. Extract payload
-        const { groupName, description, admins, members } = JSON.parse(req.body.groupData);
-
-        // Basic validation for required fields
-        if (!groupName || typeof groupName !== 'string' || groupName.trim() === '') {
-            res.status(400).json({ status: false, message: 'Group name is required.' });
+        // 2. Extract and validate payload
+        const rawData = typeof req.body.groupData === 'string' ? JSON.parse(req.body.groupData) : req.body;
+        const validation = validateUpdateGroupData(rawData);
+        if (!validation.status) {
+            res.status(400).json({ status: false, message: validation.message });
             return;
         }
+
+        const payload = validation.data!;
 
         // 3. Handle Image Upload (optional)
         let icon: string | undefined;
@@ -546,8 +547,8 @@ export const updateChatGroupController = async (req: Request, res: Response): Pr
 
         // 4. Update Chat Group basic details
         const updateFields: any = {
-            name: groupName,
-            description: description || '',
+            name: payload.groupName,
+            description: payload.description || '',
         };
         if (icon !== undefined) {
             updateFields.icon = icon;
@@ -565,18 +566,20 @@ export const updateChatGroupController = async (req: Request, res: Response): Pr
         }
 
         // 5. Handle Members and Admins update
-        const incomingAdmins = Array.isArray(admins) ? admins : [];
-        const incomingMembers = Array.isArray(members) ? members.map((m: any) => m.rollNumber) : [];
+        const incomingAdmins = payload.admins;
+        const incomingMembers = payload.members.map(m => m.rollNumber);
         const allIncomingRolls = [...new Set([...incomingAdmins, ...incomingMembers])];
 
         const users = await userModel.find({ id: { $in: allIncomingRolls } }).select('_id id').lean();
         const newUserMap = new Map<string, Types.ObjectId>(users.map(u => [u.id, u._id]));
 
         const existingMemberships = await ChatGroupMembershipModel.find({ group: groupId }).populate('member', 'id').lean();
-        const existingMemberMap = new Map<Types.ObjectId, { isAdmin: boolean, roll: string, membershipId: Types.ObjectId }>(
+        
+        // Use roll number (id) as key to avoid ObjectId comparison issues
+        const existingMemberMap = new Map<string, { isAdmin: boolean, membershipId: Types.ObjectId }>(
             existingMemberships.map(m => [
-                m.member as Types.ObjectId,
-                { isAdmin: m.isAdmin, roll: (m.member as any).id, membershipId: m._id as Types.ObjectId }
+                (m.member as any).id,
+                { isAdmin: m.isAdmin, membershipId: m._id as Types.ObjectId }
             ])
         );
 
@@ -590,20 +593,19 @@ export const updateChatGroupController = async (req: Request, res: Response): Pr
             }
 
             const isNewAdmin = incomingAdmins.includes(roll);
-            const existingMembership = Array.from(existingMemberMap.values()).find(em => em.roll === roll);
+            const existingMember = existingMemberMap.get(roll);
 
-            if (existingMembership) {
-                if (existingMembership.isAdmin !== isNewAdmin) {
+            if (existingMember) {
+                if (existingMember.isAdmin !== isNewAdmin) {
                     operations.push(
                         ChatGroupMembershipModel.updateOne(
-                            { _id: existingMembership.membershipId },
+                            { _id: existingMember.membershipId },
                             { $set: { isAdmin: isNewAdmin } }
                         )
                     );
                 }
-                // Mark as processed
-                const key = Array.from(existingMemberMap.keys()).find(k => k.equals(memberObjectId));
-                if (key) existingMemberMap.delete(key);
+                // Mark as processed by removing from map
+                existingMemberMap.delete(roll);
             } else {
                 operations.push(
                     ChatGroupMembershipModel.create({
@@ -615,10 +617,9 @@ export const updateChatGroupController = async (req: Request, res: Response): Pr
             }
         }
 
-        for (const [memberObjectId, membershipInfo] of existingMemberMap.entries()) {
-            if (!allIncomingRolls.includes(membershipInfo.roll)) {
-                operations.push(ChatGroupMembershipModel.deleteOne({ _id: membershipInfo.membershipId }));
-            }
+        // Remove any members not present in the incoming list
+        for (const [roll, info] of existingMemberMap.entries()) {
+            operations.push(ChatGroupMembershipModel.deleteOne({ _id: info.membershipId }));
         }
 
         await Promise.all(operations);
@@ -662,14 +663,15 @@ export const updateAnnouncementGroupController = async (req: Request, res: Respo
             return;
         }
 
-        // 2. Extract payload
-        const { groupName, description, admins, members } = JSON.parse(req.body.groupData);
-
-        // Basic validation for required fields
-        if (!groupName || typeof groupName !== 'string' || groupName.trim() === '') {
-            res.status(400).json({ status: false, message: 'Group name is required.' });
+        // 2. Extract and validate payload
+        const rawData = typeof req.body.groupData === 'string' ? JSON.parse(req.body.groupData) : req.body;
+        const validation = validateUpdateGroupData(rawData);
+        if (!validation.status) {
+            res.status(400).json({ status: false, message: validation.message });
             return;
         }
+
+        const payload = validation.data!;
 
         // 3. Handle Image Upload (optional)
         let icon: string | undefined;
@@ -690,8 +692,8 @@ export const updateAnnouncementGroupController = async (req: Request, res: Respo
 
         // 4. Update Announcement Group basic details
         const updateFields: any = {
-            name: groupName,
-            description: description || '',
+            name: payload.groupName,
+            description: payload.description || '',
         };
         if (icon !== undefined) {
             updateFields.icon = icon;
@@ -709,18 +711,20 @@ export const updateAnnouncementGroupController = async (req: Request, res: Respo
         }
 
         // 5. Handle Members and Admins update
-        const incomingAdmins = Array.isArray(admins) ? admins : [];
-        const incomingMembers = Array.isArray(members) ? members.map((m: any) => m.rollNumber) : [];
+        const incomingAdmins = payload.admins;
+        const incomingMembers = payload.members.map(m => m.rollNumber);
         const allIncomingRolls = [...new Set([...incomingAdmins, ...incomingMembers])];
 
         const users = await userModel.find({ id: { $in: allIncomingRolls } }).select('_id id').lean();
         const newUserMap = new Map<string, Types.ObjectId>(users.map(u => [u.id, u._id]));
 
         const existingMemberships = await AnnouncementGroupMembershipModel.find({ group: groupId }).populate('member', 'id').lean();
-        const existingMemberMap = new Map<Types.ObjectId, { isAdmin: boolean, roll: string, membershipId: Types.ObjectId }>(
+        
+        // Use roll number (id) as key to avoid ObjectId comparison issues
+        const existingMemberMap = new Map<string, { isAdmin: boolean, membershipId: Types.ObjectId }>(
             existingMemberships.map(m => [
-                m.member as Types.ObjectId,
-                { isAdmin: m.isAdmin, roll: (m.member as any).id, membershipId: m._id as Types.ObjectId }
+                (m.member as any).id,
+                { isAdmin: m.isAdmin, membershipId: m._id as Types.ObjectId }
             ])
         );
 
@@ -734,19 +738,19 @@ export const updateAnnouncementGroupController = async (req: Request, res: Respo
             }
 
             const isNewAdmin = incomingAdmins.includes(roll);
-            const existingMembership = Array.from(existingMemberMap.values()).find(em => em.roll === roll);
+            const existingMember = existingMemberMap.get(roll);
 
-            if (existingMembership) {
-                if (existingMembership.isAdmin !== isNewAdmin) {
+            if (existingMember) {
+                if (existingMember.isAdmin !== isNewAdmin) {
                     operations.push(
                         AnnouncementGroupMembershipModel.updateOne(
-                            { _id: existingMembership.membershipId },
+                            { _id: existingMember.membershipId },
                             { $set: { isAdmin: isNewAdmin } }
                         )
                     );
                 }
-                const key = Array.from(existingMemberMap.keys()).find(k => k.equals(memberObjectId));
-                if (key) existingMemberMap.delete(key);
+                // Mark as processed by removing from map
+                existingMemberMap.delete(roll);
             } else {
                 operations.push(
                     AnnouncementGroupMembershipModel.create({
@@ -758,10 +762,9 @@ export const updateAnnouncementGroupController = async (req: Request, res: Respo
             }
         }
 
-        for (const [memberObjectId, membershipInfo] of existingMemberMap.entries()) {
-            if (!allIncomingRolls.includes(membershipInfo.roll)) {
-                operations.push(AnnouncementGroupMembershipModel.deleteOne({ _id: membershipInfo.membershipId }));
-            }
+        // Remove any members not present in the incoming list
+        for (const [roll, info] of existingMemberMap.entries()) {
+            operations.push(AnnouncementGroupMembershipModel.deleteOne({ _id: info.membershipId }));
         }
 
         await Promise.all(operations);

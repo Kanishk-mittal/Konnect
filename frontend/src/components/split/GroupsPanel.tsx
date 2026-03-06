@@ -54,7 +54,7 @@ const GroupsPanel: React.FC<GroupsPanelProps> = ({
     }, [] as Array<Omit<Group, 'type'> & { type: 'chat' | 'announcement' | 'both'; chatId?: string; announcementId?: string }>);
 
     const handleEdit = (chatId?: string, announcementId?: string) => {
-        navigate(`/group/edit?chatGroupId=${chatId || ''}&announcementGroupId=${announcementId || ''}`);
+        navigate(`/${basePath}/group/edit?chatGroupId=${chatId || ''}&announcementGroupId=${announcementId || ''}`);
     };
 
     const handleDelete = () => {

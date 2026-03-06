@@ -63,6 +63,12 @@ const App = () => {
       <Route path="/club/add-group"
         element={<AddGroup redirectUrl="/club/dashboard" editProfileUrl="/club/edit-profile" />}
       />
+      <Route path="/admin/group/edit"
+        element={<EditGroupPage redirectUrl="/admin/dashboard" />}
+      />
+      <Route path="/club/group/edit"
+        element={<EditGroupPage redirectUrl="/club/dashboard" />}
+      />
       <Route path="/admin/add-club"
         element={<AddClub />}
       />
@@ -78,7 +84,6 @@ const App = () => {
       <Route path="/club/unblock-students"
         element={<UnblockClubStudents />}
       />
-      <Route path="/group/edit" element={<EditGroupPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )

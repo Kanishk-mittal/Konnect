@@ -190,7 +190,8 @@ Description :- Updates details for a specific chat group. The authenticated user
 Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).
 Input :- 
 * `image` (File, Optional) - Sent as multipart/form-data.
-* `JSON Payload`:
+* `groupData` (String, Required) - JSON string containing group details.
+`JSON Payload`:
 ```json
 {
     "groupName": "Updated Chat Group Name",
@@ -224,7 +225,8 @@ Description :- Updates details for a specific announcement group. The authentica
 Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).
 Input :- 
 * `image` (File, Optional) - Sent as multipart/form-data.
-* `JSON Payload`:
+* `groupData` (String, Required) - JSON string containing group details.
+`JSON Payload`:
 ```json
 {
     "groupName": "Updated Announcement Group Name",
