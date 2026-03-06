@@ -19,6 +19,7 @@ import BlockClubStudents from './pages/BlockClubStudents'
 import UnblockClubStudents from './pages/UnblockClubStudents'
 import NotFound from './pages/NotFound'
 import EditGroupPage from './pages/EditGroup'
+import Chat from './pages/Chat'
 
 
 const App = () => {
@@ -32,6 +33,12 @@ const App = () => {
       />
       <Route path="/student/login"
         element={<StudentLogin />}
+      />
+       <Route path="/chat"
+        element={<Chat />}
+      />
+      <Route path="/chat/:chatType/:id"
+        element={<Chat />}
       />
       <Route path="/club/login"
         element={<ClubLogin />}

@@ -83,7 +83,7 @@ const StudentLogin = () => {
 
         // Navigate after a brief delay to show success message
         setTimeout(() => {
-          navigate('/student/dashboard');
+          navigate('/chat');
         }, 1000);
       } else {
         const errorMsg = response?.message || 'Login failed. Please try again.';
