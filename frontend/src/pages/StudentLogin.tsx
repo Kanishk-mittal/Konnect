@@ -25,7 +25,7 @@ const StudentLogin = () => {
 
   const [formData, setFormData] = useState({
     collegeCode: '',
-    rollNumber: '',
+    id: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +48,7 @@ const StudentLogin = () => {
       dispatch(clearAuth());
 
       // Validate required fields
-      if (!formData.collegeCode || !formData.rollNumber || !formData.password) {
+      if (!formData.collegeCode || !formData.id || !formData.password) {
         setErrorMessage('All fields are required');
         setIsLoading(false);
         return;
@@ -56,10 +56,10 @@ const StudentLogin = () => {
 
       // Use postEncryptedData for simplified encryption handling
       const response = await postEncryptedData(
-        '/student/login',
+        '/user/login',
         {
           collegeCode: formData.collegeCode,
-          rollNumber: formData.rollNumber,
+          id: formData.id,
           password: formData.password
         },
         { expectEncryptedResponse: true }
@@ -142,8 +142,8 @@ const StudentLogin = () => {
                 width={100}
                 state={formData}
                 setState={setFormData}
-                keyName="rollNumber"
-                label="Roll Number"
+                keyName="id"
+                label="ID (Roll Number or Email)"
                 type="text"
               />
               <InputComponent
