@@ -192,3 +192,32 @@ response :-
     }
 }
 ```
+
+### 11. /users/college
+Method :- `GET`
+Description :- Returns all users from the same college as the authenticated user.
+Note :- Requires `auth_token` cookie.
+controller :- `getUsersByCollege`
+response :-
+```json
+{
+    "status": true,
+    "message": "Users retrieved successfully.",
+    "data": [
+        {
+            "_id": "60d0fe4f5311236168a109ca",
+            "id": "student123",
+            "username": "John Doe",
+            "user_type": "student",
+            "profile_picture": "http://cloudinary.com/..."
+        },
+        {
+            "_id": "60d0fe4f5311236168a109cb",
+            "id": "jane.doe@example.com",
+            "username": "Jane Doe",
+            "user_type": "faculty",
+            "profile_picture": null
+        }
+    ]
+}
+```

@@ -209,6 +209,50 @@ export const getMyDetails = async (req: Request, res: Response): Promise<void> =
 };
 
 /**
+ * Get all users from the same college as the authenticated user
+ */
+export const getUsersByCollege = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestingUserId = req.user?.id;
+
+        if (!requestingUserId) {
+            res.status(401).json({
+                status: false,
+                message: 'Unauthorized access.'
+            });
+            return;
+        }
+
+        const requestingUser = await UserModel.findById(requestingUserId).select('college_code');
+
+        if (!requestingUser) {
+            res.status(404).json({
+                status: false,
+                message: 'Requesting user not found.'
+            });
+            return;
+        }
+
+        const collegeCode = requestingUser.college_code;
+
+        const users = await UserModel.find({ college_code: collegeCode }).select('_id id username user_type profile_picture');
+
+        res.status(200).json({
+            status: true,
+            message: 'Users retrieved successfully.',
+            data: users
+        });
+
+    } catch (error) {
+        console.error('Error fetching users by college:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching users.'
+        });
+    }
+};
+
+/**
  * Update current user's profile picture
  * Requires authentication - gets user ID from JWT token
  */

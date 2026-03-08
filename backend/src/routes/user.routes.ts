@@ -4,6 +4,7 @@ import {
     getUserDetails,
     getUserEmailById,
     getMyDetails,
+    getUsersByCollege,
     updateProfilePicture,
     updateUsername,
     requestPasswordChangeOTP,
@@ -29,6 +30,9 @@ router.get('/email/:userId', authMiddleware, getUserEmailById);
 
 // Route to get current user details (from JWT)
 router.get('/details', authMiddleware, getMyDetails);
+
+// Route to get all users from the same college
+router.get('/users/college', authMiddleware, getUsersByCollege);
 
 // Route to update profile picture (authenticated)
 router.post('/profile-picture',
@@ -63,3 +67,4 @@ router.post('/login',
 router.post('/logout', logoutUser);
 
 export default router;
+
