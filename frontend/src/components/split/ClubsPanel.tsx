@@ -48,7 +48,6 @@ const ClubsPanel: React.FC<ClubsPanelProps> = ({
 
     const handleSendMessage = (clubId: string) => {
         // TODO: Implement send message functionality
-        console.log('Send message to club:', clubId);
     };
 
     return (

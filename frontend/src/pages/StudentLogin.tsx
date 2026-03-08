@@ -40,9 +40,7 @@ const StudentLogin = () => {
 
     try {
       // First, clear any existing session (logout from any previous admin/club/student session)
-      await logout('admin'); // Try to clear admin cookie
-      await logout('club');  // Try to clear club cookie
-      await logout('student'); // Try to clear student cookie
+      await logout(); // Clears the auth_token cookie regardless of user type
 
       // Clear Redux state
       dispatch(clearAuth());
@@ -69,14 +67,14 @@ const StudentLogin = () => {
         setSuccessMessage(response.message || 'Login successful!');
 
         // Handle response (now automatically decrypted)
-        if (response.privateKey && response.id) {
+        if (response.data?.privateKey && response.data?.id) {
           // Save to Redux store (primary storage)
-          dispatch(setPrivateKey(response.privateKey));
-          dispatch(setUserId(response.id));
+          dispatch(setPrivateKey(response.data.privateKey));
+          dispatch(setUserId(response.data.id));
           dispatch(setUserType('student'));
 
           // Save to localStorage as backup
-          await savePrivateKey(response.privateKey, 'student', response.id);
+          await savePrivateKey(response.data.privateKey, 'student', response.data.id);
         }
 
         dispatch(setAuthenticated(true));

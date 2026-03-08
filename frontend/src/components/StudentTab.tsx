@@ -146,7 +146,7 @@ const StudentTab: React.FC<StudentTabProps> = ({
           <div className="flex flex-shrink-0 gap-1">
             {/* Send Button */}
             <button
-              onClick={() => console.log('Send clicked for', name, 'ID:', id)}
+              onClick={() => { }}
               className="p-2 rounded-md hover:opacity-80 transition-opacity"
               style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
             >

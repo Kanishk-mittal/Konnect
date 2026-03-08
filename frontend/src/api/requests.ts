@@ -123,18 +123,16 @@ export const deleteData = async (endpoint: string, data: any) => {
 }
 
 /**
- * Logs out the current user by clearing the auth token cookie
- * Can be used for admin, club, or student logout
- * @param userType - 'admin', 'club', or 'student'
+ * Logs out the current user by clearing the auth token cookie.
+ * This is a unified logout for all user types.
  */
-export const logout = async (userType: 'admin' | 'club' | 'student' = 'admin') => {
+export const logout = async () => {
     try {
-        const endpoint = `/${userType}/logout`;
+        const endpoint = '/user/logout';
         const response = await instance.post(endpoint);
         return response.data;
     } catch (error) {
-        // Even if logout fails on server, we consider it successful
-        // The cookie will expire eventually
+        // Even if logout fails on server, we can continue
         console.warn('Logout request failed, but continuing:', error);
         return { status: true, message: 'Logged out locally' };
     }

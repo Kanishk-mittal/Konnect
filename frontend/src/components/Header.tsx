@@ -17,10 +17,6 @@ const Header = () => {
     const dispatch = useDispatch();
     const { isAuthenticated, userId, userType } = useSelector((state: RootState) => state.auth)
 
-    // Debug: Log authentication state
-    useEffect(() => {
-        console.log('isAuthenticated:', isAuthenticated, 'userId:', userId)
-    }, [isAuthenticated, userId])
     const [profilePicture, setProfilePicture] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [showTooltip, setShowTooltip] = useState(false)
