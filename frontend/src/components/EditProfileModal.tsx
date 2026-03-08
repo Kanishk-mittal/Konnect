@@ -4,6 +4,8 @@ import type { RootState } from '../store/store';
 import editIcon from '../assets/edit.png';
 import profileIcon from '../assets/profile_icon.png';
 import { getData, postData, postEncryptedData } from '../api/requests';
+import openEyeIcon from '../assets/open_eye.png';
+import closeEyeIcon from '../assets/colse_eye.png';
 
 interface EditProfileModalProps {
     isOpen: boolean;
@@ -20,6 +22,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [otp, setOtp] = useState('');
     const [showOtpField, setShowOtpField] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -287,33 +292,60 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
                 <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-3">Change Password</h3>
                     <div className="space-y-3">
-                        <input
-                            type="password"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border"
-                            style={inputStyle}
-                            placeholder="Current Password"
-                            disabled={isLoading || showOtpField}
-                        />
-                        <input
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border"
-                            style={inputStyle}
-                            placeholder="New Password (min 12 chars, upper, lower, number, special)"
-                            disabled={isLoading || showOtpField}
-                        />
-                        <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border"
-                            style={inputStyle}
-                            placeholder="Confirm New Password"
-                            disabled={isLoading || showOtpField}
-                        />
+                        <div className="relative">
+                            <input
+                                type={showCurrentPassword ? 'text' : 'password'}
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                className="w-full px-4 py-2 rounded-lg border pr-12"
+                                style={inputStyle}
+                                placeholder="Current Password"
+                                disabled={isLoading || showOtpField}
+                            />
+                            <button
+                                type="button"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            >
+                                <img src={showCurrentPassword ? openEyeIcon : closeEyeIcon} alt="Toggle visibility" className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="relative">
+                            <input
+                                type={showNewPassword ? 'text' : 'password'}
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="w-full px-4 py-2 rounded-lg border pr-12"
+                                style={inputStyle}
+                                placeholder="New Password (min 12 chars, upper, lower, number, special)"
+                                disabled={isLoading || showOtpField}
+                            />
+                            <button
+                                type="button"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                            >
+                                <img src={showNewPassword ? openEyeIcon : closeEyeIcon} alt="Toggle visibility" className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="relative">
+                            <input
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className="w-full px-4 py-2 rounded-lg border pr-12"
+                                style={inputStyle}
+                                placeholder="Confirm New Password"
+                                disabled={isLoading || showOtpField}
+                            />
+                            <button
+                                type="button"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                                <img src={showConfirmPassword ? openEyeIcon : closeEyeIcon} alt="Toggle visibility" className="w-6 h-6" />
+                            </button>
+                        </div>
 
                         {showOtpField ? (
                             <>
