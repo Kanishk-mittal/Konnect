@@ -8,6 +8,7 @@ import deleteIcon from '../assets/delete.png';
 import { deleteEncryptedData, postEncryptedData } from '../api/requests';
 import EditPositionModal from './EditPositionModal';
 import EditStudentModal from "./EditStudentModal";
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 interface StudentTabProps {
   id: string;
@@ -33,6 +34,7 @@ const StudentTab: React.FC<StudentTabProps> = ({
   const theme = useSelector((state: RootState) => state.theme.theme);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const navigate = useNavigate(); // Initialize useNavigate
 
   // Define theme-specific styles with red tint for blocked students
   let backgroundColor, borderColor;
@@ -146,7 +148,7 @@ const StudentTab: React.FC<StudentTabProps> = ({
           <div className="flex flex-shrink-0 gap-1">
             {/* Send Button */}
             <button
-              onClick={() => { }}
+              onClick={() => { navigate(`/chat/chat/${id}`) }} // Navigate to chat page
               className="p-2 rounded-md hover:opacity-80 transition-opacity"
               style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
             >
