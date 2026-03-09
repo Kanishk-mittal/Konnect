@@ -8,14 +8,14 @@ import { setChat } from '../store/chatSlice';
 
 // Components
 import Header from '../components/Header';
+import ChatLeftPanel from '../components/ChatLeftPanel';
+import ChatWindow from '../components/ChatWindow';
 
 const Chat = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
   const { chatType: chatTypeFromUrl, id: idFromUrl } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
-  const { chatType, chatId } = useSelector((state: RootState) => state.chat);
 
   useEffect(() => {
     if (chatTypeFromUrl && idFromUrl) {
@@ -31,7 +31,7 @@ const Chat = () => {
 
   // Define theme-specific colors
   const leftPanelColor = theme === 'dark' ? '#1f2937' : '#FFC362';
-  const rightPanelColor = theme === 'dark' ? '#240046' : '#FFDEA8';
+  const rightPanelColor = theme === 'dark' ? '#1f2937' : '#FFC362';
 
   const backgroundGradient = theme === 'dark'
     ? 'linear-gradient(180deg, #000000 0%, #0E001B 8%)'
@@ -55,12 +55,10 @@ const Chat = () => {
             className="flex h-full w-full split"
         >
             <div style={{ backgroundColor: leftPanelColor }} className="h-full w-full rounded-lg p-4">
-                <h2 className="text-xl font-bold">Left Panel</h2>
+                <ChatLeftPanel theme={theme} />
             </div>
             <div style={{ backgroundColor: rightPanelColor }} className="h-full w-full rounded-lg p-4">
-                <h2 className="text-xl font-bold">Right Panel</h2>
-                 <p>Chat Type: {chatType || 'Not specified'}</p>
-                 <p>ID: {chatId || 'Not specified'}</p>
+                <ChatWindow />
             </div>
         </Split>
       </div>
