@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setChatType, setChatId } from '../store/chatSlice';
 import type { RootState } from '../store/store';
 import ChatItem from './ChatItem';
 import { getData } from '../api/requests';
+import { getItems, upsertItems, updateItemTimestamp, type StoreName, CHAT_STORE, GROUP_STORE, ANNOUNCEMENT_STORE } from '../utils/db';
 
 interface ListItem {
   id: string;
   name: string;
   profilePicture: string | null;
   unreadCount: number;
+  lastAccessed: number;
 }
 
 interface ChatLeftPanelProps {
@@ -22,51 +24,70 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const [listItems, setListItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchItems = async () => {
-      setLoading(true);
-      setListItems([]);
-      try {
-        let endpoint = '';
-        if (chatType === 'chat') {
-          endpoint = '/user/users/college';
-        } else if (chatType === 'group') {
-          endpoint = '/groups/member-of/chat';
-        } else if (chatType === 'announcement') {
-          endpoint = '/groups/member-of/announcement';
-        }
+  const getStoreName = useCallback((): StoreName => {
+    if (chatType === 'chat') return CHAT_STORE;
+    if (chatType === 'group') return GROUP_STORE;
+    return ANNOUNCEMENT_STORE;
+  }, [chatType]);
 
-        if (endpoint) {
-          const response = await getData(endpoint);
-          let items: ListItem[] = [];
-          if (chatType === 'chat') {
-            items = response.data.map((user: any) => ({
-              id: user._id,
-              name: user.username,
-              profilePicture: user.profile_picture || null,
-              unreadCount: 0, // Placeholder for now
-            }));
-          } else { // group and announcement
-            items = response.data.map((group: any) => ({
-              id: group.id,
-              name: group.name,
-              profilePicture: group.icon || null,
-              unreadCount: 0, // Placeholder for now
-            }));
-          }
-          setListItems(items);
+  useEffect(() => {
+    const fetchAndStoreItems = async () => {
+      setLoading(true);
+      const storeName = getStoreName();
+      
+      // 1. Load from IndexedDB first for quick display
+      try {
+        const cachedItems = await getItems(storeName);
+        if (cachedItems.length > 0) {
+          setListItems(cachedItems.map(item => ({ ...item, unreadCount: 0 })));
         }
       } catch (error) {
-        console.error(`Error fetching ${chatType}s:`, error);
+        console.error('Error loading from IndexedDB:', error);
       } finally {
         setLoading(false);
       }
+
+      // 2. Fetch from network and update DB/UI
+      try {
+        let endpoint = '';
+        if (chatType === 'chat') endpoint = '/user/users/college';
+        else if (chatType === 'group') endpoint = '/groups/member-of/chat';
+        else endpoint = '/groups/member-of/announcement';
+
+        const response = await getData(endpoint);
+        let networkItems: Array<{ id: string; name: string; profilePicture: string | null; }> = [];
+
+        if (chatType === 'chat') {
+          networkItems = response.data.map((user: any) => ({
+            id: user._id,
+            name: user.username,
+            profilePicture: user.profile_picture || null,
+          }));
+        } else {
+          networkItems = response.data.map((group: any) => ({
+            id: group.id,
+            name: group.name,
+            profilePicture: group.icon || null,
+          }));
+        }
+        
+        await upsertItems(storeName, networkItems);
+        const updatedItems = await getItems(storeName);
+        setListItems(updatedItems.map(item => ({ ...item, unreadCount: 0 })));
+
+      } catch (error) {
+        console.error(`Error fetching ${chatType}s:`, error);
+      }
     };
 
-    fetchItems();
-  }, [chatType]);
+    fetchAndStoreItems();
+  }, [chatType, getStoreName]);
 
-  // Theme-aware styling for the tab selector
+  const handleItemClick = (id: string) => {
+    dispatch(setChatId(id));
+  };
+
+  // Theme-aware styling
   const tabContainerStyle = {
     backgroundColor: theme === 'dark' ? '#111827' : '#FEF3C7',
     padding: '0.5rem',
@@ -82,10 +103,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const inactiveTabStyle = {
     backgroundColor: 'transparent',
     color: theme === 'dark' ? '#9CA3AF' : '#78350F',
-  };
-
-  const handleItemClick = (id: string) => {
-    dispatch(setChatId(id));
   };
 
   return (
@@ -117,13 +134,13 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
 
       {/* List content based on selected tab */}
       <div className="flex-grow overflow-y-auto">
-        {loading ? (
+        {loading && listItems.length === 0 ? (
           <div className="flex justify-center items-center h-full">
             <p style={{ color: theme === 'dark' ? 'white' : 'black' }}>Loading...</p>
           </div>
         ) : (
           <div>
-            {listItems.map(item => <ChatItem key={item.id} {...item} onClick={handleItemClick} />)}
+            {listItems.map(item => <ChatItem key={item.id} {...item} onClick={() => handleItemClick(item.id)} />)}
           </div>
         )}
       </div>
