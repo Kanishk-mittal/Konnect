@@ -305,3 +305,19 @@ response :-
     }
 }
 ```
+
+### 11. /announcement/is-admin/:groupId
+Method :- `GET`
+Description :- Checks if the currently authenticated user is an admin of a specific announcement group.
+Note :- Requires `auth_token` cookie.
+controller :- `isUserAdminOfAnnouncementGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Admin status checked successfully.",
+    "data": {
+        "isAdmin": true
+    }
+}
+```

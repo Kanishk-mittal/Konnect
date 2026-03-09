@@ -30,6 +30,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
     const [chatIcon, setChatIcon] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [isUserAdmin, setIsUserAdmin] = useState<boolean>(false);
 
     useEffect(() => {
         const fetchChatDetails = async () => {
@@ -39,6 +40,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
             setError(null);
             setChatName('');
             setChatIcon(undefined);
+            setIsUserAdmin(false);
 
             try {
                 let name = '';
@@ -67,12 +69,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                         throw new Error(res.message || 'Failed to fetch group details');
                     }
                 } else if (type === 'announcement') {
-                    const res = await getData(`/groups/announcement/info/${chatId}`);
-                    if (res.status && res.data) {
-                        name = res.data.name;
-                        icon = res.data.icon;
+                    const infoPromise = getData(`/groups/announcement/info/${chatId}`);
+                    const adminStatusPromise = getData(`/groups/announcement/is-admin/${chatId}`);
+
+                    const [infoRes, adminStatusRes] = await Promise.all([infoPromise, adminStatusPromise]);
+
+                    if (infoRes.status && infoRes.data) {
+                        name = infoRes.data.name;
+                        icon = infoRes.data.icon;
                     } else {
-                        throw new Error(res.message || 'Failed to fetch announcement details');
+                        throw new Error(infoRes.message || 'Failed to fetch announcement details');
+                    }
+
+                    if (adminStatusRes.status && adminStatusRes.data) {
+                        setIsUserAdmin(adminStatusRes.data.isAdmin);
                     }
                 }
                 setChatName(name);
@@ -107,6 +117,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
             </div>
         );
     }
+
+    const canSendMessage = type === 'chat' || type === 'group' || (type === 'announcement' && isUserAdmin);
 
     return (
         <div className="flex flex-col h-full">
@@ -146,21 +158,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
             </div>
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-300 dark:border-gray-700">
-                <div className="flex items-center">
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                        placeholder="Type a message..."
-                        className="flex-grow p-2 rounded-full border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-black dark:text-white"
-                    />
-                    <button onClick={handleSendMessage} className="ml-3 p-2 rounded-full bg-blue-500 hover:bg-blue-600">
-                        <img src={SendIcon} alt="Send" className="w-6 h-6" />
-                    </button>
+            {canSendMessage && (
+                <div className="p-4 border-t border-gray-300 dark:border-gray-700">
+                    <div className="flex items-center">
+                        <input
+                            type="text"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder="Type a message..."
+                            className="flex-grow p-2 rounded-full border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-black dark:text-white"
+                        />
+                        <button onClick={handleSendMessage} className="ml-3 p-2 rounded-full bg-blue-500 hover:bg-blue-600">
+                            <img src={SendIcon} alt="Send" className="w-6 h-6" />
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isUserAdminOfAnnouncementGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -35,6 +35,12 @@ router.get('/chat/info/:groupId',
 router.get('/announcement/info/:groupId',
     authMiddleware,
     getAnnouncementGroupInfoController
+);
+
+// Check if user is admin of an announcement group
+router.get('/announcement/is-admin/:groupId',
+    authMiddleware,
+    isUserAdminOfAnnouncementGroupController
 );
 
 // Update a chat group - only group admin members can update
