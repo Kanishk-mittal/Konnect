@@ -6,11 +6,15 @@ type ChatType = 'chat' | 'announcement' | 'group';
 interface ChatState {
   chatType: ChatType;
   chatId: string | null;
+  username: string | null;
+  profilePicture: string | null;
 }
 
 const initialState: ChatState = {
   chatType: 'chat',
   chatId: null,
+  username: null,
+  profilePicture: null,
 };
 
 export const chatSlice = createSlice({
@@ -23,13 +27,18 @@ export const chatSlice = createSlice({
     setChatId: (state, action: PayloadAction<string>) => {
       state.chatId = action.payload;
     },
-    setChat: (state, action: PayloadAction<{ chatType: ChatType; chatId: string }>) => {
+    setChat: (state, action: PayloadAction<{ chatType: ChatType; chatId: string, username?: string, profilePicture?: string }>) => {
         state.chatType = action.payload.chatType;
         state.chatId = action.payload.chatId;
+        state.username = action.payload.username ?? null;
+        state.profilePicture = action.payload.profilePicture ?? null;
+
     },
     clearChat: (state) => {
         state.chatType = 'chat';
         state.chatId = null;
+        state.username = null;
+        state.profilePicture = null;
     }
   },
 });

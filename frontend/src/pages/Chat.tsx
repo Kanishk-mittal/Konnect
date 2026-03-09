@@ -13,6 +13,7 @@ import ChatWindow from '../components/ChatWindow';
 
 const Chat = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
+  const { chatType, chatId, username, profilePicture } = useSelector((state: RootState) => state.chat);
   const { chatType: chatTypeFromUrl, id: idFromUrl } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -20,16 +21,14 @@ const Chat = () => {
   useEffect(() => {
     if (chatTypeFromUrl && idFromUrl) {
       if (chatTypeFromUrl === 'chat' || chatTypeFromUrl === 'announcement' || chatTypeFromUrl === 'group') {
-        dispatch(setChat({ chatType: chatTypeFromUrl, chatId: idFromUrl }));
+        // Here you would typically fetch user/group details based on idFromUrl
+        // For now, we'll just set the basic info
+        dispatch(setChat({ chatType: chatTypeFromUrl, chatId: idFromUrl, username: `User ${idFromUrl}` }));
         navigate('/chat', { replace: true });
       }
     }
   }, [chatTypeFromUrl, idFromUrl, dispatch, navigate]);
 
-  const gradientClasses = "bg-[radial-gradient(circle,_rgba(255,255,255,0.3)_0%,_rgba(219,178,255,0.3)_55%,_rgba(219,178,255,0.3)_100%)]";
-  const transparentClasses = "bg-transparent";
-
-  // Define theme-specific colors
   const leftPanelColor = theme === 'dark' ? '#1f2937' : '#FFC362';
   const rightPanelColor = theme === 'dark' ? '#1f2937' : '#FFC362';
 
@@ -38,7 +37,7 @@ const Chat = () => {
     : 'linear-gradient(180deg, #9435E5 0%, #FFD795 8%)';
 
   const headerBackground = theme === 'dark'
-    ? {} // No background for dark theme
+    ? {}
     : { background: 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%)' };
 
 
@@ -58,7 +57,16 @@ const Chat = () => {
                 <ChatLeftPanel theme={theme} />
             </div>
             <div style={{ backgroundColor: rightPanelColor }} className="h-full w-full rounded-lg p-4 overflow-y-auto">
-                <ChatWindow />
+                {chatId ? (
+                    <ChatWindow 
+                        chatId={chatId}
+                        type={chatType}
+                    />
+                ) : (
+                    <div className="flex items-center justify-center h-full">
+                        <p className="text-lg text-gray-500">Select a chat to start messaging</p>
+                    </div>
+                )}
             </div>
         </Split>
       </div>
