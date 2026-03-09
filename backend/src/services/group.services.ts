@@ -5,12 +5,14 @@ import ChatGroupMembershipModel from '../models/chatGroupMembership.model';
 import AnnouncementGroupMembershipModel from '../models/announcementGroupMembership.model';
 
 export const getMemberChatGroups = async (userId: string | Types.ObjectId) => {
-    const memberships = await ChatGroupMembershipModel.find({ member: userId }).select('group').lean();
-    const groupIds = memberships.map(m => m.group);
+    const memberships = await ChatGroupMembershipModel.find({ member: userId }).select('group isAdmin').lean();
 
-    if (groupIds.length === 0) {
+    if (memberships.length === 0) {
         return [];
     }
+
+    const groupIds = memberships.map(m => m.group);
+    const groupAdminMap = new Map(memberships.map(m => [m.group!.toString(), m.isAdmin]));
 
     const groups = await ChatGroupModel.find({ _id: { $in: groupIds } })
         .select('name description icon createdAt')
@@ -29,6 +31,7 @@ export const getMemberChatGroups = async (userId: string | Types.ObjectId) => {
         icon: group.icon || null,
         type: 'chat',
         memberCount: memberCountMap.get(group._id.toString()) || 0,
+        isAdmin: groupAdminMap.get(group._id.toString()) || false,
         createdAt: (group as any).createdAt
     })).sort((a, b) => new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime());
 
@@ -37,12 +40,14 @@ export const getMemberChatGroups = async (userId: string | Types.ObjectId) => {
 
 
 export const getMemberAnnouncementGroups = async (userId: string | Types.ObjectId) => {
-    const memberships = await AnnouncementGroupMembershipModel.find({ member: userId }).select('group').lean();
-    const groupIds = memberships.map(m => m.group);
+    const memberships = await AnnouncementGroupMembershipModel.find({ member: userId }).select('group isAdmin').lean();
 
-    if (groupIds.length === 0) {
+    if (memberships.length === 0) {
         return [];
     }
+
+    const groupIds = memberships.map(m => m.group);
+    const groupAdminMap = new Map(memberships.map(m => [m.group!.toString(), m.isAdmin]));
 
     const groups = await AnnouncementGroupModel.find({ _id: { $in: groupIds } })
         .select('name description icon createdAt')
@@ -61,6 +66,7 @@ export const getMemberAnnouncementGroups = async (userId: string | Types.ObjectI
         icon: group.icon || null,
         type: 'announcement',
         memberCount: memberCountMap.get(group._id.toString()) || 0,
+        isAdmin: groupAdminMap.get(group._id.toString()) || false,
         createdAt: (group as any).createdAt
     })).sort((a, b) => new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime());
 

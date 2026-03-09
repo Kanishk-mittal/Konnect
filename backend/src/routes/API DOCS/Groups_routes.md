@@ -22,6 +22,7 @@ response :-
             "icon": "http://cloudinary.com/...",
             "type": "chat",
             "memberCount": 10,
+            "isAdmin": true,
             "createdAt": "2024-02-15T..."
         },
         {
@@ -31,6 +32,7 @@ response :-
             "icon": null,
             "type": "announcement",
             "memberCount": 150,
+            "isAdmin": false,
             "createdAt": "2024-02-15T..."
         }
     ]
@@ -55,6 +57,7 @@ response :-
             "icon": "http://cloudinary.com/...",
             "type": "chat",
             "memberCount": 10,
+            "isAdmin": true,
             "createdAt": "2024-02-15T..."
         }
     ]
@@ -79,6 +82,7 @@ response :-
             "icon": null,
             "type": "announcement",
             "memberCount": 150,
+            "isAdmin": false,
             "createdAt": "2024-02-15T..."
         }
     ]
