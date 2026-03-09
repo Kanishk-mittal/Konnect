@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../store/store';
 import profileIcon from '../assets/profile_icon.png';
 import announcementIcon from '../assets/announcement.png';
@@ -32,6 +33,7 @@ const GroupTab: React.FC<GroupTabProps> = ({
   const theme = useSelector((state: RootState) => state.theme.theme);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const navigate = useNavigate();
 
   // Define theme-specific styles
   const backgroundColor = theme === 'light'
@@ -111,6 +113,7 @@ const GroupTab: React.FC<GroupTabProps> = ({
       <div className="flex gap-1">
         {(type === 'announcement' || type === 'both') && (
           <button
+            onClick={() => navigate(`/chat/announcement/${announcementId || id}`)}
             className="flex-shrink-0 p-2 rounded-md hover:opacity-80 transition-opacity"
             style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
           >
@@ -124,6 +127,7 @@ const GroupTab: React.FC<GroupTabProps> = ({
         )}
         {(type === 'chat' || type === 'both') && (
           <button
+            onClick={() => navigate(`/chat/group/${chatId || id}`)}
             className="flex-shrink-0 p-2 rounded-md hover:opacity-80 transition-opacity"
             style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
           >
