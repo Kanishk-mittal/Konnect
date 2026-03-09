@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setChatType, setChatId } from '../store/chatSlice';
 import type { RootState } from '../store/store';
 import ChatItem from './ChatItem';
+import { getData } from '../api/requests';
+
+interface ListItem {
+  id: string;
+  name: string;
+  profilePicture: string | null;
+  unreadCount: number;
+}
 
 interface ChatLeftPanelProps {
   theme: string;
@@ -11,6 +19,52 @@ interface ChatLeftPanelProps {
 const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const dispatch = useDispatch();
   const { chatType } = useSelector((state: RootState) => state.chat);
+  const [listItems, setListItems] = useState<ListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      setLoading(true);
+      setListItems([]);
+      try {
+        let endpoint = '';
+        if (chatType === 'chat') {
+          endpoint = '/user/users/college';
+        } else if (chatType === 'group') {
+          endpoint = '/groups/member-of/chat';
+        } else if (chatType === 'announcement') {
+          endpoint = '/groups/member-of/announcement';
+        }
+
+        if (endpoint) {
+          const response = await getData(endpoint);
+          let items: ListItem[] = [];
+          if (chatType === 'chat') {
+            items = response.data.map((user: any) => ({
+              id: user._id,
+              name: user.username,
+              profilePicture: user.profile_picture || null,
+              unreadCount: 0, // Placeholder for now
+            }));
+          } else { // group and announcement
+            items = response.data.map((group: any) => ({
+              id: group.id,
+              name: group.name,
+              profilePicture: group.icon || null,
+              unreadCount: 0, // Placeholder for now
+            }));
+          }
+          setListItems(items);
+        }
+      } catch (error) {
+        console.error(`Error fetching ${chatType}s:`, error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchItems();
+  }, [chatType]);
 
   // Theme-aware styling for the tab selector
   const tabContainerStyle = {
@@ -29,23 +83,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
     backgroundColor: 'transparent',
     color: theme === 'dark' ? '#9CA3AF' : '#78350F',
   };
-
-  // Dummy data for demonstration
-  const dummyChats = [
-    { id: '1', name: 'Alice', profilePicture: null, unreadCount: 2 },
-    { id: '2', name: 'Bob', profilePicture: null, unreadCount: 0 },
-    { id: '3', name: 'Charlie', profilePicture: null, unreadCount: 5 },
-  ];
-
-  const dummyGroups = [
-    { id: 'g1', name: 'React Developers', profilePicture: null, unreadCount: 10 },
-    { id: 'g2', name: 'Node.js Enthusiasts', profilePicture: null, unreadCount: 0 },
-  ];
-
-  const dummyAnnouncements = [
-    { id: 'a1', name: 'General', profilePicture: null, unreadCount: 1 },
-    { id: 'a2', name: 'Event Updates', profilePicture: null, unreadCount: 3 },
-  ];
 
   const handleItemClick = (id: string) => {
     dispatch(setChatId(id));
@@ -80,19 +117,13 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
 
       {/* List content based on selected tab */}
       <div className="flex-grow overflow-y-auto">
-        {chatType === 'chat' && (
-          <div>
-            {dummyChats.map(chat => <ChatItem key={chat.id} {...chat} onClick={handleItemClick} />)}
+        {loading ? (
+          <div className="flex justify-center items-center h-full">
+            <p style={{ color: theme === 'dark' ? 'white' : 'black' }}>Loading...</p>
           </div>
-        )}
-        {chatType === 'group' && (
+        ) : (
           <div>
-            {dummyGroups.map(group => <ChatItem key={group.id} {...group} onClick={handleItemClick} />)}
-          </div>
-        )}
-        {chatType === 'announcement' && (
-          <div>
-            {dummyAnnouncements.map(ann => <ChatItem key={ann.id} {...ann} onClick={handleItemClick} />)}
+            {listItems.map(item => <ChatItem key={item.id} {...item} onClick={handleItemClick} />)}
           </div>
         )}
       </div>

@@ -47,17 +47,17 @@ const Chat = () => {
       <div style={headerBackground}>
         <Header />
       </div>
-      <div className="flex-grow flex p-3">
+      <div className="flex-grow flex p-3 min-h-0">
         <Split
             sizes={[30, 70]}
             minSize={[200, 400]}
             gutterSize={8}
             className="flex h-full w-full split"
         >
-            <div style={{ backgroundColor: leftPanelColor }} className="h-full w-full rounded-lg p-4">
+            <div style={{ backgroundColor: leftPanelColor }} className="h-full w-full rounded-lg p-4 overflow-y-auto">
                 <ChatLeftPanel theme={theme} />
             </div>
-            <div style={{ backgroundColor: rightPanelColor }} className="h-full w-full rounded-lg p-4">
+            <div style={{ backgroundColor: rightPanelColor }} className="h-full w-full rounded-lg p-4 overflow-y-auto">
                 <ChatWindow />
             </div>
         </Split>
