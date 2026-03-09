@@ -6,7 +6,7 @@ baseURL: `/api/groups`
 
 ### 1. /
 Method :- `GET`
-Description :- Returns all chat and announcement groups created by the currently authenticated user.
+Description :- Returns all chat and announcement groups the currently authenticated user is a member of.
 Note :- Requires `auth_token` cookie.
 controller :- `getUserGroupsController`
 response :- 
@@ -37,7 +37,55 @@ response :-
 }
 ```
 
-### 2. /create
+### 2. /member-of/chat
+Method :- `GET`
+Description :- Returns all chat groups the currently authenticated user is a member of.
+Note :- Requires `auth_token` cookie.
+controller :- `getMemberChatGroupsController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Chat groups fetched successfully",
+    "data": [
+        {
+            "id": "65cad...",
+            "name": "Social Club",
+            "description": "A group for social activities",
+            "icon": "http://cloudinary.com/...",
+            "type": "chat",
+            "memberCount": 10,
+            "createdAt": "2024-02-15T..."
+        }
+    ]
+}
+```
+
+### 3. /member-of/announcement
+Method :- `GET`
+Description :- Returns all announcement groups the currently authenticated user is a member of.
+Note :- Requires `auth_token` cookie.
+controller :- `getMemberAnnouncementGroupsController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Announcement groups fetched successfully",
+    "data": [
+        {
+            "id": "65cad...",
+            "name": "Exam Updates",
+            "description": "Official exam announcements",
+            "icon": null,
+            "type": "announcement",
+            "memberCount": 150,
+            "createdAt": "2024-02-15T..."
+        }
+    ]
+}
+```
+
+### 4. /create
 Method :- `POST`
 Description :- Creates one or more groups (Chat and/or Announcement). Supports optional image upload for the group icon.
 Note :- Requires `auth_token` cookie. The JSON payload must be encrypted using the security handshake.
@@ -84,7 +132,7 @@ response :-
 }
 ```
 
-### 3. /chat/delete/:groupId
+### 5. /chat/delete/:groupId
 Method :- `DELETE`
 Description :- Deletes a specific chat group. The authenticated user must be a member and an admin of the group.
 Note :- Requires `auth_token` cookie. No request body needed.
@@ -102,7 +150,7 @@ response :-
 }
 ```
 
-### 4. /announcement/delete/:groupId
+### 6. /announcement/delete/:groupId
 Method :- `DELETE`
 Description :- Deletes a specific announcement group. The authenticated user must be a member and an admin of the group.
 Note :- Requires `auth_token` cookie. No request body needed.
@@ -120,7 +168,7 @@ response :-
 }
 ```
 
-### 5. /chat/info/:groupId
+### 7. /chat/info/:groupId
 Method :- `GET`
 Description :- Fetches detailed information about a specific chat group, including a list of its members. The authenticated user must be a member of the group.
 Note :- Requires `auth_token` cookie.
@@ -152,7 +200,7 @@ response :-
 }
 ```
 
-### 6. /announcement/info/:groupId
+### 8. /announcement/info/:groupId
 Method :- `GET`
 Description :- Fetches detailed information about a specific announcement group, including a list of its members. The authenticated user must be a member of the group.
 Note :- Requires `auth_token` cookie.
@@ -184,7 +232,7 @@ response :-
 }
 ```
 
-### 7. /chat/update/:groupId
+### 9. /chat/update/:groupId
 Method :- `PUT`
 Description :- Updates details for a specific chat group. The authenticated user must be an admin of the group.
 Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).
@@ -219,7 +267,7 @@ response :-
 }
 ```
 
-### 8. /announcement/update/:groupId
+### 10. /announcement/update/:groupId
 Method :- `PUT`
 Description :- Updates details for a specific announcement group. The authenticated user must be an admin of the group.
 Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).

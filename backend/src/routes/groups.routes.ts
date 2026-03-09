@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -11,6 +11,18 @@ const router = Router();
 router.get('/',
     authMiddleware,                    // authenticate user
     getUserGroupsController            // controller logic
+);
+
+// Get chat groups user is a member of
+router.get('/member-of/chat',
+    authMiddleware,
+    getMemberChatGroupsController
+);
+
+// Get announcement groups user is a member of
+router.get('/member-of/announcement',
+    authMiddleware,
+    getMemberAnnouncementGroupsController
 );
 
 // Get chat group info

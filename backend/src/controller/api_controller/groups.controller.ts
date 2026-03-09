@@ -9,6 +9,7 @@ import AnnouncementGroupMembershipModel from '../../models/announcementGroupMemb
 
 import { validateCreateGroupData, CreateGroupData, validateUpdateGroupData } from '../../inputSchema/group.schema';
 import userModel from '../../models/user.model';
+import { getMemberChatGroups, getMemberAnnouncementGroups } from '../../services/group.services';
 
 // Export the configured multer upload for groups
 export const upload = groupImageUpload;
@@ -181,57 +182,13 @@ export const getUserGroupsController = async (req: Request, res: Response): Prom
             return;
         }
 
-        // Fetch both chat and announcement groups created by the user
+        // Fetch both chat and announcement groups user is member of
         const [chatGroups, announcementGroups] = await Promise.all([
-            ChatGroupModel.find({ created_by: userId })
-                .select('name description icon createdAt')
-                .lean(),
-            AnnouncementGroupModel.find({ created_by: userId })
-                .select('name description icon createdAt')
-                .lean()
+            getMemberChatGroups(userId),
+            getMemberAnnouncementGroups(userId)
         ]);
 
-        // Get member counts for each group
-        const chatGroupIds = chatGroups.map(g => g._id);
-        const announcementGroupIds = announcementGroups.map(g => g._id);
-
-        const [chatMemberCounts, announcementMemberCounts] = await Promise.all([
-            ChatGroupMembershipModel.aggregate([
-                { $match: { group: { $in: chatGroupIds } } },
-                { $group: { _id: '$group', count: { $sum: 1 } } }
-            ]),
-            AnnouncementGroupMembershipModel.aggregate([
-                { $match: { group: { $in: announcementGroupIds } } },
-                { $group: { _id: '$group', count: { $sum: 1 } } }
-            ])
-        ]);
-
-        // Create member count maps
-        const chatMemberCountMap = new Map(chatMemberCounts.map(c => [c._id.toString(), c.count]));
-        const announcementMemberCountMap = new Map(announcementMemberCounts.map(c => [c._id.toString(), c.count]));
-
-        // Format response
-        const formattedChatGroups = chatGroups.map(group => ({
-            id: group._id.toString(),
-            name: group.name,
-            description: group.description || '',
-            icon: group.icon || null,
-            type: 'chat',
-            memberCount: chatMemberCountMap.get(group._id.toString()) || 0,
-            createdAt: (group as any).createdAt
-        }));
-
-        const formattedAnnouncementGroups = announcementGroups.map(group => ({
-            id: group._id.toString(),
-            name: group.name,
-            description: group.description || '',
-            icon: group.icon || null,
-            type: 'announcement',
-            memberCount: announcementMemberCountMap.get(group._id.toString()) || 0,
-            createdAt: (group as any).createdAt
-        }));
-
-        const allGroups = [...formattedChatGroups, ...formattedAnnouncementGroups]
+        const allGroups = [...chatGroups, ...announcementGroups]
             .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
 
         res.status(200).json({
@@ -782,6 +739,68 @@ export const updateAnnouncementGroupController = async (req: Request, res: Respo
 
     } catch (error) {
         console.error('Error in updateAnnouncementGroupController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};
+
+// Controller: Get chat groups the user is a member of
+export const getMemberChatGroupsController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        const groups = await getMemberChatGroups(userId);
+
+        if (groups.length === 0) {
+            res.status(200).json({
+                status: true,
+                message: 'User is not a member of any chat groups.',
+                data: []
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Chat groups fetched successfully',
+            data: groups
+        });
+    } catch (error) {
+        console.error('Error in getMemberChatGroupsController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};
+
+// Controller: Get announcement groups the user is a member of
+export const getMemberAnnouncementGroupsController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        const groups = await getMemberAnnouncementGroups(userId);
+
+        if (groups.length === 0) {
+            res.status(200).json({
+                status: true,
+                message: 'User is not a member of any announcement groups.',
+                data: []
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'Announcement groups fetched successfully',
+            data: groups
+        });
+    } catch (error) {
+        console.error('Error in getMemberAnnouncementGroupsController:', error);
         res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
     }
 };
