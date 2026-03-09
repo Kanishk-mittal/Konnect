@@ -21,6 +21,7 @@ interface ChatLeftPanelProps {
 const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const dispatch = useDispatch();
   const { chatType } = useSelector((state: RootState) => state.chat);
+  const { userId } = useSelector((state: RootState) => state.auth);
   const [listItems, setListItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -32,12 +33,14 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
 
   useEffect(() => {
     const fetchAndStoreItems = async () => {
+      if (!userId) return; // Don't run if user is not logged in
+
       setLoading(true);
       const storeName = getStoreName();
       
       // 1. Load from IndexedDB first for quick display
       try {
-        const cachedItems = await getItems(storeName);
+        const cachedItems = await getItems(userId, storeName);
         if (cachedItems.length > 0) {
           setListItems(cachedItems.map(item => ({ ...item, unreadCount: 0 })));
         }
@@ -71,8 +74,8 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
           }));
         }
         
-        await upsertItems(storeName, networkItems);
-        const updatedItems = await getItems(storeName);
+        await upsertItems(userId, storeName, networkItems);
+        const updatedItems = await getItems(userId, storeName);
         setListItems(updatedItems.map(item => ({ ...item, unreadCount: 0 })));
 
       } catch (error) {
@@ -81,10 +84,15 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
     };
 
     fetchAndStoreItems();
-  }, [chatType, getStoreName]);
+  }, [chatType, getStoreName, userId]);
 
   const handleItemClick = (id: string) => {
     dispatch(setChatId(id));
+  };
+
+  const handleTabClick = (type: 'chat' | 'group' | 'announcement') => {
+    dispatch(setChatType(type));
+    dispatch(setChatId(null));
   };
 
   // Theme-aware styling
@@ -112,21 +120,21 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
         <button
           className="px-4 py-2 rounded-md font-medium"
           style={chatType === 'chat' ? activeTabStyle : inactiveTabStyle}
-          onClick={() => dispatch(setChatType('chat'))}
+          onClick={() => handleTabClick('chat')}
         >
           Chat
         </button>
         <button
           className="px-4 py-2 rounded-md font-medium"
           style={chatType === 'group' ? activeTabStyle : inactiveTabStyle}
-          onClick={() => dispatch(setChatType('group'))}
+          onClick={() => handleTabClick('group')}
         >
           Group
         </button>
         <button
           className="px-4 py-2 rounded-md font-medium"
           style={chatType === 'announcement' ? activeTabStyle : inactiveTabStyle}
-          onClick={() => dispatch(setChatType('announcement'))}
+          onClick={() => handleTabClick('announcement')}
         >
           Announcement
         </button>

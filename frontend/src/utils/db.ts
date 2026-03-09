@@ -1,6 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-const DB_NAME = 'konnect-db';
 const DB_VERSION = 1;
 
 // Define store names as constants
@@ -38,11 +37,17 @@ interface KonnectDBSchema extends DBSchema {
   };
 }
 
-let dbPromise: Promise<IDBPDatabase<KonnectDBSchema>>;
+let dbPromises = new Map<string, Promise<IDBPDatabase<KonnectDBSchema>>>();
 
-const getDb = () => {
-  if (!dbPromise) {
-    dbPromise = openDB<KonnectDBSchema>(DB_NAME, DB_VERSION, {
+const getDb = (userId: string) => {
+  if (!userId) {
+    throw new Error("User ID is required to access the database.");
+  }
+
+  const DB_NAME = `konnect-db-${userId}`;
+
+  if (!dbPromises.has(userId)) {
+    const promise = openDB<KonnectDBSchema>(DB_NAME, DB_VERSION, {
       upgrade(db) {
         // Function to create a store
         const createStore = (storeName: StoreName) => {
@@ -57,15 +62,17 @@ const getDb = () => {
         createStore(ANNOUNCEMENT_STORE);
       },
     });
+    dbPromises.set(userId, promise);
   }
-  return dbPromise;
+  return dbPromises.get(userId)!;
 };
+
 
 /**
  * Gets all items from a store, sorted by lastAccessed descending.
  */
-export const getItems = async (storeName: StoreName): Promise<StoredItem[]> => {
-  const db = await getDb();
+export const getItems = async (userId: string, storeName: StoreName): Promise<StoredItem[]> => {
+  const db = await getDb(userId);
   const tx = db.transaction(storeName, 'readonly');
   const index = tx.store.index('by-lastAccessed');
   // getAll returns items sorted by the index key
@@ -80,10 +87,11 @@ export const getItems = async (storeName: StoreName): Promise<StoredItem[]> => {
  * Existing items preserve their `lastAccessed` timestamp.
  */
 export const upsertItems = async (
+  userId: string,
   storeName: StoreName,
   items: Array<{ id: string; name: string; profilePicture: string | null }>
 ) => {
-  const db = await getDb();
+  const db = await getDb(userId);
   const tx = db.transaction(storeName, 'readwrite');
   const store = tx.objectStore(storeName);
 
@@ -111,8 +119,8 @@ export const upsertItems = async (
 /**
  * Updates the lastAccessed timestamp for a specific item in a store.
  */
-export const updateItemTimestamp = async (storeName: StoreName, itemId: string) => {
-  const db = await getDb();
+export const updateItemTimestamp = async (userId: string, storeName: StoreName, itemId: string) => {
+  const db = await getDb(userId);
   const item = await db.get(storeName, itemId);
   if (item) {
     item.lastAccessed = Date.now();

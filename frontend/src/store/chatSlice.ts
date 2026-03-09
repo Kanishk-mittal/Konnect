@@ -24,7 +24,7 @@ export const chatSlice = createSlice({
     setChatType: (state, action: PayloadAction<ChatType>) => {
       state.chatType = action.payload;
     },
-    setChatId: (state, action: PayloadAction<string>) => {
+    setChatId: (state, action: PayloadAction<string | null>) => {
       state.chatId = action.payload;
     },
     setChat: (state, action: PayloadAction<{ chatType: ChatType; chatId: string, username?: string, profilePicture?: string }>) => {
