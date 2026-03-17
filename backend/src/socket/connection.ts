@@ -1,4 +1,4 @@
-import { CustomSocket } from "../../socket/socketHandler"
+import { CustomSocket } from "./socketHandler"
 
 export const joinController = (socket: CustomSocket, data: { userId: string; username: string }): void => { 
     socket.userId = data.userId;

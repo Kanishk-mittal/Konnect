@@ -5,7 +5,7 @@ import {
 import { Server } from 'http';
 import {
     joinController
-} from "../controller/socket_controller/connection";
+} from "./connection";
 import { ServerToClientEvents, ClientToServerEvents, InterServerEvents, SocketData } from './socketTypes';
 
 export interface CustomSocket extends Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> {
