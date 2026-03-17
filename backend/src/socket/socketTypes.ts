@@ -12,7 +12,3 @@ export interface ClientToServerEvents {
 export interface InterServerEvents {
   ping: () => void;
 }
-
-export interface SocketData {
-  userId: string;
-}

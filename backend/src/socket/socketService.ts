@@ -34,10 +34,9 @@ class SocketService {
       this.socketHandler.emitToGroup(groupId, event, data);
     }
   }
-
-  public async getConnectedUsers(): Promise<string[]> {
+  public async getConnectedUsers(): Promise<Array<{ socketId: string, userId: string }>> {
     if (this.socketHandler) {
-      return this.socketHandler.getConnectedUsers();
+      return this.socketHandler.getConnectedUsersInfo();
     }
     return [];
   }

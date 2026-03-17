@@ -3,19 +3,14 @@ import {
     Socket
 } from 'socket.io';
 import { Server } from 'http';
-import { ServerToClientEvents, ClientToServerEvents, InterServerEvents, SocketData } from './socketTypes';
+import { ServerToClientEvents, ClientToServerEvents, InterServerEvents } from './socketTypes';
 import { socketAuthMiddleware } from './socketAuth.middleware';
 
-export interface CustomSocket extends Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> {
-    userId: string;
-}
-
 export class SocketHandler {
-    private io: SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
-    public connectedUsers: CustomSocket[] = new Array<CustomSocket>();
+    private io: SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents>;
 
     constructor(server: Server) {
-        this.io = new SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(server, {
+        this.io = new SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents>(server, {
             cors: {
                 origin: process.env.FRONTEND_URL || 'http://localhost:5173',
                 methods: ['GET', 'POST'],
@@ -30,22 +25,19 @@ export class SocketHandler {
     }
 
     private initializeSocketEvents(): void {
-        this.io.on('connection', (socket: CustomSocket) => {
-            console.log(`✅ User connected and authenticated: ${socket.userId}`);
-            this.connectedUsers.push(socket);
-            socket.join(`user_${socket.userId}`);
+        this.io.on('connection', (socket: Socket) => {
+            console.log(`✅ User connected and authenticated: ${socket.id}`);
 
             // Handle disconnection
             socket.on('disconnect', () => {
-                console.log(`❌ User disconnected: ${socket.userId}`);
-                this.connectedUsers = this.connectedUsers.filter(s => s.id !== socket.id);
+                console.log(`❌ User disconnected: ${socket.id}`);
             });
         });
     }
 
     // Method to emit to specific user
     public emitToUser(userId: string, event: keyof ServerToClientEvents, data: any): void {
-        this.io.to(`user_${userId}`).emit(event, data);
+        this.io.to(userId).emit(event, data);
     }
 
     // Method to emit to specific group
@@ -53,21 +45,32 @@ export class SocketHandler {
         this.io.to(`group_${groupId}`).emit(event, data);
     }
 
-    // Method to get all connected users
-    public getConnectedUsers(): string[] {
-        return this.connectedUsers.map(socket => socket.id);
-    }
-
     // Method to get connected users with their info
-    public getConnectedUsersInfo(): Array<{socketId: string, userId: string}> {
-        return this.connectedUsers.map(socket => ({
-            socketId: socket.id,
-            userId: socket.userId
-        }));
+    public getConnectedUsersInfo(): Array<{ socketId: string, userId: string }> {
+        const authenticatedSockets = new Map<string, string>(); // Map<socketId, userId>
+
+        const rooms = this.io.of("/").adapter.rooms;
+        const sids = this.io.of("/").adapter.sids;
+
+        sids.forEach((roomsForSocket, socketId) => {
+            // Find the room that is the user's ID.
+            // A socket is always in a room with its own ID, so we look for a second room.
+            const userRoom = [...roomsForSocket].find(room => room !== socketId);
+            if (userRoom) {
+                // We check if the found room is a user room (not a group room)
+                // A simple check is to see if it exists in the sids map as a key. If it does, it's a socket id, not a user id room.
+                // A more robust check might be needed if user IDs can look like socket IDs.
+                if (!sids.has(userRoom)) {
+                    authenticatedSockets.set(socketId, userRoom);
+                }
+            }
+        });
+
+        return Array.from(authenticatedSockets.entries()).map(([socketId, userId]) => ({ socketId, userId }));
     }
 
     // Get Socket.IO instance
-    public getIO(): SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> {
+    public getIO(): SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents> {
         return this.io;
     }
 }

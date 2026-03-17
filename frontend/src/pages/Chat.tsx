@@ -11,12 +11,22 @@ import Header from '../components/Header';
 import ChatLeftPanel from '../components/ChatLeftPanel';
 import ChatWindow from '../components/ChatWindow';
 
+import { connectSocket, disconnectSocket } from '../api/socket';
+
 const Chat = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
   const { chatType, chatId, username, profilePicture } = useSelector((state: RootState) => state.chat);
   const { chatType: chatTypeFromUrl, id: idFromUrl } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    connectSocket();
+
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
 
   useEffect(() => {
     if (chatTypeFromUrl && idFromUrl) {

@@ -124,7 +124,7 @@ class App {
             res.json({
                 message: 'Socket.IO is running',
                 connectedUsers: connectedUsers.length,
-                socketIds: connectedUsers
+                users: connectedUsers
             });
         });
 
