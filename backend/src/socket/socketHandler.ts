@@ -1,16 +1,13 @@
 import {
     Server as SocketIOServer,
     Socket
- } from 'socket.io';
+} from 'socket.io';
 import { Server } from 'http';
-import {
-    joinController
-} from "./connection";
 import { ServerToClientEvents, ClientToServerEvents, InterServerEvents, SocketData } from './socketTypes';
+import { socketAuthMiddleware } from './socketAuth.middleware';
 
 export interface CustomSocket extends Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> {
-    userId?: string;
-    username?: string;
+    userId: string;
 }
 
 export class SocketHandler {
@@ -28,23 +25,19 @@ export class SocketHandler {
             pingInterval: process.env.SOCKET_PING_INTERVAL ? parseInt(process.env.SOCKET_PING_INTERVAL) : 25000,
         });
 
+        this.io.use(socketAuthMiddleware);
         this.initializeSocketEvents();
     }
 
     private initializeSocketEvents(): void {
         this.io.on('connection', (socket: CustomSocket) => {
-            console.log(`✅ User connected: ${socket.id}`);
-            // Add the socket to connected users
+            console.log(`✅ User connected and authenticated: ${socket.userId}`);
             this.connectedUsers.push(socket);
-
-            // Handle user joining
-            socket.on('join', (data: { userId: string; username: string }) => joinController(socket, data));
+            socket.join(`user_${socket.userId}`);
 
             // Handle disconnection
             socket.on('disconnect', () => {
-                console.log(`❌ User disconnected: ${socket.id}`);
-                
-                // Remove from connected users array
+                console.log(`❌ User disconnected: ${socket.userId}`);
                 this.connectedUsers = this.connectedUsers.filter(s => s.id !== socket.id);
             });
         });
@@ -66,11 +59,10 @@ export class SocketHandler {
     }
 
     // Method to get connected users with their info
-    public getConnectedUsersInfo(): Array<{socketId: string, userId: string | undefined, username: string | undefined}> {
+    public getConnectedUsersInfo(): Array<{socketId: string, userId: string}> {
         return this.connectedUsers.map(socket => ({
             socketId: socket.id,
-            userId: socket.userId,
-            username: socket.username
+            userId: socket.userId
         }));
     }
 

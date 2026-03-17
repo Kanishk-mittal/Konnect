@@ -6,8 +6,7 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  // Connection events
-  join: (data: { userId: string; username: string }) => void;
+  // No client-to-server events are defined for now beyond the default ones.
 }
 
 export interface InterServerEvents {
@@ -16,5 +15,4 @@ export interface InterServerEvents {
 
 export interface SocketData {
   userId: string;
-  username: string;
 }
