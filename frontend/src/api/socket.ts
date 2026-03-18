@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 // The backend URL should be stored in an environment variable
-const URL = process.env.NODE_ENV === 'production' ? window.location.origin : 'http://localhost:3001';
+const URL = process.env.NODE_ENV === 'production' ? window.location.origin : 'http://localhost:3000';
 
 export const socket = io(URL, {
     autoConnect: false, // We will connect manually

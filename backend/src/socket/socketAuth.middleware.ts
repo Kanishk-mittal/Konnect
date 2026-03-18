@@ -1,7 +1,7 @@
 import { Socket } from "socket.io";
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../utils/jwt/jwt.utils';
-import cookie from 'cookie';
+import * as cookie from 'cookie';
 
 export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void) => {
     const cookieName = 'auth_token';

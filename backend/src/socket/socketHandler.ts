@@ -26,12 +26,7 @@ export class SocketHandler {
 
     private initializeSocketEvents(): void {
         this.io.on('connection', (socket: Socket) => {
-            console.log(`✅ User connected and authenticated: ${socket.id}`);
-
-            // Handle disconnection
-            socket.on('disconnect', () => {
-                console.log(`❌ User disconnected: ${socket.id}`);
-            });
+            const userId = [...socket.rooms].find(room => room !== socket.id);
         });
     }
 
