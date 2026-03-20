@@ -31,13 +31,11 @@ interface Group {
 }
 
 const ClubDashboard = () => {
-    const dispatch = useDispatch();
     const navigate = useNavigate();
-    const authState = useSelector((state: RootState) => state.auth);
+    const { userId } = useSelector((state: RootState) => state.auth);
+    const { profile, status: userStatus } = useSelector((state: RootState) => state.user);
     const theme = useSelector((state: RootState) => state.theme.theme);
-    const { userId } = authState;
-    const [loading, setLoading] = useState(true);
-    const [clubId, setClubId] = useState<string | null>(null);
+    
     const [memberSearchText, setMemberSearchText] = useState('');
     const [members, setMembers] = useState<Member[]>([]);
     const [membersLoading, setMembersLoading] = useState(false);
@@ -68,93 +66,42 @@ const ClubDashboard = () => {
         member.rollNumber.toLowerCase().includes(memberSearchText.toLowerCase())
     );
 
+    // Fetch data when user profile is available
     useEffect(() => {
-    const fetchClubDetails = async () => {
-      // Only fetch if clubId is not already loaded
-      if (clubId) {
-        setLoading(false);
-        return;
-      }
-
-      // If already authenticated as a club (guaranteed by ProtectedRoute), fetch details
-      if (authState.isAuthenticated && authState.userType === 'club') {
-          try {
-            const response = await getData(`/user/details`); // This already gets the full details
-
-            if (response.status) {
-                setClubId(response.data.userId);
-                // userId and userType are already set by PersistentLogin
-            }
-          } catch (error) {
-            console.error('Error fetching club details:', error);
-          } finally {
-            setLoading(false);
-          }
-      } else {
-          // If not authenticated or not club (should not happen due to ProtectedRoute), stop loading
-          setLoading(false);
-      }
-    };
-
-    fetchClubDetails();
-  }, [clubId, authState.isAuthenticated, authState.userType]);
-
-    // Fetch data when club details are available
-    useEffect(() => {
-        const fetchMembers = async () => {
-            if (!clubId) return;
+        const fetchDashboardData = async () => {
+            if (!userId) return;
 
             setMembersLoading(true);
-            try {
-                const response = await getData(`/club/members`);
-                if (response.status) {
-                    setMembers(response.data);
-                }
-            } catch (error) {
-                console.error('Error fetching club members:', error);
-                setMembers([]);
-            } finally {
-                setMembersLoading(false);
-            }
-        };
-
-        const fetchBlockedStudents = async () => {
-            if (!clubId) return;
-
             setBlockedStudentsLoading(true);
-            try {
-                const response = await getData(`/club/blocked`);
-                if (response.status) {
-                    setBlockedStudents(response.data);
-                }
-            } catch (error) {
-                console.error('Error fetching blocked students:', error);
-                setBlockedStudents([]);
-            } finally {
-                setBlockedStudentsLoading(false);
-            }
-        };
-
-        const fetchGroups = async () => {
-            if (!clubId) return;
             setGroupsLoading(true);
             try {
-                const response = await getData(`/club/groups`);
-                if (response.status) {
-                    setGroups(response.data);
-                }
+                const [
+                    membersRes,
+                    blockedStudentsRes,
+                    groupsRes
+                ] = await Promise.all([
+                    getData(`/club/members`),
+                    getData(`/club/blocked`),
+                    getData(`/club/groups`)
+                ]);
+
+                if (membersRes.status) setMembers(membersRes.data);
+                if (blockedStudentsRes.status) setBlockedStudents(blockedStudentsRes.data);
+                if (groupsRes.status) setGroups(groupsRes.data);
+
             } catch (error) {
-                console.error('Error fetching groups:', error);
-                setGroups([]);
+                console.error('Error fetching club dashboard data:', error);
             } finally {
+                setMembersLoading(false);
+                setBlockedStudentsLoading(false);
                 setGroupsLoading(false);
             }
         };
 
-        fetchMembers();
-        fetchBlockedStudents();
-        fetchGroups();
-    }, [clubId]);
+        if (userStatus === 'succeeded' && profile) {
+            fetchDashboardData();
+        }
+    }, [userId, profile, userStatus]);
 
   
 
@@ -166,9 +113,9 @@ const ClubDashboard = () => {
                 <Header />
             </div>
 
-            {loading ? (
-                <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading...</h1>
-            ) : clubId ? (
+            {userStatus === 'loading' ? (
+                <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading Dashboard...</h1>
+            ) : profile ? (
                 <ThreePanelSplitLayout
                     leftPanel={
                         <ClubMembersPanel
@@ -180,7 +127,7 @@ const ClubDashboard = () => {
                             theme={theme as 'light' | 'dark'}
                             navigate={navigate}
                             leftSectionColor={leftSectionColor}
-                            clubId={clubId || undefined}
+                            clubId={userId || undefined}
                         />
                     }
                     rightTopPanel={
@@ -206,7 +153,7 @@ const ClubDashboard = () => {
                     }
                 />
             ) : (
-                <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Club Dashboard</h1>
+                <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Could not load Club Dashboard. Please try logging in again.</h1>
             )}
         </div>
     )

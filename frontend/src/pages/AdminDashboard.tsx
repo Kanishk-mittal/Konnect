@@ -1,10 +1,8 @@
-
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../store/store';
 import { getData } from '../api/requests';
-import { setUserId, setAdminDetails } from '../store/authSlice';
 import Header from "../components/Header"
 import SplitLayout from '../components/split/SplitLayout';
 import AllStudentsPanel from '../components/split/AllStudentsPanel';
@@ -38,12 +36,10 @@ interface Club {
 }
 
 const AdminDashboard = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const authState = useSelector((state: RootState) => state.auth);
+  const { profile, status: userStatus } = useSelector((state: RootState) => state.user);
   const theme = useSelector((state: RootState) => state.theme.theme);
-  const { userId, adminDetails } = authState;
-  const [loading, setLoading] = useState(true);
+
   const [studentSearchText, setStudentSearchText] = useState('');
   const [students, setStudents] = useState<Student[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
@@ -77,116 +73,49 @@ const AdminDashboard = () => {
     student.rollNumber.toLowerCase().includes(studentSearchText.toLowerCase())
   );
 
+  // Fetch dashboard data when the user profile is loaded
   useEffect(() => {
-    const fetchAdminDetails = async () => {
-      // Only fetch if adminDetails are not already loaded
-      if (adminDetails) {
-        setLoading(false);
-        return;
-      }
+    const fetchDashboardData = async () => {
+      if (!profile?.collegeCode) return;
 
-      // If already authenticated as an admin (guaranteed by ProtectedRoute), fetch details
-      if (authState.isAuthenticated && authState.userType === 'admin') {
-          try {
-            const response = await getData(`/user/details`);
-
-            if (response.status) {
-              dispatch(setAdminDetails({
-                username: response.data.username,
-                email: response.data.email,
-                collegeCode: response.data.collegeCode
-              }));
-              // userId and userType are already set by PersistentLogin
-            }
-          } catch (error) {
-            console.error('Error fetching admin details:', error);
-          } finally {
-            setLoading(false);
-          }
-      } else {
-          // If not authenticated or not admin (should not happen due to ProtectedRoute), stop loading
-          setLoading(false);
-      }
-    };
-
-    fetchAdminDetails();
-  }, [adminDetails, authState.isAuthenticated, authState.userType, dispatch]);
-
-  // Fetch students when admin details are available
-  useEffect(() => {
-    const fetchStudents = async () => {
-      if (!adminDetails?.collegeCode) return;
-
+      // Fetch all data in parallel
       setStudentsLoading(true);
+      setBlockedStudentsLoading(true);
+      setGroupsLoading(true);
+      setClubsLoading(true);
+
       try {
-        const response = await getData(`/student/list`);
-        if (response.status) {
-          setStudents(response.data);
-        }
+        const [
+          studentsRes,
+          blockedStudentsRes,
+          groupsRes,
+          clubsRes
+        ] = await Promise.all([
+          getData(`/student/list`),
+          getData(`/student/blocked`),
+          getData(`/groups/`),
+          getData(`/club/${profile.collegeCode}`)
+        ]);
+
+        if (studentsRes.status) setStudents(studentsRes.data);
+        if (blockedStudentsRes.status) setBlockedStudents(blockedStudentsRes.data);
+        if (groupsRes.status) setGroups(groupsRes.data);
+        if (clubsRes.status) setClubs(clubsRes.data);
+
       } catch (error) {
-        console.error('Error fetching students:', error);
-        setStudents([]);
+        console.error('Error fetching dashboard data:', error);
       } finally {
         setStudentsLoading(false);
-      }
-    };
-
-    const fetchBlockedStudents = async () => {
-      if (!adminDetails?.collegeCode) return;
-
-      setBlockedStudentsLoading(true);
-      try {
-        const response = await getData(`/student/blocked`);
-        if (response.status) {
-          setBlockedStudents(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching blocked students:', error);
-        setBlockedStudents([]);
-      } finally {
         setBlockedStudentsLoading(false);
-      }
-    };
-
-    const fetchGroups = async () => {
-      if (!adminDetails?.collegeCode) return;
-
-      setGroupsLoading(true);
-      try {
-        const response = await getData(`/groups/`);
-        if (response.status) {
-          setGroups(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching groups:', error);
-        setGroups([]);
-      } finally {
         setGroupsLoading(false);
-      }
-    };
-
-    const fetchClubs = async () => {
-      if (!adminDetails?.collegeCode) return;
-
-      setClubsLoading(true);
-      try {
-        const response = await getData(`/club/${adminDetails.collegeCode}`);
-        if (response.status) {
-          setClubs(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching clubs:', error);
-        setClubs([]);
-      } finally {
         setClubsLoading(false);
       }
     };
 
-    fetchStudents();
-    fetchBlockedStudents();
-    fetchGroups();
-    fetchClubs();
-  }, [adminDetails]);
+    if (userStatus === 'succeeded' && profile) {
+        fetchDashboardData();
+    }
+  }, [profile, userStatus]);
 
 
 
@@ -198,9 +127,9 @@ const AdminDashboard = () => {
         <Header />
       </div>
 
-      {loading ? (
-        <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading...</h1>
-      ) : adminDetails ? (
+      {userStatus === 'loading' ? (
+        <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Loading Dashboard...</h1>
+      ) : profile ? (
         <SplitLayout
           leftTopPanel={
             <AllStudentsPanel
@@ -247,7 +176,7 @@ const AdminDashboard = () => {
           }
         />
       ) : (
-        <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Admin Dashboard</h1>
+        <h1 className={`text-2xl font-bold mb-4 ${textColor}`}>Could not load Admin Dashboard. Please try logging in again.</h1>
       )}
     </div>
   )
