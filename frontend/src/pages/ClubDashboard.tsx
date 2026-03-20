@@ -1,9 +1,8 @@
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '../store/store';
 import { getData } from '../api/requests';
-import { setUserId } from '../store/authSlice';
 import Header from "../components/Header";
 import ThreePanelSplitLayout from '../components/split/ThreePanelSplitLayout';
 import ClubMembersPanel from '../components/split/ClubMembersPanel';
