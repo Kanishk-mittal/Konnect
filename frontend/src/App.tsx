@@ -20,7 +20,7 @@ import UnblockClubStudents from './pages/UnblockClubStudents'
 import NotFound from './pages/NotFound'
 import EditGroupPage from './pages/EditGroup'
 import Chat from './pages/Chat'
-
+import ProtectedRoute from './components/ProtectedRoute' // Import ProtectedRoute
 
 const App = () => {
   return (
@@ -46,50 +46,113 @@ const App = () => {
       <Route path="/admin/register"
         element={<AdminRegistration />}
       />
+      {/* Protected Admin Routes */}
       <Route path="/admin/dashboard"
-        element={<AdminDashboard />}
-      />
-      <Route path="/club/dashboard"
-        element={<ClubDashboard />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
       />
       <Route path="/admin/add-student"
-        element={<AddStudent />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <AddStudent />
+          </ProtectedRoute>
+        }
       />
       <Route path="/admin/remove-student"
-        element={<RemoveStudent />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <RemoveStudent />
+          </ProtectedRoute>
+        }
       />
       <Route path="/admin/block-students"
-        element={<BlockStudents />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <BlockStudents />
+          </ProtectedRoute>
+        }
       />
       <Route path="/admin/unblock-students"
-        element={<UnblockStudents />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <UnblockStudents />
+          </ProtectedRoute>
+        }
       />
       <Route path="/admin/add-group"
-        element={<AddGroup redirectUrl="/admin/dashboard" editProfileUrl="/admin/edit-profile" />}
-      />
-      <Route path="/club/add-group"
-        element={<AddGroup redirectUrl="/club/dashboard" editProfileUrl="/club/edit-profile" />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <AddGroup redirectUrl="/admin/dashboard" editProfileUrl="/admin/edit-profile" />
+          </ProtectedRoute>
+        }
       />
       <Route path="/admin/group/edit"
-        element={<EditGroupPage redirectUrl="/admin/dashboard" />}
-      />
-      <Route path="/club/group/edit"
-        element={<EditGroupPage redirectUrl="/club/dashboard" />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <EditGroupPage redirectUrl="/admin/dashboard" />
+          </ProtectedRoute>
+        }
       />
       <Route path="/admin/add-club"
-        element={<AddClub />}
+        element={
+          <ProtectedRoute allowedUserTypes={['admin']}>
+            <AddClub />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Protected Club Routes */}
+      <Route path="/club/dashboard"
+        element={
+          <ProtectedRoute allowedUserTypes={['club']}>
+            <ClubDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/club/add-group"
+        element={
+          <ProtectedRoute allowedUserTypes={['club']}>
+            <AddGroup redirectUrl="/club/dashboard" editProfileUrl="/club/edit-profile" />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/club/group/edit"
+        element={
+          <ProtectedRoute allowedUserTypes={['club']}>
+            <EditGroupPage redirectUrl="/club/dashboard" />
+          </ProtectedRoute>
+        }
       />
       <Route path="/club/add-member"
-        element={<AddClubMember />}
+        element={
+          <ProtectedRoute allowedUserTypes={['club']}>
+            <AddClubMember />
+          </ProtectedRoute>
+        }
       />
       <Route path="/club/remove-member"
-        element={<RemoveClubMember />}
+        element={
+          <ProtectedRoute allowedUserTypes={['club']}>
+            <RemoveClubMember />
+          </ProtectedRoute>
+        }
       />
       <Route path="/club/block-students"
-        element={<BlockClubStudents />}
+        element={
+          <ProtectedRoute allowedUserTypes={['club']}>
+            <BlockClubStudents />
+          </ProtectedRoute>
+        }
       />
       <Route path="/club/unblock-students"
-        element={<UnblockClubStudents />}
+        element={
+          <ProtectedRoute allowedUserTypes={['club']}>
+            <UnblockClubStudents />
+          </ProtectedRoute>
+        }
       />
       <Route path="*" element={<NotFound />} />
     </Routes>

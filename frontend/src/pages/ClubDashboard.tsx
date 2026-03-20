@@ -69,34 +69,35 @@ const ClubDashboard = () => {
     );
 
     useEffect(() => {
-        const fetchClubDetails = async () => {
-            // If clubId already exists, no need to fetch
-            if (clubId) {
-                setLoading(false);
-                return;
+    const fetchClubDetails = async () => {
+      // Only fetch if clubId is not already loaded
+      if (clubId) {
+        setLoading(false);
+        return;
+      }
+
+      // If already authenticated as a club (guaranteed by ProtectedRoute), fetch details
+      if (authState.isAuthenticated && authState.userType === 'club') {
+          try {
+            const response = await getData(`/user/details`); // This already gets the full details
+
+            if (response.status) {
+                setClubId(response.data.userId);
+                // userId and userType are already set by PersistentLogin
             }
+          } catch (error) {
+            console.error('Error fetching club details:', error);
+          } finally {
+            setLoading(false);
+          }
+      } else {
+          // If not authenticated or not club (should not happen due to ProtectedRoute), stop loading
+          setLoading(false);
+      }
+    };
 
-            try {
-                const response = await getData(`/user/details`);
-
-                if (response.status) {
-                    const id = response.data.userId;
-                    setClubId(id);
-
-                    // Store userId in Redux if not already set
-                    if (!userId && id) {
-                        dispatch(setUserId(id));
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching club details:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchClubDetails();
-    }, [userId, clubId, dispatch]);
+    fetchClubDetails();
+  }, [clubId, authState.isAuthenticated, authState.userType]);
 
     // Fetch data when club details are available
     useEffect(() => {
@@ -155,29 +156,7 @@ const ClubDashboard = () => {
         fetchGroups();
     }, [clubId]);
 
-    // Check club authentication
-    useEffect(() => {
-        const checkClubAuth = async () => {
-            try {
-                const response = await getData('/club/userID');
-                // If successful, user is authenticated as club
-                if (response && response.userId) {
-                    // Set authenticated to true in Redux
-                    dispatch({ type: 'auth/setAuthenticated', payload: true });
-                    // Optionally set userId if not already set
-                    if (!authState.userId) {
-                        dispatch({ type: 'auth/setUserId', payload: response.userId });
-                    }
-                }
-            } catch (error) {
-                // If failed, user is not authenticated as club, redirect
-                console.error('Club authentication failed. Redirecting to home...');
-                navigate('/');
-            }
-        };
-
-        checkClubAuth();
-    }, [navigate, dispatch, authState.userId]);
+  
 
     return (
         <div className="flex flex-col h-screen" style={{

@@ -79,37 +79,38 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const fetchAdminDetails = async () => {
-      // If adminDetails already exist in Redux, no need to fetch
+      // Only fetch if adminDetails are not already loaded
       if (adminDetails) {
         setLoading(false);
         return;
       }
 
-      try {
-        const response = await getData(`/user/details`);
+      // If already authenticated as an admin (guaranteed by ProtectedRoute), fetch details
+      if (authState.isAuthenticated && authState.userType === 'admin') {
+          try {
+            const response = await getData(`/user/details`);
 
-        if (response.status) {
-          // Store admin details in Redux
-          dispatch(setAdminDetails({
-            username: response.data.username,
-            email: response.data.email,
-            collegeCode: response.data.collegeCode
-          }));
-
-          // Store userId from response if not already in Redux
-          if (!userId && response.data.userId) {
-            dispatch(setUserId(response.data.userId));
+            if (response.status) {
+              dispatch(setAdminDetails({
+                username: response.data.username,
+                email: response.data.email,
+                collegeCode: response.data.collegeCode
+              }));
+              // userId and userType are already set by PersistentLogin
+            }
+          } catch (error) {
+            console.error('Error fetching admin details:', error);
+          } finally {
+            setLoading(false);
           }
-        }
-      } catch (error) {
-        console.error('Error fetching admin details:', error);
-      } finally {
-        setLoading(false);
+      } else {
+          // If not authenticated or not admin (should not happen due to ProtectedRoute), stop loading
+          setLoading(false);
       }
     };
 
     fetchAdminDetails();
-  }, [userId, adminDetails, dispatch]);
+  }, [adminDetails, authState.isAuthenticated, authState.userType, dispatch]);
 
   // Fetch students when admin details are available
   useEffect(() => {
@@ -187,29 +188,7 @@ const AdminDashboard = () => {
     fetchClubs();
   }, [adminDetails]);
 
-  // Check admin authentication
-  useEffect(() => {
-    const checkAdminAuth = async () => {
-      try {
-        const response = await getData('/admin/userID');
-        // If successful, user is authenticated as admin
-        if (response && response.userId) {
-          // Set authenticated to true in Redux
-          dispatch({ type: 'auth/setAuthenticated', payload: true });
-          // Optionally set userId if not already set
-          if (!authState.userId) {
-            dispatch({ type: 'auth/setUserId', payload: response.userId });
-          }
-        }
-      } catch (error) {
-        // If failed, user is not authenticated as admin, redirect
-        console.error('Admin authentication failed. Redirecting to home...');
-        navigate('/');
-      }
-    };
 
-    checkAdminAuth();
-  }, [navigate, dispatch, authState.userId]);
 
   return (
     <div className="flex flex-col h-screen" style={{

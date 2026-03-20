@@ -11,6 +11,12 @@ const store = configureStore({
   },
 });
 
-export type RootState = ReturnType<typeof store.getState>;
+// Explicitly define RootState based on the reducers
+export type RootState = {
+  theme: ReturnType<typeof themeReducer>;
+  auth: ReturnType<typeof authReducer>;
+  chat: ReturnType<typeof chatReducer>;
+};
+
 export type AppDispatch = typeof store.dispatch;
 export default store;

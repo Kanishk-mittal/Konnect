@@ -5,12 +5,15 @@ import { Provider } from 'react-redux'
 import store from './store/store'
 import './index.css'
 import App from './App.tsx'
+import PersistentLogin from './components/PersistentLogin.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <Provider store={store}>
-        <App />
+        <PersistentLogin>
+          <App />
+        </PersistentLogin>
       </Provider>
     </BrowserRouter>
   </StrictMode>,
