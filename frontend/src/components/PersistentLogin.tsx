@@ -20,11 +20,13 @@ const PersistentLogin = ({ children }: { children: ReactNode }) => {
           // After setting auth, fetch the full user profile
           dispatch(fetchUser());
         } else {
-          dispatch(clearAuth());
+          // If the API call succeeds but indicates no active session
+          dispatch(setAuthStatus('failed'));
         }
       } catch (error) {
+        // If the API call fails (e.g., 401 Unauthorized)
         console.error('Session verification failed:', error);
-        dispatch(clearAuth());
+        dispatch(setAuthStatus('failed'));
       }
     };
 
