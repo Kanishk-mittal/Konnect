@@ -2,7 +2,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { RootState } from '../store/store';
+import type { RootState, AppDispatch } from '../store/store'; // Added AppDispatch
 
 // Components
 import Header from '../components/Header';
@@ -11,16 +11,17 @@ import OtpPopup from '../components/OtpPopup';
 import RecoveryKeyPopup from '../components/RecoveryKeyPopup';
 
 // Redux actions
-import { setAuthenticated, setEmail, setPrivateKey, setUserId, setUserType } from '../store/authSlice';
+import { setAuth } from '../store/authSlice'; // Only setAuth
+import { fetchUser } from '../store/userSlice'; // New import
 
 // API and utilities
 import { postData, postEncryptedData } from "../api/requests";
 import { validateRegistrationData } from '../utils/registrationUtils';
-import { savePrivateKey } from '../utils/privateKeyManager';
+import { importAndStorePrivateKey } from '../services/cryptoService'; // New import
 
 const AdminRegistration = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
-  const dispatch = useDispatch();
+  const dispatch: AppDispatch = useDispatch(); // Use AppDispatch
   const navigate = useNavigate();
   const gradientClasses = "bg-[radial-gradient(circle,_rgba(255,255,255,0.3)_0%,_rgba(219,178,255,0.3)_55%,_rgba(219,178,255,0.3)_100%)]"
   const transparentClasses = "bg-transparent"
@@ -68,24 +69,22 @@ const AdminRegistration = () => {
         setSuccessMessage(response.message || 'Registration successful!');
 
         // Sensitive data is nested inside response.data by the backend
-        const { privateKey, id, recoveryKey: resRecoveryKey } = response.data || {};
+        const { privateKey, id, recoveryKey: resRecoveryKey, userType } = response.data || {};
 
-        if (privateKey && id) {
-          // Save to Redux store (primary storage)
-          dispatch(setPrivateKey(privateKey));
-          dispatch(setUserId(id));
-          dispatch(setUserType('admin'));
-          dispatch(setEmail(formData.emailId));
+        if (privateKey && id && userType) {
+          // Securely store the private key in IndexedDB
+          await importAndStorePrivateKey(id, privateKey);
 
-          // Save to localStorage as backup
-          await savePrivateKey(privateKey, 'admin', id);
+          // Set authentication state in Redux
+          dispatch(setAuth({ userId: id, userType }));
+          
+          // Fetch user profile data
+          dispatch(fetchUser());
 
           // Set recovery key for popup if available
           if (resRecoveryKey) {
             setRecoveryKey(resRecoveryKey);
           }
-
-          dispatch(setAuthenticated(true));
 
           // Close OTP popup
           setShowOtpPopup(false);
@@ -93,14 +92,8 @@ const AdminRegistration = () => {
           // Show recovery key popup
           setShowRecoveryPopup(true);
         } else {
-          // No encrypted data in response, just proceed
-          dispatch(setAuthenticated(true));
-
-          // Close popup and navigate after a brief delay to show success message
-          setTimeout(() => {
-            setShowOtpPopup(false);
-            navigate('/admin/dashboard');
-          }, 1500);
+          // If privateKey, id, or userType are missing, something went wrong
+          throw new Error('Registration response missing essential data (private key, user ID, or user type).');
         }
       } else {
         // Handle backend error responses
@@ -111,14 +104,11 @@ const AdminRegistration = () => {
       console.error('Error during registration:', error);
 
       // Handle different types of errors
-      let errorMsg = 'An unexpected error occurred during registration.';
+      let errorMsg = error.message || 'An unexpected error occurred during registration.';
 
       if (error?.response?.data?.message) {
         // API error with specific message
         errorMsg = error.response.data.message;
-      } else if (error?.message) {
-        // General error with message
-        errorMsg = error.message;
       }
 
       setErrorMessage(errorMsg);
@@ -133,9 +123,6 @@ const AdminRegistration = () => {
     setSuccessMessage('');
 
     try {
-      // Store email in Redux
-      dispatch(setEmail(formData.emailId));
-
       // Validate the form data
       const validation = validateRegistrationData(formData);
       if (!validation.status) {
@@ -159,11 +146,9 @@ const AdminRegistration = () => {
     } catch (error: any) {
       console.error('Error sending OTP:', error);
 
-      let errorMsg = 'An error occurred while sending OTP.';
+      let errorMsg = error.message || 'An error occurred while sending OTP.';
       if (error?.response?.data?.message) {
         errorMsg = error.response.data.message;
-      } else if (error?.message) {
-        errorMsg = error.message;
       }
 
       setErrorMessage(errorMsg);
