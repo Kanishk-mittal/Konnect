@@ -2,22 +2,23 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { RootState } from '../store/store';
+import type { RootState, AppDispatch } from '../store/store';
 
 // Components
 import Header from '../components/Header';
 import InputComponent from '../components/InputComponent';
 
 // Redux actions
-import { setAuthenticated, setPrivateKey, setUserId, setUserType, clearAuth } from '../store/authSlice';
+import { setAuth, clearAuth } from '../store/authSlice';
+import { fetchUser } from '../store/userSlice';
 
 // API and utilities
 import { postEncryptedData, logout } from '../api/requests';
-import { savePrivateKey } from '../utils/privateKeyManager';
+import { importAndStorePrivateKey } from '../services/cryptoService';
 
 const AdminLogin = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
-  const dispatch = useDispatch();
+  const dispatch: AppDispatch = useDispatch();
   const navigate = useNavigate();
 
   const gradientClasses = "bg-[radial-gradient(circle,_rgba(255,255,255,0.3)_0%,_rgba(219,178,255,0.3)_55%,_rgba(219,178,255,0.3)_100%)]";
@@ -39,12 +40,7 @@ const AdminLogin = () => {
     setSuccessMessage('');
 
     try {
-      // First, clear any existing session (logout from any previous admin/club/student session)
-      await logout('admin'); // Try to clear admin cookie
-      await logout('club');  // Try to clear club cookie
-      await logout('student'); // Try to clear student cookie
-
-      // Clear Redux state
+      // Clear any existing Redux state
       dispatch(clearAuth());
 
       // Create the data object to send (unified login uses 'id' field)
@@ -64,21 +60,21 @@ const AdminLogin = () => {
       if (response && response.status === true) {
         setSuccessMessage(response.message || 'Login successful!');
 
-        // The response is already decrypted by postEncryptedData
-        // Sensitive data is nested inside response.data by the backend
         const { privateKey, id, userType } = response.data || {};
 
-        if (privateKey && id) {
-          // Save to Redux store (primary storage)
-          dispatch(setPrivateKey(privateKey));
-          dispatch(setUserId(id));
-          dispatch(setUserType(userType || 'admin'));
+        if (privateKey && id && userType) {
+          // Securely store the private key in IndexedDB via CryptoService
+          await importAndStorePrivateKey(id, privateKey);
 
-          // Save to localStorage as backup
-          await savePrivateKey(privateKey, 'admin', id);
+          // Set authentication state in Redux
+          dispatch(setAuth({ userId: id, userType }));
+          
+          // Fetch user profile data
+          dispatch(fetchUser());
+
+        } else {
+          throw new Error('Login response missing essential data.');
         }
-
-        dispatch(setAuthenticated(true));
 
         // Navigate after a brief delay to show success message
         setTimeout(() => {
@@ -90,18 +86,10 @@ const AdminLogin = () => {
       }
     } catch (error: any) {
       console.error('Error during login:', error);
-
-      // Handle different types of errors
-      let errorMsg = 'An unexpected error occurred during login.';
-
+      let errorMsg = error.message || 'An unexpected error occurred during login.';
       if (error?.response?.data?.message) {
-        // API error with specific message
         errorMsg = error.response.data.message;
-      } else if (error?.message) {
-        // General error with message
-        errorMsg = error.message;
       }
-
       setErrorMessage(errorMsg);
     } finally {
       setIsLoading(false);
