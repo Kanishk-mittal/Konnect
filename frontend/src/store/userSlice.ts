@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { getData } from '../../api/requests';
+import { getData } from '../api/requests';
 
 interface UserProfile {
   username: string;
