@@ -10,7 +10,8 @@ import { useSelector, useDispatch } from "react-redux"
 import type { RootState, AppDispatch } from "../store/store"
 import { clearAuth } from "../store/authSlice"
 import { clearUser } from "../store/userSlice"
-import { deletePrivateKey, deleteUserDatabase } from "../services/cryptoService"
+import { deletePrivateKey } from "../services/cryptoService"
+import { deleteUserDatabase } from "../utils/db"
 
 
 const Header = () => {
