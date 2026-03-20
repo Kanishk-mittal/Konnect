@@ -135,7 +135,8 @@ export const registerCollegeController = async (req: Request, res: Response): Pr
             data: {
                 recoveryKey: adminResp.rawKeys?.recoveryKey,
                 privateKey: adminResp.rawKeys?.privateKey,
-                id: adminResp.user._id.toString()
+                id: adminResp.user._id.toString(),
+                userType: "admin" // Added for frontend compatibility
             },
             // Include public key in response so resolvePublicKey middleware can use it
             publicKey: clientPublicKey

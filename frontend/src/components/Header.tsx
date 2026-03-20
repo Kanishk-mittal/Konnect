@@ -3,21 +3,24 @@ import Logo from "../assets/Logo.png"
 import ProfileIcon from "../assets/profile_icon.png"
 import ThemeButton from "./ThemeButton"
 import EditProfileModal from "./EditProfileModal"
-import { postData } from "../api/requests"
+import { postData, getData } from "../api/requests"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import type { RootState } from "../store/store"
-import { getData } from "../api/requests"
+import type { RootState, AppDispatch } from "../store/store"
+import { clearAuth } from "../store/authSlice"
+import { clearUser } from "../store/userSlice"
+import { deletePrivateKey } from "../services/cryptoService"
+import { deleteUserDatabase } from "../utils/db"
 
 
 const Header = () => {
     const navigate = useNavigate()
     const location = useLocation()
-    const dispatch = useDispatch();
+    const dispatch: AppDispatch = useDispatch();
     const { isAuthenticated, userId, userType } = useSelector((state: RootState) => state.auth)
+    const { profile } = useSelector((state: RootState) => state.user);
 
-    const [profilePicture, setProfilePicture] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [showTooltip, setShowTooltip] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
@@ -26,30 +29,10 @@ const Header = () => {
     // Check if we're on a login page
     const isLoginPage = ['/admin/login', '/club/login', '/student/login', '/login'].includes(location.pathname)
 
-    const fetchProfilePicture = async () => {
-        // Don't fetch if on login page or not authenticated
-        if (isLoginPage || !isAuthenticated || !userId) {
-            setProfilePicture(null)
-            return
-        }
-
-        setLoading(true)
-        try {
-            const response = await getData(`/user/profile-picture/${userId}`)
-            if (response.status) {
-                setProfilePicture(response.profilePicture)
-            }
-        } catch (error) {
-            // Error fetching profile picture or status
-            console.error('Error fetching user data:', error)
-        } finally {
-            setLoading(false)
-        }
+    const fetchProfilePicture = () => {
+        // No fetching needed here anymore, as the userSlice handles it.
+        // We just get the picture from the profile.
     }
-
-    useEffect(() => {
-        fetchProfilePicture()
-    }, [isAuthenticated, userId, isLoginPage])
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -73,14 +56,21 @@ const Header = () => {
         setShowTooltip(false)
     }
 
-    const handleLogout = () => {
-        postData('/user/logout', {})
-            .finally(() => {
-                // Always clear Redux state and navigate even if logout fails
-                navigate('/');
-                dispatch({ type: 'auth/clearAuth' });
-            });
+    const handleLogout = async () => {
+        if (userId) {
+          // Clear the securely stored private key from IndexedDB
+          await deletePrivateKey(userId);
+          // Also delete the entire DB for the user for a full cleanup
+          await deleteUserDatabase(userId);
+        }
+        // Clear Redux state for both auth and user
+        dispatch(clearAuth());
+        dispatch(clearUser());
+        // Navigate to home
+        navigate('/');
     }
+
+    const userStatus = useSelector((state: RootState) => state.user.status);
 
     return (
         <header className="flex justify-center items-center select-none pt-1">
@@ -100,11 +90,11 @@ const Header = () => {
                                 onClick={handleProfileClick}
                                 className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
-                                {loading ? (
+                                {userStatus === 'loading' && !profile?.profilePicture ? (
                                     <div className="w-10 h-10 bg-gray-300 rounded-full animate-pulse"></div>
-                                ) : profilePicture ? (
+                                ) : profile?.profilePicture ? (
                                     <img
-                                        src={profilePicture}
+                                        src={profile.profilePicture}
                                         alt="Profile"
                                         className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                     />
@@ -148,7 +138,7 @@ const Header = () => {
                     isOpen={showEditModal}
                     onClose={() => setShowEditModal(false)}
                     userId={userId}
-                    onProfileUpdate={fetchProfilePicture}
+                    onProfileUpdate={() => dispatch(fetchUser())}
                 />
             )}
         </header>

@@ -1,11 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented version for schema change
 
 // Define store names as constants
 export const CHAT_STORE = 'chats';
 export const GROUP_STORE = 'groups';
 export const ANNOUNCEMENT_STORE = 'announcements';
+export const KEY_STORE = 'keys'; // New store for crypto keys
 
 // Define a union type for store names for type safety
 export type StoreName = typeof CHAT_STORE | typeof GROUP_STORE | typeof ANNOUNCEMENT_STORE;
@@ -35,6 +36,10 @@ interface KonnectDBSchema extends DBSchema {
     value: StoredItem;
     indexes: { 'by-lastAccessed': number };
   };
+  [KEY_STORE]: {
+    key: string; // Key will be the user's ID
+    value: CryptoKey; // Value is the non-extractable CryptoKey
+  };
 }
 
 let dbPromises = new Map<string, Promise<IDBPDatabase<KonnectDBSchema>>>();
@@ -48,7 +53,7 @@ const getDb = (userId: string) => {
 
   if (!dbPromises.has(userId)) {
     const promise = openDB<KonnectDBSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion) {
         // Function to create a store
         const createStore = (storeName: StoreName) => {
           if (!db.objectStoreNames.contains(storeName)) {
@@ -56,10 +61,20 @@ const getDb = (userId: string) => {
             store.createIndex('by-lastAccessed', 'lastAccessed');
           }
         };
-        // Create all stores
-        createStore(CHAT_STORE);
-        createStore(GROUP_STORE);
-        createStore(ANNOUNCEMENT_STORE);
+
+        if (oldVersion < 1) {
+          // Create all stores for a fresh install
+          createStore(CHAT_STORE);
+          createStore(GROUP_STORE);
+          createStore(ANNOUNCEMENT_STORE);
+        }
+        
+        if (oldVersion < 2) {
+          // Add the new key store
+          if (!db.objectStoreNames.contains(KEY_STORE)) {
+            db.createObjectStore(KEY_STORE);
+          }
+        }
       },
     });
     dbPromises.set(userId, promise);
@@ -126,4 +141,49 @@ export const updateItemTimestamp = async (userId: string, storeName: StoreName, 
     item.lastAccessed = Date.now();
     await db.put(storeName, item);
   }
+};
+
+// --- Crypto Key Storage Functions ---
+
+/**
+ * Stores a CryptoKey in the key store.
+ * @param userId The ID of the user owning the key.
+ * @param key The CryptoKey object to store.
+ */
+export const storeCryptoKey = async (userId: string, key: CryptoKey): Promise<void> => {
+  const db = await getDb(userId);
+  await db.put(KEY_STORE, key, userId); // Use userId as the key in the key store
+};
+
+/**
+ * Retrieves a CryptoKey from the key store.
+ * @param userId The ID of the user owning the key.
+ * @returns The CryptoKey object, or undefined if not found.
+ */
+export const getCryptoKey = async (userId: string): Promise<CryptoKey | undefined> => {
+  const db = await getDb(userId);
+  return db.get(KEY_STORE, userId);
+};
+
+/**
+ * Deletes a CryptoKey from the key store.
+ * @param userId The ID of the user owning the key.
+ */
+export const deleteCryptoKey = async (userId: string): Promise<void> => {
+  const db = await getDb(userId);
+  await db.delete(KEY_STORE, userId);
+};
+
+/**
+ * Deletes the entire IndexedDB database for a user.
+ * @param userId The ID of the user whose database should be deleted.
+ */
+export const deleteUserDatabase = async (userId: string): Promise<void> => {
+    const dbName = `konnect-db-${userId}`;
+    if (dbPromises.has(userId)) {
+        const db = await dbPromises.get(userId);
+        db?.close();
+        dbPromises.delete(userId);
+    }
+    await window.indexedDB.deleteDatabase(dbName);
 };

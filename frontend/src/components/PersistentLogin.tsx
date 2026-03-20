@@ -1,35 +1,43 @@
-import { useEffect, useState, ReactNode } from 'react';
-import { useDispatch } from 'react-redux';
-import { setAuthenticated, setUserId, setUserType, setEmail } from '../store/authSlice';
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { setAuth, setAuthStatus } from '../store/authSlice';
+import { fetchUser } from '../store/userSlice';
 import { getData } from '../api/requests';
+import type { AppDispatch, RootState } from '../store/store';
+import type { ReactNode } from 'react';
 
 const PersistentLogin = ({ children }: { children: ReactNode }) => {
-  const [loading, setLoading] = useState(true);
-  const dispatch = useDispatch();
+  const dispatch: AppDispatch = useDispatch();
+  const authStatus = useSelector((state: RootState) => state.auth.status);
 
   useEffect(() => {
     const verifyUser = async () => {
+      dispatch(setAuthStatus('loading'));
       try {
         const response = await getData('/user/details');
-        if (response?.status) {
-          const { userId, userType, email } = response.data;
-          dispatch(setUserId(userId));
-          dispatch(setUserType(userType));
-          dispatch(setEmail(email));
-          dispatch(setAuthenticated(true));
+        if (response?.status && response.data?.userId) {
+          const { userId, userType } = response.data;
+          dispatch(setAuth({ userId, userType }));
+          // After setting auth, fetch the full user profile
+          dispatch(fetchUser());
+        } else {
+          // If the API call succeeds but indicates no active session
+          dispatch(setAuthStatus('failed'));
         }
       } catch (error) {
-        console.error('Session verification failed:', error);
-      } finally {
-        setLoading(false);
+        dispatch(setAuthStatus('failed'));
       }
     };
 
-    verifyUser();
-  }, [dispatch]);
+    // Only run verification if the auth status is idle (initial load)
+    if (authStatus === 'idle') {
+      verifyUser();
+    }
+  }, [dispatch, authStatus]);
 
-  if (loading) {
-    return <div>Loading...</div>; // You can replace this with a proper spinner component
+  // Show loading indicator while session is being verified
+  if (authStatus === 'loading' || authStatus === 'idle') {
+    return <div>Loading...</div>; // Or a proper spinner component
   }
 
   return <>{children}</>;
