@@ -6,11 +6,14 @@ import { storeCryptoKey, getCryptoKey, deleteCryptoKey } from '../utils/db';
  * @returns A CryptoKey object.
  */
 async function importRsaPrivateKey(pem: string): Promise<CryptoKey> {
-  // 1. Remove PEM headers and footers and whitespace
+  // 1. Remove PEM headers/footers and whitespace. Handles both PKCS#1 and PKCS#8 headers.
   const pemContents = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
-    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, '')
+    .replace(/-----END (RSA )?PRIVATE KEY-----/, '')
     .replace(/\s/g, '');
+
+  // // TODO: Remove this console.log in production. For debugging.
+  // console.log('PEM Contents after stripping:', pemContents);
 
   // 2. Base64 decode the string to get an ArrayBuffer
   const binaryDer = window.atob(pemContents);
@@ -21,10 +24,10 @@ async function importRsaPrivateKey(pem: string): Promise<CryptoKey> {
 
   // 3. Import the key into the Web Crypto API
   return window.crypto.subtle.importKey(
-    'pkcs8', // Private key format
+    'pkcs8', // Private key format produced by forge.wrapRsaPrivateKey
     binaryDerBuffer.buffer,
     {
-      name: 'RSA-OAEP',
+      name: 'RSA-OAEP', // Match backend encryption algorithm
       hash: 'SHA-256',
     },
     false, // Make the key non-extractable for security

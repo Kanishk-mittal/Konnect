@@ -1,9 +1,10 @@
-import { useEffect, useState, ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { setAuth, clearAuth, setAuthStatus } from '../store/authSlice';
+import { setAuth, setAuthStatus } from '../store/authSlice';
 import { fetchUser } from '../store/userSlice';
 import { getData } from '../api/requests';
 import type { AppDispatch, RootState } from '../store/store';
+import type { ReactNode } from 'react';
 
 const PersistentLogin = ({ children }: { children: ReactNode }) => {
   const dispatch: AppDispatch = useDispatch();
@@ -24,15 +25,13 @@ const PersistentLogin = ({ children }: { children: ReactNode }) => {
           dispatch(setAuthStatus('failed'));
         }
       } catch (error) {
-        // If the API call fails (e.g., 401 Unauthorized)
-        console.error('Session verification failed:', error);
         dispatch(setAuthStatus('failed'));
       }
     };
 
     // Only run verification if the auth status is idle (initial load)
     if (authStatus === 'idle') {
-        verifyUser();
+      verifyUser();
     }
   }, [dispatch, authStatus]);
 

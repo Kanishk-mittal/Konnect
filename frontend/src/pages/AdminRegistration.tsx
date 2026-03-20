@@ -63,6 +63,8 @@ const AdminRegistration = () => {
         dataToSend,
         { expectEncryptedResponse: true }
       );
+      //TODO : remove this before commit
+      console.log('Decrypted registration response:', response);
 
       // Handle response (now automatically decrypted)
       if (response && response.status === true) {
@@ -77,7 +79,7 @@ const AdminRegistration = () => {
 
           // Set authentication state in Redux
           dispatch(setAuth({ userId: id, userType }));
-          
+
           // Fetch user profile data
           dispatch(fetchUser());
 

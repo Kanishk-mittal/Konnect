@@ -67,9 +67,6 @@ const StudentLogin = () => {
         const { privateKey, id, userType } = response.data || {};
 
         if (privateKey && id && userType) {
-          // TODO: Remove this console.log in production. This is for debugging the private key format.
-          console.log('Private Key received from backend:', privateKey);
-
           // Securely store the private key in IndexedDB
           await importAndStorePrivateKey(id, privateKey);
           

@@ -31,7 +31,9 @@ export const decryptRSA = (encryptedMessage: string, privateKey: string): string
  */
 export const generateRSAKeyPair = (): [string, string] => {
     const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
-    const privateKey = forge.pki.privateKeyToPem(keypair.privateKey);
+    const privateKeyAsn1 = forge.pki.privateKeyToAsn1(keypair.privateKey);
+    const privateKeyInfoAsn1 = forge.pki.wrapRsaPrivateKey(privateKeyAsn1);
+    const privateKey = forge.pki.privateKeyInfoToPem(privateKeyInfoAsn1);
     const publicKey = forge.pki.publicKeyToPem(keypair.publicKey);
     return [privateKey, publicKey];
 };
