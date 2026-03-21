@@ -14,7 +14,7 @@ import { fetchUser } from '../store/userSlice';
 import { showLoading, hideLoading } from '../store/loadingSlice'; // Import global loading actions
 
 // API and utilities
-import { postEncryptedData, logout } from '../api/requests';
+import { postEncryptedData } from '../api/requests';
 import { importAndStorePrivateKey } from '../services/cryptoService';
 
 const AdminLogin = () => {
