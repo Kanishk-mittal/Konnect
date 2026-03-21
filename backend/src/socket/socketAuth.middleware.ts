@@ -25,8 +25,8 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
         // TODO: Remove console.log for socketAuthMiddleware user add
         console.log(`Auth Middleware: Socket ${socket.id} authenticated and added for user ${decoded.id}`);
 
-        // Join the user to a room named after their user ID
-        socket.join(decoded.id);
+        // Join the user to a room named after their user ID - REMOVED as it's redundant with the new userSocketMap
+        // socket.join(decoded.id);
         next();
 
     } catch (error) {

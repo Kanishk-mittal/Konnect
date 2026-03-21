@@ -3,10 +3,11 @@
 export interface ServerToClientEvents {
   // Connection events
   connected: (data: { message: string; userId: string; socketId: string }) => void;
+  new_message: (data: { sender: string; message: string; groupId?: string }) => void;
 }
 
 export interface ClientToServerEvents {
-  // No client-to-server events are defined for now beyond the default ones.
+  private_message: (data: { receiver: string; message: string; groupId?: string }) => void;
 }
 
 export interface InterServerEvents {
