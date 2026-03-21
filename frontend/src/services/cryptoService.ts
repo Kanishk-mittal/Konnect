@@ -12,9 +12,6 @@ async function importRsaPrivateKey(pem: string): Promise<CryptoKey> {
     .replace(/-----END (RSA )?PRIVATE KEY-----/, '')
     .replace(/\s/g, '');
 
-  // // TODO: Remove this console.log in production. For debugging.
-  // console.log('PEM Contents after stripping:', pemContents);
-
   // 2. Base64 decode the string to get an ArrayBuffer
   const binaryDer = window.atob(pemContents);
   const binaryDerBuffer = new Uint8Array(binaryDer.length);

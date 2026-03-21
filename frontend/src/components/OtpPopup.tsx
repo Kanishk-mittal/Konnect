@@ -9,7 +9,6 @@ interface OtpPopupProps {
     onClose: () => void;
     onSubmit: (otp: string) => Promise<void> | void;
     title?: string;
-    isLoading?: boolean;
     errorMessage?: string;
     successMessage?: string;
 }
@@ -20,7 +19,6 @@ const OtpPopup = ({
     onClose,
     onSubmit,
     title = "OTP Verification",
-    isLoading = false,
     errorMessage = '',
     successMessage = ''
 }: OtpPopupProps) => {
@@ -103,19 +101,19 @@ const OtpPopup = ({
                     <div className="flex justify-center items-center mt-6">
                         <button
                             type="submit"
-                            disabled={isSubmitting || isLoading}
+                            disabled={isSubmitting}
                             className={`px-8 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 ${
-                                (isSubmitting || isLoading)
+                                (isSubmitting)
                                     ? 'bg-gray-500 cursor-not-allowed'
                                     : theme === 'dark'
                                         ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900]'
                                         : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A]'
                                 }`}
                         >
-                            {(isSubmitting || isLoading) ? (
+                            {isSubmitting ? (
                                 <div className="flex items-center gap-2">
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    {isLoading ? 'Processing...' : 'Verifying...'}
+                                    Verifying...
                                 </div>
                             ) : (
                                 'Verify OTP'

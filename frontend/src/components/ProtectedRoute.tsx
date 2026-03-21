@@ -1,7 +1,7 @@
 import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import type { RootState } from '../store/store';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -19,7 +19,7 @@ const ProtectedRoute = ({ children, allowedUserTypes, redirectPath = '/' }: Prot
 
   // If authenticated but userId is missing (shouldn't happen if isAuthenticated is true, but as a safeguard)
   if (!userId) {
-      return <Navigate to={redirectPath} replace />;
+    return <Navigate to={redirectPath} replace />;
   }
 
   // Check if the user's type is allowed for this route
@@ -27,7 +27,6 @@ const ProtectedRoute = ({ children, allowedUserTypes, redirectPath = '/' }: Prot
     // For now, redirect to the general path.
     return <Navigate to={redirectPath} replace />;
   }
-
   // If authenticated and authorized, render the children
   return <>{children}</>;
 };

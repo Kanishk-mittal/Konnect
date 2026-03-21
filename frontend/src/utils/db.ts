@@ -68,7 +68,7 @@ const getDb = (userId: string) => {
           createStore(GROUP_STORE);
           createStore(ANNOUNCEMENT_STORE);
         }
-        
+
         if (oldVersion < 2) {
           // Add the new key store
           if (!db.objectStoreNames.contains(KEY_STORE)) {
@@ -179,11 +179,11 @@ export const deleteCryptoKey = async (userId: string): Promise<void> => {
  * @param userId The ID of the user whose database should be deleted.
  */
 export const deleteUserDatabase = async (userId: string): Promise<void> => {
-    const dbName = `konnect-db-${userId}`;
-    if (dbPromises.has(userId)) {
-        const db = await dbPromises.get(userId);
-        db?.close();
-        dbPromises.delete(userId);
-    }
-    await window.indexedDB.deleteDatabase(dbName);
+  const dbName = `konnect-db-${userId}`;
+  if (dbPromises.has(userId)) {
+    const db = await dbPromises.get(userId);
+    db?.close();
+    dbPromises.delete(userId);
+  }
+  await window.indexedDB.deleteDatabase(dbName);
 };

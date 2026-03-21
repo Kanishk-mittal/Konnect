@@ -11,6 +11,7 @@ import InputComponent from '../components/InputComponent';
 // Redux actions
 import { setAuth, clearAuth } from '../store/authSlice';
 import { fetchUser } from '../store/userSlice';
+import { showLoading, hideLoading } from '../store/loadingSlice'; // Import global loading actions
 
 // API and utilities
 import { postEncryptedData } from '../api/requests';
@@ -29,13 +30,12 @@ const StudentLogin = () => {
     id: '',
     password: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    dispatch(showLoading()); // Use global loading
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -46,7 +46,7 @@ const StudentLogin = () => {
       // Validate required fields
       if (!formData.collegeCode || !formData.id || !formData.password) {
         setErrorMessage('All fields are required');
-        setIsLoading(false);
+        dispatch(hideLoading()); // Hide loading if validation fails
         return;
       }
 
@@ -73,17 +73,15 @@ const StudentLogin = () => {
           // Set authentication state in Redux
           dispatch(setAuth({ userId: id, userType }));
 
-          // Fetch user profile data
-          dispatch(fetchUser());
+          // Fetch user profile data and await its completion to ensure data is ready before navigation
+          await dispatch(fetchUser());
 
         } else {
             throw new Error('Login response missing essential data.');
         }
 
-        // Navigate after a brief delay
-        setTimeout(() => {
-          navigate('/chat');
-        }, 1000);
+        // Navigate to dashboard after all data is fetched and processed
+        navigate('/chat');
       } else {
         const errorMsg = response?.message || 'Login failed. Please try again.';
         setErrorMessage(errorMsg);
@@ -96,9 +94,11 @@ const StudentLogin = () => {
       }
       setErrorMessage(errorMsg);
     } finally {
-      setIsLoading(false);
+      dispatch(hideLoading()); // Use global loading
     }
   };
+
+  const globalIsLoading = useSelector((state: RootState) => state.loading.isLoading); // Get global loading state
 
   return (
     <div className={`min-h-[100vh] w-[100vw] ${theme === 'dark' ? 'bg-[#0E001B]' : 'bg-gradient-to-b from-[#FFC362] to-[#9653D0]'}`}>
@@ -149,20 +149,13 @@ const StudentLogin = () => {
               <div className='flex justify-center items-center'>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={globalIsLoading}
                   className={`mt-4 px-6 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
                     ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900] disabled:hover:bg-[#FF7900]'
                     : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A] disabled:hover:bg-[#5A189A]'
                     }`}
                 >
-                  {isLoading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Logging in...
-                    </div>
-                  ) : (
-                    'Login'
-                  )}
+                  {globalIsLoading ? 'Logging in...' : 'Login'}
                 </button>
               </div>
             </form>

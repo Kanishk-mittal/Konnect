@@ -2,14 +2,16 @@ import { configureStore } from '@reduxjs/toolkit';
 import themeReducer from './themeSlice';
 import authReducer from './authSlice';
 import chatReducer from './chatSlice';
-import userReducer from './userSlice'; // Import the new user reducer
+import userReducer from './userSlice';
+import loadingReducer from './loadingSlice'; // Import the new loading reducer
 
 const store = configureStore({
   reducer: {
     theme: themeReducer,
     auth: authReducer,
     chat: chatReducer,
-    user: userReducer, // Add the user reducer
+    user: userReducer,
+    loading: loadingReducer, // Add the loading reducer
   },
 });
 
@@ -19,6 +21,7 @@ export type RootState = {
   auth: ReturnType<typeof authReducer>;
   chat: ReturnType<typeof chatReducer>;
   user: ReturnType<typeof userReducer>;
+  loading: ReturnType<typeof loadingReducer>; // Add the loading reducer type
 };
 
 export type AppDispatch = typeof store.dispatch;

@@ -2,7 +2,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { RootState, AppDispatch } from '../store/store'; // Added AppDispatch
+import type { RootState, AppDispatch } from '../store/store';
 
 // Components
 import Header from '../components/Header';
@@ -11,8 +11,9 @@ import OtpPopup from '../components/OtpPopup';
 import RecoveryKeyPopup from '../components/RecoveryKeyPopup';
 
 // Redux actions
-import { setAuth } from '../store/authSlice'; // Only setAuth
-import { fetchUser } from '../store/userSlice'; // New import
+import { setAuth } from '../store/authSlice';
+import { fetchUser } from '../store/userSlice';
+import { showLoading, hideLoading } from '../store/loadingSlice'; // Import global loading actions
 
 // API and utilities
 import { postData, postEncryptedData } from "../api/requests";
@@ -28,7 +29,6 @@ const AdminRegistration = () => {
 
   const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [showRecoveryPopup, setShowRecoveryPopup] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
@@ -43,7 +43,7 @@ const AdminRegistration = () => {
   });
 
   const register = async (otp: string): Promise<void> => {
-    setIsLoading(true);
+    dispatch(showLoading()); // Use global loading
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -63,8 +63,6 @@ const AdminRegistration = () => {
         dataToSend,
         { expectEncryptedResponse: true }
       );
-      //TODO : remove this before commit
-      console.log('Decrypted registration response:', response);
 
       // Handle response (now automatically decrypted)
       if (response && response.status === true) {
@@ -115,12 +113,13 @@ const AdminRegistration = () => {
 
       setErrorMessage(errorMsg);
     } finally {
-      setIsLoading(false);
+      dispatch(hideLoading()); // Use global loading
     }
-  }; const handleSubmit = async (e: React.FormEvent) => {
+  };
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    setIsLoading(true);
+    dispatch(showLoading()); // Use global loading
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -129,6 +128,7 @@ const AdminRegistration = () => {
       const validation = validateRegistrationData(formData);
       if (!validation.status) {
         setErrorMessage(validation.message);
+        dispatch(hideLoading()); // Hide loading if validation fails
         return;
       }
 
@@ -155,9 +155,11 @@ const AdminRegistration = () => {
 
       setErrorMessage(errorMsg);
     } finally {
-      setIsLoading(false);
+      dispatch(hideLoading()); // Use global loading
     }
   };
+
+  const globalIsLoading = useSelector((state: RootState) => state.loading.isLoading); // Get global loading state
 
   return (
     <>
@@ -240,20 +242,13 @@ const AdminRegistration = () => {
               <div className='flex justify-center items-center'>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={globalIsLoading} // Use global loading state
                   className={`mt-4 px-6 py-3 text-white font-semibold rounded-full transition-colors duration-300 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
                     ? 'bg-[#FF7900] hover:bg-[#E86C00] focus:ring-[#FF7900] disabled:hover:bg-[#FF7900]'
                     : 'bg-[#5A189A] hover:bg-[#4C1184] focus:ring-[#5A189A] disabled:hover:bg-[#5A189A]'
                     }`}
                 >
-                  {isLoading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Sending OTP...
-                    </div>
-                  ) : (
-                    'Get OTP'
-                  )}
+                  {globalIsLoading ? 'Processing...' : 'Get OTP'}
                 </button>
               </div>
             </form>
@@ -273,7 +268,6 @@ const AdminRegistration = () => {
         onSubmit={register}
         email={formData.emailId}
         title="Verify Your Email"
-        isLoading={isLoading}
         errorMessage={errorMessage}
         successMessage={successMessage}
       />
