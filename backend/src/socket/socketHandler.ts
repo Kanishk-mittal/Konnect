@@ -31,16 +31,12 @@ export class SocketHandler {
 
     private initializeSocketEvents(): void {
         this.io.on('connection', (socket: Socket) => {
-            // TODO: Remove console.log for socket connection
-            console.log(`Socket connected: ${socket.id}`);
 
             socket.on('private_message', async (data) => {
                 const { receiver, message, groupId } = data;
                 const senderId = userSocketMap.getUserId(socket.id);
 
                 if (!senderId) {
-                    // TODO: Remove console.log for private_message no sender
-                    console.log(`Could not find sender for socket ${socket.id}`);
                     return; // Sender not found in map, drop message
                 }
 
@@ -50,22 +46,16 @@ export class SocketHandler {
                     const receiverUser = await User.findOne({ id: receiver }).lean();
 
                     if (!senderUser || !receiverUser) {
-                        // TODO: Remove console.log for private_message user not found
-                        console.log(`Sender or receiver not found in DB. Sender: ${senderId}, Receiver: ${receiver}`);
                         return; // User not found, drop message
                     }
 
                     // 1. Check for same college
                     if (senderUser.college_code !== receiverUser.college_code) {
-                        // TODO: Remove console.log for private_message different college
-                        console.log(`Message dropped: Sender and receiver in different colleges.`);
                         return;
                     }
 
                     // 2. Check if sender is blocked by receiver
                     if (receiverUser.blocked_users?.some(blockedId => blockedId.equals(senderUser._id))) {
-                        // TODO: Remove console.log for private_message sender blocked
-                        console.log(`Message dropped: Sender ${senderId} is blocked by receiver ${receiver}.`);
                         return;
                     }
 
@@ -82,8 +72,6 @@ export class SocketHandler {
                         });
 
                         if (isChatGroupMember < 2 && isAnnouncementGroupMember < 2) {
-                            // TODO: Remove console.log for private_message not group members
-                            console.log(`Message dropped: Not all users are members of group ${groupId}.`);
                             return; // Not all users are members of the group
                         }
                     }
@@ -93,23 +81,16 @@ export class SocketHandler {
                     if (receiverSocketId) {
                         const payload = { sender: senderId, message, groupId };
                         this.io.to(receiverSocketId).emit('new_message', payload);
-                        // TODO: Remove console.log for private_message success
-                        console.log(`Message from ${senderId} to ${receiver} sent successfully.`);
                     } else {
-                        // TODO: Remove console.log for private_message receiver offline
-                        console.log(`Receiver ${receiver} is not online. Message not sent.`);
                     }
 
                 } catch (error) {
-                    // TODO: Remove console.log for private_message error
                     console.error('Error handling private_message:', error);
                 }
             });
 
 
             socket.on('disconnect', () => {
-                // TODO: Remove console.log for socket disconnection
-                console.log(`Socket disconnected: ${socket.id}`);
                 userSocketMap.remove(socket.id);
             });
         });

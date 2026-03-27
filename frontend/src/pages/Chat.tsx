@@ -22,6 +22,8 @@ const Chat = () => {
 
   useEffect(() => {
     connectSocket();
+    // TODO: Remove this alert before pushing to GitHub
+    alert('Connected to socket!');
 
     return () => {
       disconnectSocket();

@@ -6,8 +6,6 @@ class UserSocketMap {
     constructor() {
         this.socketToUserMap = new Map();
         this.userToSocketMap = new Map();
-        // TODO: Remove console.log for UserSocketMap initialization
-        console.log("UserSocketMap initialized");
     }
 
     /**
@@ -18,8 +16,6 @@ class UserSocketMap {
     add(socketId: string, userId: string): void {
         this.socketToUserMap.set(socketId, userId);
         this.userToSocketMap.set(userId, socketId);
-        // TODO: Remove console.log for UserSocketMap add
-        console.log(`UserSocketMap: Added socket ${socketId} for user ${userId}`);
     }
 
     /**
@@ -31,11 +27,7 @@ class UserSocketMap {
         if (userId) {
             this.socketToUserMap.delete(socketId);
             this.userToSocketMap.delete(userId);
-            // TODO: Remove console.log for UserSocketMap remove
-            console.log(`UserSocketMap: Removed socket ${socketId} for user ${userId}`);
         } else {
-            // TODO: Remove console.log for UserSocketMap remove (socket not found)
-            console.log(`UserSocketMap: Attempted to remove socket ${socketId}, but not found.`);
         }
     }
 
