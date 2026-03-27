@@ -6,6 +6,7 @@ import sendIcon from '../assets/send.png';
 import editIcon from '../assets/edit.png';
 import deleteIcon from '../assets/delete.png';
 import EditClubModal from './EditClubModal';
+import { useNavigate } from 'react-router-dom';
 
 interface ClubTabProps {
     id: string;
@@ -13,7 +14,7 @@ interface ClubTabProps {
     email: string;
     icon?: string;
     onDelete?: () => void;
-    onSendMessage?: () => void;
+    user_id: string;
 }
 
 const ClubTab: React.FC<ClubTabProps> = ({
@@ -22,11 +23,12 @@ const ClubTab: React.FC<ClubTabProps> = ({
     email,
     icon,
     onDelete,
-    onSendMessage
+    user_id
 }) => {
     const theme = useSelector((state: RootState) => state.theme.theme);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const navigate = useNavigate();
 
     // Define theme-specific styles
     const backgroundColor = theme === 'light'
@@ -85,21 +87,19 @@ const ClubTab: React.FC<ClubTabProps> = ({
                 {/* Action Buttons */}
                 <div className="flex flex-shrink-0 gap-1">
                     {/* Send Message Button */}
-                    {onSendMessage && (
-                        <button
-                            onClick={onSendMessage}
-                            className="p-2 rounded-md hover:opacity-80 transition-opacity"
-                            style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                            title="Send Message"
-                        >
-                            <img
-                                src={sendIcon}
-                                alt="Send Message"
-                                className="w-5 h-5"
-                                style={{ filter: iconFilter }}
-                            />
-                        </button>
-                    )}
+                    <button
+                        onClick={() => { navigate(`/chat/chat/${user_id}`) }}
+                        className="p-2 rounded-md hover:opacity-80 transition-opacity"
+                        style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+                        title="Send Message"
+                    >
+                        <img
+                            src={sendIcon}
+                            alt="Send Message"
+                            className="w-5 h-5"
+                            style={{ filter: iconFilter }}
+                        />
+                    </button>
 
                     {/* Edit Button */}
                     <button

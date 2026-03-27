@@ -137,7 +137,7 @@ export const getClubsByCollegeCodeController = async (req: Request, res: Respons
 
         // Fetch all clubs for the college
         const clubs = await ClubModel.find({ college_code: collegeCode })
-            .select('Club_name email icon')
+            .select('Club_name email icon user_id')
             .lean();
 
         // Format response
@@ -145,7 +145,8 @@ export const getClubsByCollegeCodeController = async (req: Request, res: Respons
             id: club._id.toString(),
             name: club.Club_name,
             email: club.email,
-            icon: club.icon
+            icon: club.icon,
+            user_id: club.user_id
         }));
 
         res.status(200).json({

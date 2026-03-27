@@ -27,9 +27,30 @@ response :- Returns the created club and user details, including cryptographic k
 # Club Routes
 This Document contains all information regarding club.routes.ts
 
-## Endpoints 
+## Endpoints
 baseURL: `/api/club`
 
+### 1. /:collegeCode
+Method :- `GET`
+Description :- Fetches all clubs for a specific college code. Accessible only by an authenticated admin.
+input :- `collegeCode` as a URL parameter.
+controller :- `getClubsByCollegeCodeController`
+response :- Returns a list of clubs with their ID, name, email, icon, and user ID.
+```json
+{
+    "status": true,
+    "message": "Clubs fetched successfully",
+    "data": [
+        {
+            "id": "65cad...",
+            "name": "Club Name",
+            "email": "club@example.com",
+            "icon": "https://...",
+            "user_id": "65cad..."
+        }
+    ]
+}
+```
 
 ### 3. /delete/:clubId
 Method :- `DELETE`

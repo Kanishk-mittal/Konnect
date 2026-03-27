@@ -10,6 +10,7 @@ interface Club {
     name: string;
     email: string;
     icon?: string;
+    user_id: string;
 }
 
 interface ClubsPanelProps {
@@ -26,12 +27,8 @@ const ClubsPanel: React.FC<ClubsPanelProps> = ({
     backgroundColor,
     navigate,
     clubs,
-    clubsLoading,
-    textColor
+    clubsLoading
 }) => {
-    const handleEdit = (clubId: string) => {
-        navigate(`/admin/edit-club/${clubId}`);
-    };
 
     const handleDelete = async (clubId: string) => {
         try {
@@ -44,10 +41,6 @@ const ClubsPanel: React.FC<ClubsPanelProps> = ({
             console.error('Error deleting club:', error);
             alert(`Failed to delete club: ${error.response?.data?.message || 'Unknown error'}`);
         }
-    };
-
-    const handleSendMessage = (clubId: string) => {
-        // TODO: Implement send message functionality
     };
 
     return (
@@ -74,9 +67,8 @@ const ClubsPanel: React.FC<ClubsPanelProps> = ({
                                 name={club.name}
                                 email={club.email}
                                 icon={club.icon}
-                                onEdit={() => handleEdit(club.id)}
                                 onDelete={() => handleDelete(club.id)}
-                                onSendMessage={() => handleSendMessage(club.id)}
+                                user_id={club.user_id}
                             />
                         ))
                     )}

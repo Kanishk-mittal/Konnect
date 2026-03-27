@@ -33,6 +33,8 @@ interface Club {
   id: string;
   name: string;
   email: string;
+  icon?: string;
+  user_id: string;
 }
 
 const AdminDashboard = () => {
@@ -113,7 +115,7 @@ const AdminDashboard = () => {
     };
 
     if (userStatus === 'succeeded' && profile) {
-        fetchDashboardData();
+      fetchDashboardData();
     }
   }, [profile, userStatus]);
 
