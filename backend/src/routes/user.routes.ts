@@ -33,7 +33,7 @@ router.get('/email/:userId', authMiddleware, getUserEmailById);
 router.get('/details', authMiddleware, getMyDetails);
 
 // Route to get AES_EXTERNAL env key for authenticated user
-router.get('/aes-external', authMiddleware, getAesExternalKey);
+router.get('/aes-external', authMiddleware, getAesExternalKey, resolvePublicKey, encryptResponse);
 
 // Route to get all users from the same college
 router.get('/users/college', authMiddleware, getUsersByCollege);

@@ -22,8 +22,6 @@ const Chat = () => {
 
   useEffect(() => {
     connectSocket();
-    // TODO: Remove this alert before pushing to GitHub
-    alert('Connected to socket!');
 
     return () => {
       disconnectSocket();
@@ -60,26 +58,26 @@ const Chat = () => {
       </div>
       <div className="flex-grow flex p-3 min-h-0">
         <Split
-            sizes={[30, 70]}
-            minSize={[200, 400]}
-            gutterSize={8}
-            className="flex h-full w-full split"
+          sizes={[30, 70]}
+          minSize={[200, 400]}
+          gutterSize={8}
+          className="flex h-full w-full split"
         >
-            <div style={{ backgroundColor: leftPanelColor }} className="h-full w-full rounded-lg p-4 overflow-y-auto">
-                <ChatLeftPanel theme={theme} />
-            </div>
-            <div style={{ backgroundColor: rightPanelColor }} className="h-full w-full rounded-lg p-4 overflow-y-auto">
-                {chatId ? (
-                    <ChatWindow 
-                        chatId={chatId}
-                        type={chatType}
-                    />
-                ) : (
-                    <div className="flex items-center justify-center h-full">
-                        <p className="text-lg text-gray-500">Select a chat to start messaging</p>
-                    </div>
-                )}
-            </div>
+          <div style={{ backgroundColor: leftPanelColor }} className="h-full w-full rounded-lg p-4 overflow-y-auto">
+            <ChatLeftPanel theme={theme} />
+          </div>
+          <div style={{ backgroundColor: rightPanelColor }} className="h-full w-full rounded-lg p-4 overflow-y-auto">
+            {chatId ? (
+              <ChatWindow
+                chatId={chatId}
+                type={chatType}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-lg text-gray-500">Select a chat to start messaging</p>
+              </div>
+            )}
+          </div>
         </Split>
       </div>
     </div>

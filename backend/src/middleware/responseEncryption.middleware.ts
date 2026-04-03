@@ -2,9 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { generateAESKey, encryptAES, decryptAES } from '../utils/encryption/aes.utils';
 import { encryptRSA } from '../utils/encryption/rsa.utils';
 import { internalAesKey } from '../constants/keys';
-import StudentModel from '../models/Student.model';
-import AdminModel from '../models/admin.model';
-import ClubModel from '../models/club.model';
+import UserModel from '../models/user.model';
 
 /**
  * Extended Request interface to include user information from auth middleware
@@ -49,21 +47,8 @@ export const resolvePublicKey = async (req: AuthenticatedRequest, res: Response,
             const userId = req.user.id;
             const userType = req.user.userType || req.user.type;
 
-            // Query the appropriate model based on user type
-            let user: any = null;
-            switch (userType) {
-                case 'student':
-                    user = await StudentModel.findById(userId).select('public_key');
-                    break;
-                case 'admin':
-                    user = await AdminModel.findById(userId).select('public_key');
-                    break;
-                case 'club':
-                    user = await ClubModel.findById(userId).select('public_key');
-                    break;
-                default:
-                    throw new Error(`Unknown user type: ${userType}`);
-            }
+            // Query the UserModel to find the public key
+            const user = await UserModel.findOne({ id: userId, user_type: userType }).select('public_key');
 
             if (!user || !user.public_key) {
                 throw new Error('User public key not found in database');
