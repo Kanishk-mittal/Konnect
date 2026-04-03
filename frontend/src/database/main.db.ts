@@ -47,6 +47,7 @@ export const getDb = (userId: string) => {
         // Create message stores
         if (!db.objectStoreNames.contains(CHAT_MESSAGES_STORE)) {
           const chatMessagesStore = db.createObjectStore(CHAT_MESSAGES_STORE, { keyPath: 'id' });
+          chatMessagesStore.createIndex('by-contactId', 'contactId');
           chatMessagesStore.createIndex('by-senderId', 'senderId');
           chatMessagesStore.createIndex('by-timestamp', 'timestamp');
         }

@@ -6,6 +6,7 @@ import ChatItem from './ChatItem';
 import { getData } from '../api/requests';
 import { getItems, upsertItems, updateItemTimestamp } from '../database/userList.db';
 import { type ListStoreName, CHAT_LIST_STORE, GROUP_STORE, ANNOUNCEMENT_STORE, type ContactListItem } from '../database/schema.db';
+import { getUnreadChatMessagesCount, getUnreadGroupMessagesCount, getUnreadAnnouncementMessagesCount, markChatRead, markGroupRead, markAnnouncementRead } from '../database/messages.db';
 
 interface ListItem extends ContactListItem {
   unreadCount: number;
@@ -28,23 +29,55 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
     return ANNOUNCEMENT_STORE;
   }, [chatType]);
 
+  /**
+   * Fetches unread count for a specific item based on chat type
+   */
+  const getUnreadCount = useCallback(async (itemId: string): Promise<number> => {
+    if (!userId) return 0;
+
+    try {
+      if (chatType === 'chat') {
+        return await getUnreadChatMessagesCount(userId, itemId);
+      } else if (chatType === 'group') {
+        return await getUnreadGroupMessagesCount(userId, itemId);
+      } else {
+        return await getUnreadAnnouncementMessagesCount(userId, itemId);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      return 0;
+    }
+  }, [userId, chatType]);
+
+  /**
+   * Fetches unread counts for all items in the list
+   */
+  const fetchUnreadCounts = useCallback(async (items: ContactListItem[]): Promise<ListItem[]> => {
+    const itemsWithUnread = await Promise.all(
+      items.map(async (item) => ({
+        ...item,
+        unreadCount: await getUnreadCount(item.id),
+      }))
+    );
+    return itemsWithUnread;
+  }, [getUnreadCount]);
+
   useEffect(() => {
     const fetchAndStoreItems = async () => {
       if (!userId) return; // Don't run if user is not logged in
 
       setLoading(true);
       const storeName = getStoreName();
-      
-      // 1. Load from IndexedDB first for quick display
+
+      // 1. Load from IndexedDB first for quick display with unread counts
       try {
         const cachedItems = await getItems(userId, storeName);
         if (cachedItems.length > 0) {
-          setListItems(cachedItems.map(item => ({ ...item, unreadCount: 0 })));
+          const itemsWithUnread = await fetchUnreadCounts(cachedItems);
+          setListItems(itemsWithUnread);
         }
       } catch (error) {
         console.error('Error loading from IndexedDB:', error);
-      } finally {
-        setLoading(false);
       }
 
       // 2. Fetch from network and update DB/UI
@@ -70,21 +103,46 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
             profilePicture: group.icon || null,
           }));
         }
-        
+
         await upsertItems(userId, storeName, networkItems);
         const updatedItems = await getItems(userId, storeName);
-        setListItems(updatedItems.map(item => ({ ...item, unreadCount: 0 })));
+        const itemsWithUnread = await fetchUnreadCounts(updatedItems);
+        setListItems(itemsWithUnread);
 
       } catch (error) {
         console.error(`Error fetching ${chatType}s:`, error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchAndStoreItems();
-  }, [chatType, getStoreName, userId]);
+  }, [chatType, getStoreName, userId, fetchUnreadCounts]);
 
-  const handleItemClick = (id: string) => {
+  const handleItemClick = async (id: string) => {
     dispatch(setChatId(id));
+
+    // Mark messages as read when chat is opened
+    if (!userId) return;
+
+    try {
+      if (chatType === 'chat') {
+        await markChatRead(userId, id);
+      } else if (chatType === 'group') {
+        await markGroupRead(userId, id);
+      } else {
+        await markAnnouncementRead(userId, id);
+      }
+
+      // Update the unread count for this item to 0
+      setListItems(prevItems =>
+        prevItems.map(item =>
+          item.id === id ? { ...item, unreadCount: 0 } : item
+        )
+      );
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
   };
 
   const handleTabClick = (type: 'chat' | 'group' | 'announcement') => {

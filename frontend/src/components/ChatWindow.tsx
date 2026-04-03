@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../store/store';
 import ProfileIcon from '../assets/profile_icon.png';
 import SendIcon from '../assets/send.png';
 import { getData } from '../api/requests';
+import { getChatMessages, getGroupMessages, getAnnouncementMessages, addChatMessage, addGroupMessage, addAnnouncementMessage } from '../database/messages.db';
 
 type ChatType = 'chat' | 'announcement' | 'group';
 
 interface Message {
-    id: number;
+    id: string | number;
     text: string;
     sender: 'me' | 'other';
     senderName?: string; 
@@ -18,12 +21,9 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
-    const [messages, setMessages] = useState<Message[]>([
-        { id: 1, text: 'Hello! This is a received message.', sender: 'other', senderName: 'Alice' },
-        { id: 2, text: 'This is a message sent by me.', sender: 'me', senderName: 'Current User' },
-        { id: 3, text: 'This is another received message in a group.', sender: 'other', senderName: 'Bob' },
-        { id: 4, text: 'This is an announcement. It should be in the center.', sender: 'other', senderName: 'Admin' },
-    ]);
+    const userId = useSelector((state: RootState) => state.auth.userId);
+    const username = useSelector((state: RootState) => state.user.profile?.username || 'Me');
+    const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
     
     const [chatName, setChatName] = useState<string>('');
@@ -98,15 +98,77 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
         fetchChatDetails();
     }, [chatId, type]);
 
+    useEffect(() => {
+        const fetchMessages = async () => {
+            if (!chatId || !userId) return;
 
-    const handleSendMessage = () => {
-        if (newMessage.trim()) {
-            const newMsg: Message = { id: Date.now(), text: newMessage, sender: 'me' };
-            if (type !== 'chat') {
-                newMsg.senderName = "Me"; // Placeholder for current user's name
+            try {
+                let dbMessages: any[] = [];
+                if (type === 'chat') {
+                    dbMessages = await getChatMessages(userId, chatId);
+                } else if (type === 'group') {
+                    dbMessages = await getGroupMessages(userId, chatId);
+                } else if (type === 'announcement') {
+                    dbMessages = await getAnnouncementMessages(userId, chatId);
+                }
+
+                const formattedMessages: Message[] = dbMessages.map((m) => ({
+                    id: m.id,
+                    text: m.content,
+                    sender: m.senderId === userId ? 'me' : 'other',
+                    senderName: m.senderId === userId ? 'Me' : (type === 'chat' ? chatName : (m.senderName || 'User'))
+                }));
+                setMessages(formattedMessages);
+            } catch (err) {
+                console.error('Failed to fetch messages from database:', err);
             }
-            setMessages([...messages, newMsg]);
-            setNewMessage('');
+        };
+
+        fetchMessages();
+    }, [chatId, type, userId, chatName]);
+
+
+    const handleSendMessage = async () => {
+        if (newMessage.trim() && userId) {
+            const messageId = Date.now().toString();
+            const newMsg: Message = { id: messageId, text: newMessage, sender: 'me', senderName: 'Me' };
+            
+            try {
+                if (type === 'chat') {
+                    await addChatMessage(userId, chatId, {
+                        id: messageId,
+                        senderId: userId,
+                        content: newMessage,
+                        readStatus: true,
+                        timestamp: Date.now()
+                    });
+                } else if (type === 'group') {
+                    await addGroupMessage(userId, {
+                        id: messageId,
+                        senderId: userId,
+                        senderName: username,
+                        content: newMessage,
+                        readStatus: true,
+                        timestamp: Date.now(),
+                        groupId: chatId
+                    });
+                } else if (type === 'announcement') {
+                    await addAnnouncementMessage(userId, {
+                        id: messageId,
+                        senderId: userId,
+                        senderName: username,
+                        content: newMessage,
+                        readStatus: true,
+                        timestamp: Date.now(),
+                        groupId: chatId
+                    });
+                }
+                
+                setMessages(prev => [...prev, newMsg]);
+                setNewMessage('');
+            } catch (err) {
+                console.error("Failed to save message to database:", err);
+            }
         }
     };
     

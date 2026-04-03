@@ -22,7 +22,7 @@ export const getItems = async (userId: string, storeName: ListStoreName): Promis
 export const upsertItems = async (
   userId: string,
   storeName: ListStoreName,
-  items: ContactListItem[]
+  items: Omit<ContactListItem, 'lastAccessed'>[]
 ) => {
   const db = await getDb(userId);
   const tx = db.transaction(storeName, 'readwrite');

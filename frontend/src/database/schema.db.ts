@@ -1,6 +1,6 @@
 import { type DBSchema } from 'idb';
 
-export const DB_VERSION = 4; // Incremented version for message schema update
+export const DB_VERSION = 5; // Incremented version for GroupMessage schema update
 
 // Define store names as constants
 export const CHAT_LIST_STORE = 'chats';
@@ -44,6 +44,7 @@ export interface ChatMessage extends BaseMessage {
 // Group message schema (messages in regular groups)
 export interface GroupMessage extends BaseMessage {
   groupId: string;
+  senderName: string;
 }
 
 // Define the database schema
