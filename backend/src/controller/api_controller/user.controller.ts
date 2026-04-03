@@ -8,6 +8,7 @@ import { validateChangePasswordData, validateLoginData } from '../../inputSchema
 import { updateCryptographicFields } from '../../services/user.services';
 import { setJwtCookie } from '../../utils/jwt/jwt.utils';
 import { decryptAES, generateAESKeyFromString } from '../../utils/encryption/aes.utils';
+import { internalAesKey } from '../../constants/keys';
 
 /**
  * Get profile picture for a specific user by their ID
@@ -62,7 +63,7 @@ export const getUserDetails = async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        const user = await UserModel.findById(userId).select('username email_id college_code user_type');
+        const user = await UserModel.findById(userId).select('username email_id college_code user_type id');
 
         if (!user) {
             res.status(404).json({
@@ -80,7 +81,8 @@ export const getUserDetails = async (req: Request, res: Response): Promise<void>
                 username: user.username,
                 email: user.email_id,
                 collegeCode: user.college_code,
-                userType: user.user_type
+                userType: user.user_type,
+                id: user.id
             }
         });
     } catch (error) {
@@ -188,7 +190,7 @@ export const getUserPublicKey = async (req: Request, res: Response): Promise<voi
         }
 
         const [targetUser, requestingUser] = await Promise.all([
-            UserModel.findById(targetUserId).select('public_key college_code username'),
+            UserModel.findById(targetUserId).select('public_key college_code username id'),
             UserModel.findById(requestingUserId).select('college_code')
         ]);
 
@@ -220,8 +222,9 @@ export const getUserPublicKey = async (req: Request, res: Response): Promise<voi
             status: true,
             message: 'Public key retrieved successfully.',
             data: {
-                publicKey: targetUser.public_key,
-                username: targetUser.username
+                publicKey: decryptAES(targetUser.public_key, internalAesKey),
+                username: targetUser.username,
+                id: targetUser.id
             }
         });
     } catch (error) {

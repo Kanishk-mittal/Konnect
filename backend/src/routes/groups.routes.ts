@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isUserAdminOfAnnouncementGroupController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getChatGroupMembersKeysController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isUserAdminOfAnnouncementGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -29,6 +29,12 @@ router.get('/member-of/announcement',
 router.get('/chat/info/:groupId',
     authMiddleware,
     getChatGroupInfoController
+);
+
+// Get chat group members' public keys
+router.get('/chat/members-keys/:groupId',
+    authMiddleware,
+    getChatGroupMembersKeysController
 );
 
 // Get announcement group info

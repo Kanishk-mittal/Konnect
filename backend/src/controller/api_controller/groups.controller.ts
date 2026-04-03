@@ -10,6 +10,8 @@ import AnnouncementGroupMembershipModel from '../../models/announcementGroupMemb
 import { validateCreateGroupData, CreateGroupData, validateUpdateGroupData } from '../../inputSchema/group.schema';
 import userModel from '../../models/user.model';
 import { getMemberChatGroups, getMemberAnnouncementGroups } from '../../services/group.services';
+import { decryptAES } from '../../utils/encryption/aes.utils';
+import { internalAesKey } from '../../constants/keys';
 
 // Export the configured multer upload for groups
 export const upload = groupImageUpload;
@@ -371,6 +373,73 @@ export const getChatGroupInfoController = async (req: Request, res: Response): P
 
     } catch (error) {
         console.error('Error in getChatGroupInfoController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};
+
+// Controller: Get Chat Group Members' Public Keys
+export const getChatGroupMembersKeysController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        if (!groupId) {
+            res.status(400).json({ status: false, message: 'Group ID is required.' });
+            return;
+        }
+
+        if (!Types.ObjectId.isValid(groupId)) {
+            res.status(400).json({ status: false, message: 'Invalid group ID format.' });
+            return;
+        }
+
+        // 1. Check if user is a member
+        const membership = await ChatGroupMembershipModel.findOne({ group: groupId, member: userId });
+        if (!membership) {
+            res.status(403).json({ status: false, message: 'You are not a member of this group.' });
+            return;
+        }
+
+        // 2. Get all members with their public keys
+        const membersKeysFromDb = await ChatGroupMembershipModel.aggregate([
+            { $match: { group: new Types.ObjectId(groupId) } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'member',
+                    foreignField: '_id',
+                    as: 'userDetails'
+                }
+            },
+            { $unwind: '$userDetails' },
+            {
+                $project: {
+                    _id: 0,
+                    user_id: '$userDetails._id',
+                    publicKey: '$userDetails.public_key'
+                }
+            }
+        ]);
+
+        // Decrypt each public key
+        const membersKeys = membersKeysFromDb.map(member => ({
+            user_id: member.user_id,
+            publicKey: decryptAES(member.publicKey, internalAesKey)
+        }));
+
+        res.status(200).json({
+            status: true,
+            message: 'Chat group members keys fetched successfully.',
+            data: membersKeys
+        });
+
+    } catch (error) {
+        console.error('Error in getChatGroupMembersKeysController:', error);
         res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
     }
 };
