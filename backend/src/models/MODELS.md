@@ -70,11 +70,21 @@ These act as join tables to handle Many-to-Many relationships.
 ## 3. Interaction & Security
 
 ### Message (`message.model.ts`)
-Handles E2EE messaging.
+Handles E2EE messaging for both individual and group chats.
+- **Key Fields**:
+    - `message`: The AES-encrypted message payload.
+    - `aes_key`: The RSA-encrypted AES key.
+    - `sender`: Points to the `User` who sent the message.
+    - `receiver`: Points to the `User` intended to receive the message.
+    - `isGroupMessage`: Boolean flag.
+    - `groupId`: Reference to `ChatGroup` (set if `isGroupMessage` is true).
+    - `isAnnouncement`: Boolean flag.
+    - `announcementId`: Reference to `Announcement` (set if `isAnnouncement` is true).
 - **Connections**:
     - `sender` -> Points to `User`.
-    - `receiver` -> Points to `User` (or a Group ID if `isGroupMessage` is true).
-    - Stores `aes_key` which is used for the message payload.
+    - `receiver` -> Points to `User`.
+    - `groupId` -> Points to `ChatGroup`.
+    - `announcementId` -> Points to `AnnouncementGroup`.
 
 ### BlockedStudent (`blockedStudent.model.ts`)
 An administrative audit log of students blocked at the college level.

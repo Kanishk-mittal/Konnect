@@ -89,7 +89,106 @@ response :-
 }
 ```
 
-### 4. /create
+### 4. /chat/info/:groupId
+Method :- `GET`
+Description :- Fetches detailed information about a specific chat group, including a list of its members. The authenticated user must be a member of the group.
+Note :- Requires `auth_token` cookie.
+controller :- `getChatGroupInfoController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Chat group information fetched successfully.",
+    "data": {
+        "name": "Tech Enthusiasts",
+        "icon": "http://cloudinary.com/...",
+        "description": "A group for tech lovers",
+        "members": [
+            {
+                "user_id": "65cad...",
+                "id": "21001",
+                "username": "john_doe",
+                "isAdmin": true
+            },
+            {
+                "user_id": "65cad...",
+                "id": "21003",
+                "username": "jane_doe",
+                "isAdmin": false
+            }
+        ]
+    }
+}
+```
+
+### 5. /announcement/info/:groupId
+Method :- `GET`
+Description :- Fetches detailed information about a specific announcement group, including a list of its members. The authenticated user must be a member of the group.
+Note :- Requires `auth_token` cookie.
+controller :- `getAnnouncementGroupInfoController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Announcement group information fetched successfully.",
+    "data": {
+        "name": "Exam Updates",
+        "icon": null,
+        "description": "Official exam announcements",
+        "members": [
+            {
+                "user_id": "65cad...",
+                "id": "21001",
+                "username": "john_doe",
+                "isAdmin": true
+            },
+            {
+                "user_id": "65cad...",
+                "id": "21004",
+                "username": "test_user",
+                "isAdmin": false
+            }
+        ]
+    }
+}
+```
+
+### 6. /chat/members-keys/:groupId
+Method :- `GET`
+Description :- Fetches public keys for all members of a chat group. Each key is decrypted by the server before sending. The authenticated user must be a member of the group.
+Note :- Requires `auth_token` cookie.
+controller :- `getChatGroupMembersKeysController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Chat group members keys fetched successfully.",
+    "data": [
+        {
+            "user_id": "65cad...",
+            "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B..."
+        }
+    ]
+}
+```
+
+### 7. /announcement/is-admin/:groupId
+Method :- `GET`
+Description :- Checks if the currently authenticated user is an admin of a specific announcement group.
+Note :- Requires `auth_token` cookie.
+controller :- `isUserAdminOfAnnouncementGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Admin status checked successfully.",
+    "data": {
+        "isAdmin": true
+    }
+}
+```
+
+### 8. /create
 Method :- `POST`
 Description :- Creates one or more groups (Chat and/or Announcement). Supports optional image upload for the group icon.
 Note :- Requires `auth_token` cookie. The JSON payload must be encrypted using the security handshake.
@@ -132,106 +231,6 @@ response :-
             "cloudUrl": "http://cloudinary.com/..."
         },
         "createdBy": "65cad..."
-    }
-}
-```
-
-### 5. /chat/delete/:groupId
-Method :- `DELETE`
-Description :- Deletes a specific chat group. The authenticated user must be a member and an admin of the group.
-Note :- Requires `auth_token` cookie. No request body needed.
-Input :- None (groupId is in the URL path)
-controller :- `deleteChatGroupController`
-response :-
-```json
-{
-    "status": true,
-    "message": "Chat group deleted successfully",
-    "data": {
-        "id": "65cad...",
-        "type": "chat"
-    }
-}
-```
-
-### 6. /announcement/delete/:groupId
-Method :- `DELETE`
-Description :- Deletes a specific announcement group. The authenticated user must be a member and an admin of the group.
-Note :- Requires `auth_token` cookie. No request body needed.
-Input :- None (groupId is in the URL path)
-controller :- `deleteAnnouncementGroupController`
-response :-
-```json
-{
-    "status": true,
-    "message": "Announcement group deleted successfully",
-    "data": {
-        "id": "65cad...",
-        "type": "announcement"
-    }
-}
-```
-
-### 7. /chat/info/:groupId
-Method :- `GET`
-Description :- Fetches detailed information about a specific chat group, including a list of its members. The authenticated user must be a member of the group.
-Note :- Requires `auth_token` cookie.
-controller :- `getChatGroupInfoController`
-response :-
-```json
-{
-    "status": true,
-    "message": "Chat group information fetched successfully.",
-    "data": {
-        "name": "Tech Enthusiasts",
-        "icon": "http://cloudinary.com/...",
-        "description": "A group for tech lovers",
-        "members": [
-            {
-                "user_id": "65cad...",
-                "id": "21001",
-                "username": "john_doe",
-                "isAdmin": true
-            },
-            {
-                "user_id": "65cad...",
-                "id": "21003",
-                "username": "jane_doe",
-                "isAdmin": false
-            }
-        ]
-    }
-}
-```
-
-### 8. /announcement/info/:groupId
-Method :- `GET`
-Description :- Fetches detailed information about a specific announcement group, including a list of its members. The authenticated user must be a member of the group.
-Note :- Requires `auth_token` cookie.
-controller :- `getAnnouncementGroupInfoController`
-response :-
-```json
-{
-    "status": true,
-    "message": "Announcement group information fetched successfully.",
-    "data": {
-        "name": "Exam Updates",
-        "icon": null,
-        "description": "Official exam announcements",
-        "members": [
-            {
-                "user_id": "65cad...",
-                "id": "21001",
-                "username": "john_doe",
-                "isAdmin": true
-            },
-            {
-                "user_id": "65cad...",
-                "id": "21004",
-                "username": "test_user",
-                "isAdmin": false
-            }
-        ]
     }
 }
 ```
@@ -306,18 +305,38 @@ response :-
 }
 ```
 
-### 11. /announcement/is-admin/:groupId
-Method :- `GET`
-Description :- Checks if the currently authenticated user is an admin of a specific announcement group.
-Note :- Requires `auth_token` cookie.
-controller :- `isUserAdminOfAnnouncementGroupController`
+### 11. /chat/delete/:groupId
+Method :- `DELETE`
+Description :- Deletes a specific chat group. The authenticated user must be a member and an admin of the group.
+Note :- Requires `auth_token` cookie. No request body needed.
+Input :- None (groupId is in the URL path)
+controller :- `deleteChatGroupController`
 response :-
 ```json
 {
     "status": true,
-    "message": "Admin status checked successfully.",
+    "message": "Chat group deleted successfully",
     "data": {
-        "isAdmin": true
+        "id": "65cad...",
+        "type": "chat"
+    }
+}
+```
+
+### 12. /announcement/delete/:groupId
+Method :- `DELETE`
+Description :- Deletes a specific announcement group. The authenticated user must be a member and an admin of the group.
+Note :- Requires `auth_token` cookie. No request body needed.
+Input :- None (groupId is in the URL path)
+controller :- `deleteAnnouncementGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Announcement group deleted successfully",
+    "data": {
+        "id": "65cad...",
+        "type": "announcement"
     }
 }
 ```

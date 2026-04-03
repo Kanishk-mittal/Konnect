@@ -50,7 +50,8 @@ response :-
         "username": "JohnDoe",
         "email": "john@example.com",
         "collegeCode": "EXUNI",
-        "userType": "student"
+        "userType": "student",
+        "id": "21001"
     }
 }
 ```
@@ -107,7 +108,8 @@ response :-
     "message": "Public key retrieved successfully.",
     "data": {
         "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B...",
-        "username": "JohnDoe"
+        "username": "JohnDoe",
+        "id": "21001"
     }
 }
 ```
