@@ -19,11 +19,3 @@ const chatGroupSchema = new Schema<IChatGroup>({
 });
 
 export default model<IChatGroup>('ChatGroup', chatGroupSchema);
-
-/*
-Note to future self:- 
-1. This model is faulty and same goes to announcement group and so the membership models as well 
-2. Current system assumes that only users are member of groups 
-3. But a club and admin is also a valid member of group 
-4. One solution is there 
- */

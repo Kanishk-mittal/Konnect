@@ -9,6 +9,7 @@ import { userSocketMap } from './userSocketMap';
 import User from '../models/user.model';
 import ChatGroupMembership from '../models/chatGroupMembership.model';
 import AnnouncementGroupMembership from '../models/announcementGroupMembership.model';
+import Message from '../models/message.model';
 
 
 export class SocketHandler {
@@ -33,29 +34,41 @@ export class SocketHandler {
         this.io.on('connection', (socket: Socket) => {
 
             socket.on('private_message', async (data) => {
+                // TODO: Remove before pushing to GitHub
+                console.log('--- Incoming Private Message ---');
+                console.log('Data:', data);
+
                 const { receiver, message, groupId } = data;
                 const senderId = userSocketMap.getUserId(socket.id);
 
                 if (!senderId) {
+                    // TODO: Remove before pushing to GitHub
+                    console.log('Dropped: Sender not found in userSocketMap');
                     return; // Sender not found in map, drop message
                 }
 
                 try {
                     // Fetch sender and receiver user documents
-                    const senderUser = await User.findOne({ id: senderId }).lean();
-                    const receiverUser = await User.findOne({ id: receiver }).lean();
+                    const senderUser = await User.findById(senderId).lean();
+                    const receiverUser = await User.findById(receiver).lean();
 
                     if (!senderUser || !receiverUser) {
+                        // TODO: Remove before pushing to GitHub
+                        console.log(`Dropped: User not found. Sender: ${!!senderUser}, Receiver: ${!!receiverUser}`);
                         return; // User not found, drop message
                     }
 
                     // 1. Check for same college
                     if (senderUser.college_code !== receiverUser.college_code) {
+                        // TODO: Remove before pushing to GitHub
+                        console.log('Dropped: College code mismatch');
                         return;
                     }
 
                     // 2. Check if sender is blocked by receiver
                     if (receiverUser.blocked_users?.some(blockedId => blockedId.equals(senderUser._id))) {
+                        // TODO: Remove before pushing to GitHub
+                        console.log('Dropped: Sender is blocked by receiver');
                         return;
                     }
 
@@ -72,6 +85,8 @@ export class SocketHandler {
                         });
 
                         if (isChatGroupMember < 2 && isAnnouncementGroupMember < 2) {
+                            // TODO: Remove before pushing to GitHub
+                            console.log('Dropped: Group membership validation failed');
                             return; // Not all users are members of the group
                         }
                     }
@@ -79,9 +94,31 @@ export class SocketHandler {
                     // All checks passed, forward the message
                     const receiverSocketId = userSocketMap.getSocketId(receiver);
                     if (receiverSocketId) {
+                        // TODO: Remove before pushing to GitHub
+                        console.log(`Forwarding message to receiver: ${receiver} (Socket: ${receiverSocketId})`);
+                        
                         const payload = { sender: senderId, message, groupId };
                         this.io.to(receiverSocketId).emit('new_message', payload);
                     } else {
+                        // TODO: Remove before pushing to GitHub
+                        console.log(`Receiver ${receiver} is not currently online (no socket ID found). Storing message in DB.`);
+
+                        try {
+                            const parsedData = JSON.parse(message);
+                            const newMessage = new Message({
+                                message: parsedData.message,
+                                aes_key: parsedData.encryptedAesKey,
+                                sender: senderId,
+                                receiver: receiver,
+                                isGroupMessage: !!groupId,
+                                groupId: groupId ? groupId : undefined
+                            });
+                            await newMessage.save();
+                            // TODO: Remove before pushing to GitHub
+                            console.log(`Message stored in database for offline receiver ${receiver}`);
+                        } catch (err) {
+                            console.error('Error storing offline message:', err);
+                        }
                     }
 
                 } catch (error) {
