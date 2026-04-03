@@ -1,6 +1,6 @@
 import { type DBSchema } from 'idb';
 
-export const DB_VERSION = 3; // Incremented version for message schema addition
+export const DB_VERSION = 4; // Incremented version for message schema update
 
 // Define store names as constants
 export const CHAT_LIST_STORE = 'chats';
@@ -29,26 +29,20 @@ export interface ChatListItem extends ContactListItem {
 
 // Base message interface with common attributes
 export interface BaseMessage {
+  id: string;
   senderId: string;
-  message: string;
+  content: string;
   readStatus: boolean;
   timestamp?: number; // Optional timestamp
 }
 
-// Chat message schema (direct messages between users)
+// Direct chat message schema, extending BaseMessage with contactId
 export interface ChatMessage extends BaseMessage {
-  id: string;
+  contactId: string;
 }
 
 // Group message schema (messages in regular groups)
 export interface GroupMessage extends BaseMessage {
-  id: string;
-  groupId: string;
-}
-
-// Announcement message schema (messages in announcement groups)
-export interface AnnouncementMessage extends BaseMessage {
-  id: string;
   groupId: string;
 }
 
@@ -76,7 +70,7 @@ export interface KonnectDBSchema extends DBSchema {
   [CHAT_MESSAGES_STORE]: {
     key: string; // Message ID
     value: ChatMessage;
-    indexes: { 'by-senderId': string; 'by-timestamp': number };
+    indexes: { 'by-contactId': string; 'by-senderId': string; 'by-timestamp': number };
   };
   [GROUP_MESSAGES_STORE]: {
     key: string; // Message ID
@@ -85,7 +79,7 @@ export interface KonnectDBSchema extends DBSchema {
   };
   [ANNOUNCEMENT_MESSAGES_STORE]: {
     key: string; // Message ID
-    value: AnnouncementMessage;
+    value: GroupMessage;
     indexes: { 'by-groupId': string; 'by-senderId': string; 'by-timestamp': number };
   };
 }

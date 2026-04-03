@@ -31,6 +31,26 @@ const getServerPublicKey = async (): Promise<{ publicKey: string; keyId: string 
 };
 
 /**
+ * Gets the database encryption key from the server.
+ * This key is used for client-side database encryption.
+ */
+export const getDatabaseEncryptionKey = async (): Promise<string> => {
+    try {
+        // This endpoint requires authentication.
+        const response = await getData('/user/aes-external');
+
+        if (!response || !response.status || !response.data || !response.data.aesExternal) {
+            throw new Error('Invalid database encryption key response');
+        }
+
+        return response.data.aesExternal;
+    } catch (error) {
+        console.error('Failed to get database encryption key:', error);
+        throw new Error('Unable to fetch database encryption key from server');
+    }
+};
+
+/**
  * Decrypts a server response using client's private key.
  * 
  * The backend's encryptResponse middleware encrypts the entire response JSON
