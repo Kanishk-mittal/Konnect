@@ -93,7 +93,26 @@ response :-
 }
 ```
 
-### 6. /password/request-otp
+### 6. /public-key/:userId
+Method :- `GET`
+Description :- Returns the public key for a specific user, verifying that the requesting user belongs to the same college.
+Parameters :-
+* `userId`: The MongoDB `_id` of the user.
+Note :- Requires `auth_token` cookie. Only users from the same college can retrieve another user's public key.
+controller :- `getUserPublicKey`
+response :-
+```json
+{
+    "status": true,
+    "message": "Public key retrieved successfully.",
+    "data": {
+        "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B...",
+        "username": "JohnDoe"
+    }
+}
+```
+
+### 7. /password/request-otp
 Method :- `GET`
 Description :- Requests an OTP for password change. The OTP is sent to the user's primary email address.
 Note :- Requires `auth_token` cookie.
@@ -106,7 +125,7 @@ response :-
 }
 ```
 
-### 7. /password/change
+### 8. /password/change
 Method :- `POST`
 Description :- Changes the user's password after verifying the OTP.
 Note :- Requires `auth_token` cookie. The request should be encrypted.
@@ -131,7 +150,7 @@ response :-
 }
 ```
 
-### 8. /login
+### 9. /login
 Method :- `POST`
 Description :- Authenticates a user (Student, Club, Admin, or Faculty).
 Note :- The request body must be encrypted. Returns JWT `auth_token` cookie and encrypted credentials.
@@ -159,7 +178,7 @@ response :-
 }
 ```
 
-### 9. /logout
+### 10. /logout
 Method :- `POST`
 Description :- Logs out the current user by clearing the `auth_token` cookie.
 controller :- `logoutUser`
@@ -171,7 +190,7 @@ response :-
 }
 ```
 
-### 10. /profile/username
+### 11. /profile/username
 Method :- `POST`
 Description :- Updates the username for the currently authenticated user. No encryption required.
 Note :- Requires `auth_token` cookie.
@@ -193,7 +212,7 @@ response :-
 }
 ```
 
-### 11. /users/college
+### 12. /users/college
 Method :- `GET`
 Description :- Returns all users from the same college as the authenticated user.
 Note :- Requires `auth_token` cookie.
@@ -222,7 +241,7 @@ response :-
 }
 ```
 
-### 12. /aes-external
+### 13. /aes-external
 Method :- `GET`
 Description :- Returns the `AES_EXTERNAL` environment variable for the currently authenticated user.
 Note :- Requires `auth_token` cookie.

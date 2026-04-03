@@ -3,6 +3,7 @@ import {
     getUserProfilePicture,
     getUserDetails,
     getUserEmailById,
+    getUserPublicKey,
     getMyDetails,
     getAesExternalKey,
     getUsersByCollege,
@@ -28,6 +29,9 @@ router.get('/details/:userId', getUserDetails);
 
 // Route to get email by user ID (authenticated, same college check)
 router.get('/email/:userId', authMiddleware, getUserEmailById);
+
+// Route to get public key by user ID (authenticated, same college check)
+router.get('/public-key/:userId', authMiddleware, getUserPublicKey);
 
 // Route to get current user details (from JWT)
 router.get('/details', authMiddleware, getMyDetails);
