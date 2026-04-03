@@ -209,6 +209,45 @@ export const getMyDetails = async (req: Request, res: Response): Promise<void> =
 };
 
 /**
+ * Get AES_EXTERNAL key for authenticated user
+ */
+export const getAesExternalKey = async (req: Request, res: Response): Promise<void> => {
+    try {
+        if (!req.user?.id) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required.'
+            });
+            return;
+        }
+
+        const aesExternal = process.env.AES_EXTERNAL;
+
+        if (!aesExternal) {
+            res.status(500).json({
+                status: false,
+                message: 'AES external key is not configured.'
+            });
+            return;
+        }
+
+        res.status(200).json({
+            status: true,
+            message: 'AES external key retrieved successfully.',
+            data: {
+                aesExternal
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching AES external key:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while fetching AES external key.'
+        });
+    }
+};
+
+/**
  * Get all users from the same college as the authenticated user
  */
 export const getUsersByCollege = async (req: Request, res: Response): Promise<void> => {

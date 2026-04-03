@@ -221,3 +221,19 @@ response :-
     ]
 }
 ```
+
+### 12. /aes-external
+Method :- `GET`
+Description :- Returns the `AES_EXTERNAL` environment variable for the currently authenticated user.
+Note :- Requires `auth_token` cookie.
+controller :- `getAesExternalKey`
+response :-
+```json
+{
+    "status": true,
+    "message": "AES external key retrieved successfully.",
+    "data": {
+        "aesExternal": "your-AES_EXTERNAL-value"
+    }
+}
+```

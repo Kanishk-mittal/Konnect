@@ -4,6 +4,7 @@ import {
     getUserDetails,
     getUserEmailById,
     getMyDetails,
+    getAesExternalKey,
     getUsersByCollege,
     updateProfilePicture,
     updateUsername,
@@ -30,6 +31,9 @@ router.get('/email/:userId', authMiddleware, getUserEmailById);
 
 // Route to get current user details (from JWT)
 router.get('/details', authMiddleware, getMyDetails);
+
+// Route to get AES_EXTERNAL env key for authenticated user
+router.get('/aes-external', authMiddleware, getAesExternalKey);
 
 // Route to get all users from the same college
 router.get('/users/college', authMiddleware, getUsersByCollege);
