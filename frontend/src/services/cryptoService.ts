@@ -1,4 +1,4 @@
-import { storeCryptoKey, getCryptoKey, deleteCryptoKey } from '../utils/db';
+import { storeCryptoKey, getCryptoKey, deleteCryptoKey } from '../database/key.db';
 
 /**
  * Converts a PEM-formatted private key string into a CryptoKey object.

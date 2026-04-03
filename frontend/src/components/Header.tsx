@@ -11,7 +11,7 @@ import type { RootState, AppDispatch } from "../store/store"
 import { clearAuth } from "../store/authSlice"
 import { clearUser } from "../store/userSlice"
 import { deletePrivateKey } from "../services/cryptoService"
-import { deleteUserDatabase } from "../utils/db"
+import { deleteUserDatabase } from "../database/main.db"
 
 
 const Header = () => {

@@ -4,14 +4,11 @@ import { setChatType, setChatId } from '../store/chatSlice';
 import type { RootState } from '../store/store';
 import ChatItem from './ChatItem';
 import { getData } from '../api/requests';
-import { getItems, upsertItems, updateItemTimestamp, type StoreName, CHAT_STORE, GROUP_STORE, ANNOUNCEMENT_STORE } from '../utils/db';
+import { getItems, upsertItems, updateItemTimestamp } from '../database/userList.db';
+import { type ListStoreName, CHAT_LIST_STORE, GROUP_STORE, ANNOUNCEMENT_STORE, type ContactListItem } from '../database/schema.db';
 
-interface ListItem {
-  id: string;
-  name: string;
-  profilePicture: string | null;
+interface ListItem extends ContactListItem {
   unreadCount: number;
-  lastAccessed: number;
 }
 
 interface ChatLeftPanelProps {
@@ -25,8 +22,8 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const [listItems, setListItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const getStoreName = useCallback((): StoreName => {
-    if (chatType === 'chat') return CHAT_STORE;
+  const getStoreName = useCallback((): ListStoreName => {
+    if (chatType === 'chat') return CHAT_LIST_STORE;
     if (chatType === 'group') return GROUP_STORE;
     return ANNOUNCEMENT_STORE;
   }, [chatType]);
