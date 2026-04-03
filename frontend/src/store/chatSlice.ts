@@ -8,6 +8,7 @@ interface ChatState {
   chatId: string | null;
   username: string | null;
   profilePicture: string | null;
+  lastUpdated: number; // For triggering list updates
 }
 
 const initialState: ChatState = {
@@ -15,6 +16,7 @@ const initialState: ChatState = {
   chatId: null,
   username: null,
   profilePicture: null,
+  lastUpdated: Date.now(),
 };
 
 export const chatSlice = createSlice({
@@ -34,6 +36,9 @@ export const chatSlice = createSlice({
         state.profilePicture = action.payload.profilePicture ?? null;
 
     },
+    triggerUpdate: (state) => {
+        state.lastUpdated = Date.now();
+    },
     clearChat: (state) => {
         state.chatType = 'chat';
         state.chatId = null;
@@ -43,6 +48,6 @@ export const chatSlice = createSlice({
   },
 });
 
-export const { setChatType, setChatId, setChat, clearChat } = chatSlice.actions;
+export const { setChatType, setChatId, setChat, clearChat, triggerUpdate } = chatSlice.actions;
 
 export default chatSlice.reducer;

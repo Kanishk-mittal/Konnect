@@ -18,7 +18,7 @@ interface ChatLeftPanelProps {
 
 const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const dispatch = useDispatch();
-  const { chatType } = useSelector((state: RootState) => state.chat);
+  const { chatType, lastUpdated } = useSelector((state: RootState) => state.chat);
   const { userId } = useSelector((state: RootState) => state.auth);
   const [listItems, setListItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -117,7 +117,7 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
     };
 
     fetchAndStoreItems();
-  }, [chatType, getStoreName, userId, fetchUnreadCounts]);
+  }, [chatType, getStoreName, userId, fetchUnreadCounts, lastUpdated]);
 
   const handleItemClick = async (id: string) => {
     dispatch(setChatId(id));

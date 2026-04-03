@@ -1,10 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { triggerUpdate } from '../store/chatSlice';
 import type { RootState } from '../store/store';
 import ProfileIcon from '../assets/profile_icon.png';
 import SendIcon from '../assets/send.png';
 import { getData } from '../api/requests';
 import { getChatMessages, getGroupMessages, getAnnouncementMessages, addChatMessage, addGroupMessage, addAnnouncementMessage } from '../database/messages.db';
+import { getPublicKey, setPublicKey } from '../database/userList.db';
+import { encryptAES, generateAESKey } from '../encryption/AES_utils';
+import { encryptRSA } from '../encryption/RSA_utils';
+import { socket } from '../api/socket';
 
 type ChatType = 'chat' | 'announcement' | 'group';
 
@@ -21,6 +26,7 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
+    const dispatch = useDispatch();
     const userId = useSelector((state: RootState) => state.auth.userId);
     const username = useSelector((state: RootState) => state.user.profile?.username || 'Me');
     const [messages, setMessages] = useState<Message[]>([]);
@@ -131,33 +137,107 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
     const handleSendMessage = async () => {
         if (newMessage.trim() && userId) {
             const messageId = Date.now().toString();
-            const newMsg: Message = { id: messageId, text: newMessage, sender: 'me', senderName: 'Me' };
+            const originalMessage = newMessage;
+            const newMsg: Message = { id: messageId, text: originalMessage, sender: 'me', senderName: 'Me' };
             
             try {
                 if (type === 'chat') {
+                    // 1. Get receiver's public key
+                    let publicKey = await getPublicKey(userId, chatId);
+                    
+                    if (!publicKey) {
+                        const res = await getData(`/user/public-key/${chatId}`);
+                        if (res.status && res.data.publicKey) {
+                            publicKey = res.data.publicKey;
+                            await setPublicKey(userId, chatId, publicKey!);
+                        } else {
+                            throw new Error("Could not retrieve receiver's public key.");
+                        }
+                    }
+
+                    // 2. Generate random AES key
+                    const aesKey = generateAESKey();
+
+                    // 3. Encrypt message with AES
+                    const encryptedMessage = encryptAES(originalMessage, aesKey);
+
+                    // 4. Encrypt AES key with receiver's RSA public key
+                    const encryptedAesKey = encryptRSA(aesKey, publicKey!);
+
+                    // 5. Send via socket
+                    const payload = JSON.stringify({
+                        message: encryptedMessage,
+                        encryptedAesKey: encryptedAesKey
+                    });
+
+                    socket.emit('private_message', {
+                        receiver: chatId,
+                        message: payload
+                    });
+
+                    // 6. Save to local DB (encrypted content is handled by addChatMessage)
                     await addChatMessage(userId, chatId, {
                         id: messageId,
                         senderId: userId,
-                        content: newMessage,
+                        content: originalMessage,
                         readStatus: true,
                         timestamp: Date.now()
                     });
+
                 } else if (type === 'group') {
+                    // 1. Get all group members' public keys
+                    const res = await getData(`/groups/chat/members-keys/${chatId}`);
+                    if (!res.status || !res.data) {
+                        throw new Error("Failed to fetch group members' public keys.");
+                    }
+
+                    const membersKeys: { user_id: string, publicKey: string }[] = res.data;
+
+                    // 2. Generate ONE random AES key for this message
+                    const aesKey = generateAESKey();
+
+                    // 3. Encrypt message with AES once
+                    const encryptedMessage = encryptAES(originalMessage, aesKey);
+
+                    // 4. For each member (except self), encrypt AES key and send
+                    membersKeys.forEach(member => {
+                        if (member.user_id !== userId) {
+                            const encryptedAesKeyForMember = encryptRSA(aesKey, member.publicKey);
+                            
+                            const payload = JSON.stringify({
+                                message: encryptedMessage,
+                                encryptedAesKey: encryptedAesKeyForMember,
+                                groupId: chatId
+                            });
+
+                            socket.emit('private_message', {
+                                receiver: member.user_id,
+                                message: payload,
+                                groupId: chatId
+                            });
+                        }
+                    });
+
+                    // 5. Save to local DB
                     await addGroupMessage(userId, {
                         id: messageId,
                         senderId: userId,
                         senderName: username,
-                        content: newMessage,
+                        content: originalMessage,
                         readStatus: true,
                         timestamp: Date.now(),
                         groupId: chatId
                     });
+
                 } else if (type === 'announcement') {
+                    // TODO: Implement announcement group sending logic later
+                    console.log("Announcement sending is not yet implemented");
+                    
                     await addAnnouncementMessage(userId, {
                         id: messageId,
                         senderId: userId,
                         senderName: username,
-                        content: newMessage,
+                        content: originalMessage,
                         readStatus: true,
                         timestamp: Date.now(),
                         groupId: chatId
@@ -166,8 +246,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                 
                 setMessages(prev => [...prev, newMsg]);
                 setNewMessage('');
-            } catch (err) {
-                console.error("Failed to save message to database:", err);
+                dispatch(triggerUpdate());
+            } catch (err: any) {
+                console.error("Failed to send message:", err);
+                setError(err.message || "Failed to send message.");
             }
         }
     };
