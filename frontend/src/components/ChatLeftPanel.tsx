@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { Link } from 'react-router-dom';
 import { setChatType, setChatId } from '../store/chatSlice';
 import type { RootState } from '../store/store';
 import ChatItem from './ChatItem';
 import { getData } from '../api/requests';
-import { getItems, upsertItems, updateItemTimestamp } from '../database/userList.db';
+import { getItems, upsertItems } from '../database/userList.db';
 import { type ListStoreName, CHAT_LIST_STORE, GROUP_STORE, ANNOUNCEMENT_STORE, type ContactListItem } from '../database/schema.db';
 import { getUnreadChatMessagesCount, getUnreadGroupMessagesCount, getUnreadAnnouncementMessagesCount, markChatRead, markGroupRead, markAnnouncementRead } from '../database/messages.db';
+import announcementIcon from '../assets/announcement.png';
+import sendIcon from '../assets/send.png';
 
 interface ListItem extends ContactListItem {
   unreadCount: number;
@@ -19,7 +22,7 @@ interface ChatLeftPanelProps {
 const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const dispatch = useDispatch();
   const { chatType, lastUpdated } = useSelector((state: RootState) => state.chat);
-  const { userId } = useSelector((state: RootState) => state.auth);
+  const { userId, userType, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const [listItems, setListItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -29,9 +32,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
     return ANNOUNCEMENT_STORE;
   }, [chatType]);
 
-  /**
-   * Fetches unread count for a specific item based on chat type
-   */
   const getUnreadCount = useCallback(async (itemId: string): Promise<number> => {
     if (!userId) return 0;
 
@@ -49,9 +49,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
     }
   }, [userId, chatType]);
 
-  /**
-   * Fetches unread counts for all items in the list
-   */
   const fetchUnreadCounts = useCallback(async (items: ContactListItem[]): Promise<ListItem[]> => {
     const itemsWithUnread = await Promise.all(
       items.map(async (item) => ({
@@ -64,12 +61,11 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
 
   useEffect(() => {
     const fetchAndStoreItems = async () => {
-      if (!userId) return; // Don't run if user is not logged in
+      if (!userId) return;
 
       setLoading(true);
       const storeName = getStoreName();
 
-      // 1. Load from IndexedDB first for quick display with unread counts
       try {
         const cachedItems = await getItems(userId, storeName);
         if (cachedItems.length > 0) {
@@ -80,7 +76,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
         console.error('Error loading from IndexedDB:', error);
       }
 
-      // 2. Fetch from network and update DB/UI
       try {
         let endpoint = '';
         if (chatType === 'chat') endpoint = '/user/users/college';
@@ -122,7 +117,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   const handleItemClick = async (id: string) => {
     dispatch(setChatId(id));
 
-    // Mark messages as read when chat is opened
     if (!userId) return;
 
     try {
@@ -134,7 +128,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
         await markAnnouncementRead(userId, id);
       }
 
-      // Update the unread count for this item to 0
       setListItems(prevItems =>
         prevItems.map(item =>
           item.id === id ? { ...item, unreadCount: 0 } : item
@@ -150,7 +143,9 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
     dispatch(setChatId(null));
   };
 
-  // Theme-aware styling
+  const canCreateGroup = isAuthenticated;
+  const addGroupUrl = userType ? `/${userType}/add-group` : '/';
+
   const tabContainerStyle = {
     backgroundColor: theme === 'dark' ? '#111827' : '#FEF3C7',
     padding: '0.5rem',
@@ -169,8 +164,7 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tab selection */}
+    <div className="flex flex-col h-full relative">
       <div className="flex justify-around" style={tabContainerStyle}>
         <button
           className="px-4 py-2 rounded-md font-medium"
@@ -195,7 +189,6 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
         </button>
       </div>
 
-      {/* List content based on selected tab */}
       <div className="flex-grow overflow-y-auto">
         {loading && listItems.length === 0 ? (
           <div className="flex justify-center items-center h-full">
@@ -207,6 +200,29 @@ const ChatLeftPanel: React.FC<ChatLeftPanelProps> = ({ theme }) => {
           </div>
         )}
       </div>
+
+      {canCreateGroup && (
+        <div className="absolute bottom-4 right-4 flex flex-col space-y-2">
+          <Link
+            to={`${addGroupUrl}?type=group`}
+            className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl shadow-lg transition-transform transform hover:scale-110 ${
+              theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+            title="Create new chat group"
+          >
+            <img src={sendIcon} alt="Create Chat Group" className="w-6 h-6" />
+          </Link>
+          <Link
+            to={`${addGroupUrl}?type=announcement`}
+            className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl shadow-lg transition-transform transform hover:scale-110 ${
+              theme === 'dark' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-500 hover:bg-purple-600'
+            }`}
+            title="Create new announcement group"
+          >
+            <img src={announcementIcon} alt="Create Announcement Group" className="w-6 h-6" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

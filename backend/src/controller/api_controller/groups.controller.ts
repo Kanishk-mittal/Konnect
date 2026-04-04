@@ -976,3 +976,39 @@ export const isUserAdminOfAnnouncementGroupController = async (req: Request, res
         res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
     }
 };
+
+// Controller: Check if user is admin of a Chat Group
+export const isUserAdminOfChatGroupController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        if (!groupId || !Types.ObjectId.isValid(groupId)) {
+            res.status(400).json({ status: false, message: 'Invalid group ID format.' });
+            return;
+        }
+
+        const membership = await ChatGroupMembershipModel.findOne({
+            group: groupId,
+            member: userId,
+            isAdmin: true
+        }).lean();
+
+        res.status(200).json({
+            status: true,
+            message: 'Admin status checked successfully.',
+            data: {
+                isAdmin: !!membership
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in isUserAdminOfChatGroupController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { RootState } from '../store/store';
 import Header from '../components/Header';
 import CsvUploader from '../components/CsvUploader';
@@ -9,7 +9,7 @@ import ImageInput from '../components/ImageInput';
 import TokenInput from '../components/TokenInput';
 import type { Student, WrongValue } from './AddStudent';
 import { encryptAES, generateAESKey } from '../encryption/AES_utils';
-import { encryptRSA, generateRSAKeyPair } from '../encryption/RSA_utils';
+import { encryptRSA } from '../encryption/RSA_utils';
 import { getData } from '../api/requests';
 import axios from 'axios';
 
@@ -32,6 +32,7 @@ interface AddGroupProps {
 
 const AddGroup = ({ redirectUrl, editProfileUrl }: AddGroupProps) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const theme = useSelector((state: RootState) => state.theme.theme);
 
     const [formData, setFormData] = useState<GroupFormData>({
@@ -54,6 +55,16 @@ const AddGroup = ({ redirectUrl, editProfileUrl }: AddGroupProps) => {
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [createdGroupsData, setCreatedGroupsData] = useState<Array<{ id: string; type: string; name: string; membersAdded: number }> | null>(null);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const groupType = params.get('type');
+        if (groupType === 'group') {
+            setFormData(prev => ({ ...prev, isChatGroup: true, isAnnouncementGroup: false }));
+        } else if (groupType === 'announcement') {
+            setFormData(prev => ({ ...prev, isAnnouncementGroup: true, isChatGroup: false }));
+        }
+    }, [location.search]);
 
     // Define theme-specific colors
     const backgroundGradient = theme === 'dark'

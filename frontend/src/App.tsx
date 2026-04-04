@@ -112,6 +112,15 @@ const App = () => {
           }
         />
 
+        {/* Protected Student Routes */}
+        <Route path="/student/add-group"
+          element={
+            <ProtectedRoute allowedUserTypes={['student']}>
+              <AddGroup redirectUrl="/chat" editProfileUrl="/chat" />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Protected Club Routes */}
         <Route path="/club/dashboard"
           element={

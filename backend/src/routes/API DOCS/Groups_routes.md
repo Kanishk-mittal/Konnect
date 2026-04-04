@@ -166,7 +166,8 @@ response :-
     "data": [
         {
             "user_id": "65cad...",
-            "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0B..."
+            "publicKey": "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0B..."
         }
     ]
 }
@@ -188,7 +189,23 @@ response :-
 }
 ```
 
-### 8. /create
+### 8. /chat/is-admin/:groupId
+Method :- `GET`
+Description :- Checks if the currently authenticated user is an admin of a specific chat group.
+Note :- Requires `auth_token` cookie.
+controller :- `isUserAdminOfChatGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "Admin status checked successfully.",
+    "data": {
+        "isAdmin": true
+    }
+}
+```
+
+### 9. /create
 Method :- `POST`
 Description :- Creates one or more groups (Chat and/or Announcement). Supports optional image upload for the group icon.
 Note :- Requires `auth_token` cookie. The JSON payload must be encrypted using the security handshake.
@@ -235,7 +252,7 @@ response :-
 }
 ```
 
-### 9. /chat/update/:groupId
+### 10. /chat/update/:groupId
 Method :- `PUT`
 Description :- Updates details for a specific chat group. The authenticated user must be an admin of the group.
 Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).
@@ -270,7 +287,7 @@ response :-
 }
 ```
 
-### 10. /announcement/update/:groupId
+### 11. /announcement/update/:groupId
 Method :- `PUT`
 Description :- Updates details for a specific announcement group. The authenticated user must be an admin of the group.
 Note :- Requires `auth_token` cookie. The JSON payload is NOT encrypted. Supports optional image upload (multipart/form-data).
@@ -305,7 +322,7 @@ response :-
 }
 ```
 
-### 11. /chat/delete/:groupId
+### 12. /chat/delete/:groupId
 Method :- `DELETE`
 Description :- Deletes a specific chat group. The authenticated user must be a member and an admin of the group.
 Note :- Requires `auth_token` cookie. No request body needed.
@@ -323,7 +340,7 @@ response :-
 }
 ```
 
-### 12. /announcement/delete/:groupId
+### 13. /announcement/delete/:groupId
 Method :- `DELETE`
 Description :- Deletes a specific announcement group. The authenticated user must be a member and an admin of the group.
 Note :- Requires `auth_token` cookie. No request body needed.

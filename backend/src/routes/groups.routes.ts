@@ -55,6 +55,12 @@ router.get('/announcement/is-admin/:groupId',
     isUserAdminOfAnnouncementGroupController
 );
 
+// Check if user is admin of a chat group
+router.get('/chat/is-admin/:groupId',
+    authMiddleware,
+    isUserAdminOfChatGroupController
+);
+
 // Update a chat group - only group admin members can update
 router.put('/chat/update/:groupId',
     authMiddleware,
