@@ -58,10 +58,8 @@ const Header = () => {
 
     const handleLogout = async () => {
         if (userId) {
-          // Clear the securely stored private key from IndexedDB
+          // Clear the securely stored private key from IndexedDB for security
           await deletePrivateKey(userId);
-          // Also delete the entire DB for the user for a full cleanup
-          await deleteUserDatabase(userId);
         }
         // Clear Redux state for both auth and user
         dispatch(clearAuth());

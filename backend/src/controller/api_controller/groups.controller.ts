@@ -522,6 +522,73 @@ export const getAnnouncementGroupInfoController = async (req: Request, res: Resp
     }
 };
 
+// Controller: Get Announcement Group Members' Public Keys
+export const getAnnouncementGroupMembersKeysController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        if (!groupId) {
+            res.status(400).json({ status: false, message: 'Group ID is required.' });
+            return;
+        }
+
+        if (!Types.ObjectId.isValid(groupId)) {
+            res.status(400).json({ status: false, message: 'Invalid group ID format.' });
+            return;
+        }
+
+        // 1. Check if user is a member
+        const membership = await AnnouncementGroupMembershipModel.findOne({ group: groupId, member: userId });
+        if (!membership) {
+            res.status(403).json({ status: false, message: 'You are not a member of this announcement group.' });
+            return;
+        }
+
+        // 2. Get all members with their public keys
+        const membersKeysFromDb = await AnnouncementGroupMembershipModel.aggregate([
+            { $match: { group: new Types.ObjectId(groupId) } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'member',
+                    foreignField: '_id',
+                    as: 'userDetails'
+                }
+            },
+            { $unwind: '$userDetails' },
+            {
+                $project: {
+                    _id: 0,
+                    user_id: '$userDetails._id',
+                    publicKey: '$userDetails.public_key'
+                }
+            }
+        ]);
+
+        // Decrypt each public key
+        const membersKeys = membersKeysFromDb.map(member => ({
+            user_id: member.user_id,
+            publicKey: decryptAES(member.publicKey, internalAesKey)
+        }));
+
+        res.status(200).json({
+            status: true,
+            message: 'Announcement group members keys fetched successfully.',
+            data: membersKeys
+        });
+
+    } catch (error) {
+        console.error('Error in getAnnouncementGroupMembersKeysController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};
+
 // Controller: Update Chat Group Details
 export const updateChatGroupController = async (req: Request, res: Response): Promise<void> => {
     try {

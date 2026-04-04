@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getChatGroupMembersKeysController, getAnnouncementGroupInfoController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isUserAdminOfAnnouncementGroupController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getChatGroupMembersKeysController, getAnnouncementGroupInfoController, getAnnouncementGroupMembersKeysController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isUserAdminOfAnnouncementGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -41,6 +41,12 @@ router.get('/chat/members-keys/:groupId',
 router.get('/announcement/info/:groupId',
     authMiddleware,
     getAnnouncementGroupInfoController
+);
+
+// Get announcement group members' public keys
+router.get('/announcement/members-keys/:groupId',
+    authMiddleware,
+    getAnnouncementGroupMembersKeysController
 );
 
 // Check if user is admin of an announcement group

@@ -17,6 +17,7 @@ import { decryptWithStoredKey } from '../services/cryptoService';
 import { decryptAES } from '../encryption/AES_utils';
 import { addChatMessage, addGroupMessage, addAnnouncementMessage } from '../database/messages.db';
 import { v4 as uuidv4 } from 'uuid';
+import { getData } from '../api/requests';
 
 const Chat = () => {
   const theme = useSelector((state: RootState) => state.theme.theme);
@@ -28,12 +29,6 @@ const Chat = () => {
   const { userId } = useSelector((state: RootState) => state.auth);
   const { status: userStatus } = useSelector((state: RootState) => state.user);
 
-  useEffect(() => {
-    if (userStatus !== 'loading' && !userId) {
-      navigate('/');
-    }
-  }, [userId, userStatus, navigate]);
-  
   useEffect(() => {
     connectSocket();
 
@@ -51,73 +46,102 @@ const Chat = () => {
     }
   }, [chatTypeFromUrl, idFromUrl, dispatch, navigate]);
 
+  const processAndStoreMessage = async (data: { sender: string; message: string; groupId?: string }) => {
+    if (!userId) return;
+
+    try {
+      const { sender, message, groupId } = data;
+      
+      const parsedMessage = JSON.parse(message);
+      const { 
+        message: encryptedContent, 
+        encryptedAesKey, 
+        senderName, 
+        timestamp, 
+        type: messageType 
+      } = parsedMessage;
+
+      const aesKey = await decryptWithStoredKey(userId, encryptedAesKey);
+      const decryptedContent = decryptAES(encryptedContent, aesKey);
+      const messageId = uuidv4();
+
+      const baseMessage = {
+        id: messageId,
+        senderId: sender,
+        content: decryptedContent,
+        readStatus: false,
+        timestamp: timestamp || Date.now(),
+      };
+
+      if (messageType === 'group') {
+        await addGroupMessage(userId, {
+          ...baseMessage,
+          senderName: senderName || 'Unknown User',
+          groupId: groupId!,
+        });
+      } else if (messageType === 'announcement') {
+        await addAnnouncementMessage(userId, {
+          ...baseMessage,
+          senderName: senderName || 'Unknown User',
+          groupId: groupId!,
+        });
+      } else { // 'chat'
+        await addChatMessage(userId, sender, baseMessage);
+      }
+    } catch (error) {
+      console.error('Failed to process incoming message:', error);
+    }
+  };
+
   useEffect(() => {
     if (!userId) return;
 
-    const handleNewMessage = async (data: { sender: string; message: string; groupId?: string }) => {
-      try {
-        const { sender, message, groupId } = data;
-        
-        // The message from the socket is a JSON string, parse it first
-        const parsedMessage = JSON.parse(message);
-        const { message: encryptedContent, encryptedAesKey, senderName, timestamp } = parsedMessage;
+    // Listen for live messages
+    socket.on('new_message', async (data) => {
+      await processAndStoreMessage(data);
+      dispatch(triggerUpdate()); // Update UI for each live message
+    });
 
-        // 1. Decrypt the AES key with user's private RSA key
-        const aesKey = await decryptWithStoredKey(userId, encryptedAesKey);
-
-        // 2. Decrypt the message content with the AES key
-        const decryptedContent = decryptAES(encryptedContent, aesKey);
-
-        const messageId = uuidv4();
-
-        // 3. Store the message in the appropriate database
-        if (groupId) {
-          // It's a group or announcement message
-          const groupMessage = {
-            id: messageId,
-            senderId: sender,
-            senderName: senderName || 'Unknown User', // Use senderName from payload if available
-            content: decryptedContent,
-            readStatus: false,
-            timestamp: timestamp || Date.now(),
-            groupId: groupId,
-          };
-          
-          // We need to know if it's an announcement or a regular group.
-          // We can check the currently selected chat type if the incoming message is for the active chat.
-          // For inactive chats, this logic might need to be more robust, but for now, we'll rely on current state.
-          // A better approach in the future might be to include the type in the socket payload.
-          if (chatId === groupId && chatType === 'announcement') {
-            await addAnnouncementMessage(userId, groupMessage);
-          } else {
-            await addGroupMessage(userId, groupMessage);
-          }
-
-        } else {
-          // It's a direct chat message
-          await addChatMessage(userId, sender, {
-            id: messageId,
-            senderId: sender,
-            content: decryptedContent,
-            readStatus: false,
-            timestamp: timestamp || Date.now(),
-          });
+    // Fetch offline messages once
+    const fetchOfflineMessages = async () => {
+        try {
+            const res = await getData('/messages/offline');
+            if (res.status && res.data.length > 0) {
+                console.log(`Processing ${res.data.length} offline messages.`);
+                
+                const processingPromises = res.data.map((msg: any) => 
+                    processAndStoreMessage({
+                        sender: msg.sender,
+                        message: JSON.stringify({
+                            message: msg.message,
+                            encryptedAesKey: msg.aes_key,
+                            senderName: msg.senderName,
+                            timestamp: msg.timestamp,
+                            type: msg.messageType, // Use messageType from the DB
+                        }),
+                        groupId: msg.groupId,
+                    })
+                );
+                
+                await Promise.all(processingPromises);
+                
+                // Trigger a single UI update after all offline messages are processed
+                dispatch(triggerUpdate());
+            }
+        } catch (error) {
+            console.error('Failed to fetch or process offline messages:', error);
         }
-
-        // 4. Dispatch an action to notify the UI to update
-        dispatch(triggerUpdate());
-
-      } catch (error) {
-        console.error('Failed to process incoming message:', error);
-      }
     };
 
-    socket.on('new_message', handleNewMessage);
+    // Use a small timeout to ensure socket connection is established
+    const timer = setTimeout(fetchOfflineMessages, 1500);
 
     return () => {
-      socket.off('new_message', handleNewMessage);
+      socket.off('new_message');
+      clearTimeout(timer);
     };
-  }, [userId, dispatch, chatType, chatId]);
+  }, [userId, dispatch]); // Removed chatType and chatId as they caused re-subscriptions and issues with the new robust logic
+
 
 
   const leftPanelColor = theme === 'dark' ? '#1f2937' : '#FFC362';

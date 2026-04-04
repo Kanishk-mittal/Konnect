@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import PersistentLogin from './components/PersistentLogin'
 
 import Landing from './pages/Landing'
 import AdminLogin from './pages/AdminLogin'
@@ -23,7 +24,7 @@ import Chat from './pages/Chat'
 import ProtectedRoute from './components/ProtectedRoute'
 const App = () => {
   return (
-    <>
+    <PersistentLogin>
       <Routes>
         <Route path="/"
           element={<Landing />}
@@ -35,10 +36,17 @@ const App = () => {
           element={<StudentLogin />}
         />
         <Route path="/chat"
-          element={<Chat />}
+          element={
+            <ProtectedRoute allowedUserTypes={['admin', 'club', 'student']}>
+              <Chat />
+            </ProtectedRoute>
+          }
         />
         <Route path="/chat/:chatType/:id"
-          element={<Chat />}
+          element={
+            <ProtectedRoute allowedUserTypes={['admin', 'club', 'student']}>
+              <Chat />
+            </ProtectedRoute>}
         />
         <Route path="/club/login"
           element={<ClubLogin />}
@@ -156,7 +164,7 @@ const App = () => {
         />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </PersistentLogin>
   )
 }
 

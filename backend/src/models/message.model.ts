@@ -6,19 +6,22 @@ export interface IMessage extends Document {
   sender: Types.ObjectId;
   receiver: Types.ObjectId;
   isGroupMessage: boolean;
-  groupId?: Types.ObjectId; // Optional, only for group messages
-  isAnnouncement?: boolean; // Optional, only for announcements
-  announcementId?: Types.ObjectId; // Optional, only for announcements
+  groupId?: Types.ObjectId;
+  timestamp: number;
+  senderName?: string;
+  messageType: 'chat' | 'group' | 'announcement';
 }
 
 const messageSchema = new Schema<IMessage>({
   message: { type: String, required: true },
   aes_key: { type: String, required: true },
   sender: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
-  receiver: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
-  isGroupMessage: { type: Boolean, required: true },
-  groupId: { type: Schema.Types.ObjectId, ref: 'ChatGroup' }, // Only set if isGroupMessage is true
-  announcementId: { type: Schema.Types.ObjectId, ref: 'Announcement' }, // Only set if isAnnouncement is true
+  receiver: { type: Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+  isGroupMessage: { type: Boolean, required: true, default: false },
+  groupId: { type: Schema.Types.ObjectId, ref: 'ChatGroup' },
+  timestamp: { type: Number, required: true, index: true },
+  senderName: { type: String },
+  messageType: { type: String, enum: ['chat', 'group', 'announcement'], required: true },
 }, { timestamps: true });
 
 export default model<IMessage>('Message', messageSchema);

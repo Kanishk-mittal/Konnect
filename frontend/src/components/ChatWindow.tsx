@@ -162,11 +162,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
             const messageId = timestamp.toString();
             const originalMessage = newMessage;
             const newMsg: Message = { id: messageId, text: originalMessage, sender: 'me', senderName: 'Me', timestamp };
-            
+
             try {
                 if (type === 'chat') {
                     let publicKey = await getPublicKey(userId, chatId);
-                    
+
                     if (!publicKey) {
                         const res = await getData(`/user/public-key/${chatId}`);
                         if (res.status && res.data.publicKey) {
@@ -184,7 +184,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                     const payload = JSON.stringify({
                         message: encryptedMessage,
                         encryptedAesKey: encryptedAesKey,
-                        timestamp: timestamp
+                        timestamp: timestamp,
+                        type: 'chat'
                     });
 
                     socket.emit('private_message', {
@@ -200,10 +201,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                         timestamp: timestamp
                     });
 
-                } else if (type === 'group') {
-                    const res = await getData(`/groups/chat/members-keys/${chatId}`);
+                } else if (type === 'group' || type === 'announcement') {
+                    const membersEndpoint = type === 'group' 
+                        ? `/groups/chat/members-keys/${chatId}` 
+                        : `/groups/announcement/members-keys/${chatId}`;
+
+                    const res = await getData(membersEndpoint);
                     if (!res.status || !res.data) {
-                        throw new Error("Failed to fetch group members' public keys.");
+                        throw new Error(`Failed to fetch ${type} members' public keys.`);
                     }
 
                     const membersKeys: { user_id: string, publicKey: string }[] = res.data;
@@ -213,13 +218,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                     membersKeys.forEach(member => {
                         if (member.user_id !== userId) {
                             const encryptedAesKeyForMember = encryptRSA(aesKey, member.publicKey);
-                            
+
                             const payload = JSON.stringify({
                                 message: encryptedMessage,
                                 encryptedAesKey: encryptedAesKeyForMember,
                                 groupId: chatId,
                                 senderName: username,
-                                timestamp: timestamp
+                                timestamp: timestamp,
+                                type: type
                             });
 
                             socket.emit('private_message', {
@@ -230,31 +236,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                         }
                     });
 
-                    await addGroupMessage(userId, {
-                        id: messageId,
-                        senderId: userId,
-                        senderName: username,
-                        content: originalMessage,
-                        readStatus: true,
-                        timestamp: timestamp,
-                        groupId: chatId
-                    });
-
-                } else if (type === 'announcement') {
-                    // TODO: Implement announcement group sending logic later
-                    console.log("Announcement sending is not yet implemented");
-                    
-                    await addAnnouncementMessage(userId, {
-                        id: messageId,
-                        senderId: userId,
-                        senderName: username,
-                        content: originalMessage,
-                        readStatus: true,
-                        timestamp: timestamp,
-                        groupId: chatId
-                    });
+                    if (type === 'group') {
+                        await addGroupMessage(userId, {
+                            id: messageId,
+                            senderId: userId,
+                            senderName: username,
+                            content: originalMessage,
+                            readStatus: true,
+                            timestamp: timestamp,
+                            groupId: chatId
+                        });
+                    } else { // announcement
+                        await addAnnouncementMessage(userId, {
+                            id: messageId,
+                            senderId: userId,
+                            senderName: username,
+                            content: originalMessage,
+                            readStatus: true,
+                            timestamp: timestamp,
+                            groupId: chatId
+                        });
+                    }
                 }
-                
+
                 setMessages(prev => [...prev, newMsg]);
                 setNewMessage('');
                 dispatch(triggerUpdate());

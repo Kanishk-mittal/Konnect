@@ -111,7 +111,10 @@ export class SocketHandler {
                                 sender: senderId,
                                 receiver: receiver,
                                 isGroupMessage: !!groupId,
-                                groupId: groupId ? groupId : undefined
+                                groupId: groupId ? groupId : undefined,
+                                timestamp: parsedData.timestamp || Date.now(),
+                                senderName: parsedData.senderName,
+                                messageType: parsedData.type
                             });
                             await newMessage.save();
                             // TODO: Remove before pushing to GitHub
