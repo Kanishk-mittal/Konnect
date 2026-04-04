@@ -25,7 +25,7 @@ async function importRsaPrivateKey(pem: string): Promise<CryptoKey> {
     binaryDerBuffer.buffer,
     {
       name: 'RSA-OAEP', // Match backend encryption algorithm
-      hash: 'SHA-256',
+      hash: 'SHA-1',
     },
     false, // Make the key non-extractable for security
     ['decrypt'] // Specify key usages

@@ -17,13 +17,20 @@ interface Message {
     id: string | number;
     text: string;
     sender: 'me' | 'other';
-    senderName?: string; 
+    senderName?: string;
+    timestamp?: number;
 }
 
 interface ChatWindowProps {
     chatId: string;
     type: ChatType;
 }
+
+const formatTime = (timestamp: number | undefined) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
     const dispatch = useDispatch();
@@ -37,6 +44,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [isUserAdmin, setIsUserAdmin] = useState<boolean>(false);
+
+    const messagesEndRef = useRef<null | HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    const lastUpdated = useSelector((state: RootState) => state.chat.lastUpdated);
 
     useEffect(() => {
         const fetchChatDetails = async () => {
@@ -118,11 +137,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                     dbMessages = await getAnnouncementMessages(userId, chatId);
                 }
 
+                dbMessages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
                 const formattedMessages: Message[] = dbMessages.map((m) => ({
                     id: m.id,
                     text: m.content,
                     sender: m.senderId === userId ? 'me' : 'other',
-                    senderName: m.senderId === userId ? 'Me' : (type === 'chat' ? chatName : (m.senderName || 'User'))
+                    senderName: m.senderId === userId ? 'Me' : (type === 'chat' ? chatName : (m.senderName || 'User')),
+                    timestamp: m.timestamp
                 }));
                 setMessages(formattedMessages);
             } catch (err) {
@@ -131,18 +153,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
         };
 
         fetchMessages();
-    }, [chatId, type, userId, chatName]);
+    }, [chatId, type, userId, chatName, lastUpdated]);
 
 
     const handleSendMessage = async () => {
         if (newMessage.trim() && userId) {
-            const messageId = Date.now().toString();
+            const timestamp = Date.now();
+            const messageId = timestamp.toString();
             const originalMessage = newMessage;
-            const newMsg: Message = { id: messageId, text: originalMessage, sender: 'me', senderName: 'Me' };
+            const newMsg: Message = { id: messageId, text: originalMessage, sender: 'me', senderName: 'Me', timestamp };
             
             try {
                 if (type === 'chat') {
-                    // 1. Get receiver's public key
                     let publicKey = await getPublicKey(userId, chatId);
                     
                     if (!publicKey) {
@@ -155,19 +177,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                         }
                     }
 
-                    // 2. Generate random AES key
                     const aesKey = generateAESKey();
-
-                    // 3. Encrypt message with AES
                     const encryptedMessage = encryptAES(originalMessage, aesKey);
-
-                    // 4. Encrypt AES key with receiver's RSA public key
                     const encryptedAesKey = encryptRSA(aesKey, publicKey!);
 
-                    // 5. Send via socket
                     const payload = JSON.stringify({
                         message: encryptedMessage,
-                        encryptedAesKey: encryptedAesKey
+                        encryptedAesKey: encryptedAesKey,
+                        timestamp: timestamp
                     });
 
                     socket.emit('private_message', {
@@ -175,31 +192,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                         message: payload
                     });
 
-                    // 6. Save to local DB (encrypted content is handled by addChatMessage)
                     await addChatMessage(userId, chatId, {
                         id: messageId,
                         senderId: userId,
                         content: originalMessage,
                         readStatus: true,
-                        timestamp: Date.now()
+                        timestamp: timestamp
                     });
 
                 } else if (type === 'group') {
-                    // 1. Get all group members' public keys
                     const res = await getData(`/groups/chat/members-keys/${chatId}`);
                     if (!res.status || !res.data) {
                         throw new Error("Failed to fetch group members' public keys.");
                     }
 
                     const membersKeys: { user_id: string, publicKey: string }[] = res.data;
-
-                    // 2. Generate ONE random AES key for this message
                     const aesKey = generateAESKey();
-
-                    // 3. Encrypt message with AES once
                     const encryptedMessage = encryptAES(originalMessage, aesKey);
 
-                    // 4. For each member (except self), encrypt AES key and send
                     membersKeys.forEach(member => {
                         if (member.user_id !== userId) {
                             const encryptedAesKeyForMember = encryptRSA(aesKey, member.publicKey);
@@ -207,7 +217,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                             const payload = JSON.stringify({
                                 message: encryptedMessage,
                                 encryptedAesKey: encryptedAesKeyForMember,
-                                groupId: chatId
+                                groupId: chatId,
+                                senderName: username,
+                                timestamp: timestamp
                             });
 
                             socket.emit('private_message', {
@@ -218,14 +230,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                         }
                     });
 
-                    // 5. Save to local DB
                     await addGroupMessage(userId, {
                         id: messageId,
                         senderId: userId,
                         senderName: username,
                         content: originalMessage,
                         readStatus: true,
-                        timestamp: Date.now(),
+                        timestamp: timestamp,
                         groupId: chatId
                     });
 
@@ -239,7 +250,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                         senderName: username,
                         content: originalMessage,
                         readStatus: true,
-                        timestamp: Date.now(),
+                        timestamp: timestamp,
                         groupId: chatId
                     });
                 }
@@ -295,10 +306,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                                     <p className="text-xs font-bold mb-1">{msg.senderName}</p>
                                 )}
                                 <p>{msg.text}</p>
+                                <p className={`text-xs mt-1 ${isSent ? 'text-gray-800' : 'text-gray-300'} opacity-75`}>
+                                    {formatTime(msg.timestamp)}
+                                </p>
                             </div>
                         </div>
                     );
                 })}
+                <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input */}
