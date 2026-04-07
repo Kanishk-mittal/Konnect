@@ -48,6 +48,13 @@ const App = () => {
               <Chat />
             </ProtectedRoute>}
         />
+        <Route path="/edit-group"
+          element={
+            <ProtectedRoute allowedUserTypes={['admin', 'club', 'student']}>
+              <EditGroupPage redirectUrl="/chat" />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/club/login"
           element={<ClubLogin />}
         />

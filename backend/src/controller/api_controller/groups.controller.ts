@@ -942,7 +942,7 @@ export const getMemberAnnouncementGroupsController = async (req: Request, res: R
 };
 
 // Controller: Check if user is admin of an Announcement Group
-export const isUserAdminOfAnnouncementGroupController = async (req: Request, res: Response): Promise<void> => {
+export const isGroupAdminAnnouncementController = async (req: Request, res: Response): Promise<void> => {
     try {
         const { groupId } = req.params;
         const userId = req.user?.id;

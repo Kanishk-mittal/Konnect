@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getChatGroupMembersKeysController, getAnnouncementGroupInfoController, getAnnouncementGroupMembersKeysController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isUserAdminOfAnnouncementGroupController } from '../controller/api_controller/groups.controller';
+import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getChatGroupMembersKeysController, getAnnouncementGroupInfoController, getAnnouncementGroupMembersKeysController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isGroupAdminAnnouncementController, isUserAdminOfChatGroupController } from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -52,7 +52,7 @@ router.get('/announcement/members-keys/:groupId',
 // Check if user is admin of an announcement group
 router.get('/announcement/is-admin/:groupId',
     authMiddleware,
-    isUserAdminOfAnnouncementGroupController
+    isGroupAdminAnnouncementController
 );
 
 // Check if user is admin of a chat group

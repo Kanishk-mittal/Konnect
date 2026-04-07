@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { triggerUpdate } from '../store/chatSlice';
 import type { RootState } from '../store/store';
 import ProfileIcon from '../assets/profile_icon.png';
 import SendIcon from '../assets/send.png';
+import EditIcon from '../assets/edit.png';
 import { getData } from '../api/requests';
 import { getChatMessages, getGroupMessages, getAnnouncementMessages, addChatMessage, addGroupMessage, addAnnouncementMessage } from '../database/messages.db';
 import { getPublicKey, setPublicKey } from '../database/userList.db';
@@ -34,6 +36,7 @@ const formatTime = (timestamp: number | undefined) => {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const userId = useSelector((state: RootState) => state.auth.userId);
     const username = useSelector((state: RootState) => state.user.profile?.username || 'Me');
     const [messages, setMessages] = useState<Message[]>([]);
@@ -86,12 +89,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                     }
 
                 } else if (type === 'group') {
-                    const res = await getData(`/groups/chat/info/${chatId}`);
-                    if (res.status && res.data) {
-                        name = res.data.name;
-                        icon = res.data.icon;
+                    const infoPromise = getData(`/groups/chat/info/${chatId}`);
+                    const adminStatusPromise = getData(`/groups/chat/is-admin/${chatId}`);
+                    const [infoRes, adminStatusRes] = await Promise.all([infoPromise, adminStatusPromise]);
+
+                    if (infoRes.status && infoRes.data) {
+                        name = infoRes.data.name;
+                        icon = infoRes.data.icon;
                     } else {
-                        throw new Error(res.message || 'Failed to fetch group details');
+                        throw new Error(infoRes.message || 'Failed to fetch group details');
+                    }
+                    if (adminStatusRes.status && adminStatusRes.data) {
+                        setIsUserAdmin(adminStatusRes.data.isAdmin);
                     }
                 } else if (type === 'announcement') {
                     const infoPromise = getData(`/groups/announcement/info/${chatId}`);
@@ -277,6 +286,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
         );
     }
 
+    const handleEditClick = () => {
+        if (type === 'chat') return;
+        const queryParam = type === 'group' ? 'chatGroupId' : 'announcementGroupId';
+        navigate(`/edit-group?${queryParam}=${chatId}`);
+    };
+
     const canSendMessage = type === 'chat' || type === 'group' || (type === 'announcement' && isUserAdmin);
 
     return (
@@ -288,9 +303,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, type }) => {
                 ) : (
                     <img src={chatIcon || ProfileIcon} alt="Profile" className="w-10 h-10 rounded-full mr-4" />
                 )}
-                <h2 className="text-xl font-bold text-gray-800 dark:text-white">
-                    {loading ? 'Loading...' : error || chatName}
-                </h2>
+                <div className="flex-grow">
+                    <h2 
+                        className={`text-xl font-bold text-gray-800 dark:text-white ${isUserAdmin && (type === 'group' || type === 'announcement') ? 'cursor-pointer hover:underline' : ''}`}
+                        onClick={isUserAdmin ? handleEditClick : undefined}
+                    >
+                        {loading ? 'Loading...' : error || chatName}
+                    </h2>
+                </div>
             </div>
 
             {/* Messages Area */}
