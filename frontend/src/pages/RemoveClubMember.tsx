@@ -183,7 +183,7 @@ const RemoveClubMember = () => {
     return (
         <div className="flex flex-col" style={{ background: backgroundGradient, minHeight: '100vh' }}>
             <div style={headerBackground}>
-                <Header editProfileUrl="/club/edit-profile" />
+                <Header />
             </div>
             <div className="flex-grow flex flex-col p-6 pb-12">
                 <div className="flex items-center justify-between mb-6">
@@ -229,10 +229,10 @@ const RemoveClubMember = () => {
                             onDrop={handleDrop}
                             onClick={() => fileInputRef.current?.click()}
                             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${isDragOver
-                                    ? 'border-blue-500 bg-blue-500/10'
-                                    : theme === 'dark'
-                                        ? 'border-gray-500 hover:border-gray-400'
-                                        : 'border-gray-400 hover:border-gray-600'
+                                ? 'border-blue-500 bg-blue-500/10'
+                                : theme === 'dark'
+                                    ? 'border-gray-500 hover:border-gray-400'
+                                    : 'border-gray-400 hover:border-gray-600'
                                 }`}
                         >
                             <input
@@ -269,10 +269,10 @@ const RemoveClubMember = () => {
                             onClick={handleCsvSubmit}
                             disabled={files.length === 0}
                             className={`mt-4 w-full py-2 px-4 rounded-lg font-semibold transition-colors ${files.length === 0
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : theme === 'dark'
-                                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : theme === 'dark'
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white'
                                 }`}
                         >
                             Process CSV and Load Members
@@ -298,8 +298,8 @@ const RemoveClubMember = () => {
                                 onClick={handleSubmit}
                                 disabled={isLoading}
                                 className={`px-8 py-3 rounded-lg font-semibold text-white transition-colors ${isLoading
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-red-600 hover:bg-red-700'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-red-600 hover:bg-red-700'
                                     }`}
                             >
                                 {isLoading ? 'Removing Members...' : `Remove ${members.length} Member(s)`}

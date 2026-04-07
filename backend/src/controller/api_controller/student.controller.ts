@@ -616,11 +616,6 @@ export const bulkStudentRegistration = async (req: Request, res: Response): Prom
     }
 };
 
-
-export const blockStudent = async (req: Request, res: Response): Promise<void> => {
-
-}
-
 /**
  * Delete a student by ID - Can only be accessed by an admin
  * @param req - Express request object with studentId in body
