@@ -3,15 +3,14 @@ import Logo from "../assets/Logo.png"
 import ProfileIcon from "../assets/profile_icon.png"
 import ThemeButton from "./ThemeButton"
 import EditProfileModal from "./EditProfileModal"
-import { postData, getData } from "../api/requests"
+import { postData, getData, logout } from "../api/requests"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import type { RootState, AppDispatch } from "../store/store"
 import { clearAuth } from "../store/authSlice"
-import { clearUser } from "../store/userSlice"
+import { clearUser, fetchUser } from "../store/userSlice"
 import { deletePrivateKey } from "../services/cryptoService"
-import { deleteUserDatabase } from "../database/main.db"
 
 
 const Header = () => {
@@ -57,15 +56,23 @@ const Header = () => {
     }
 
     const handleLogout = async () => {
-        if (userId) {
-          // Clear the securely stored private key from IndexedDB for security
-          await deletePrivateKey(userId);
+        try {
+            // Call backend logout to clear session/token
+            await logout();
+            
+            if (userId) {
+                // Clear the securely stored private key from IndexedDB for security
+                await deletePrivateKey(userId);
+            }
+        } catch (error) {
+            console.error("Logout process encountered an error:", error);
+        } finally {
+            // Clear Redux state for both auth and user
+            dispatch(clearAuth());
+            dispatch(clearUser());
+            // Navigate to home
+            navigate('/');
         }
-        // Clear Redux state for both auth and user
-        dispatch(clearAuth());
-        dispatch(clearUser());
-        // Navigate to home
-        navigate('/');
     }
 
     const userStatus = useSelector((state: RootState) => state.user.status);

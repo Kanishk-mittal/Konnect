@@ -1,14 +1,16 @@
 import { Request, Response } from 'express';
 import UserModel from '../../models/user.model';
+import DiscardedToken from '../../models/discardedToken.model';
 import { isCloudinaryConfigured, uploadAndCleanup } from '../../utils/cloudinary.utils';
 import { sendOTPEmail } from '../../utils/mailer.utils';
 import { OTP } from '../../utils/otp.utils';
 import { createHash, verifyHash } from '../../utils/encryption/hash.utils';
 import { validateChangePasswordData, validateLoginData } from '../../inputSchema/user.schema';
 import { updateCryptographicFields } from '../../services/user.services';
-import { setJwtCookie } from '../../utils/jwt/jwt.utils';
+import { setJwtCookie, getJwtSecret } from '../../utils/jwt/jwt.utils';
 import { decryptAES, generateAESKeyFromString } from '../../utils/encryption/aes.utils';
 import { internalAesKey } from '../../constants/keys';
+import jwt from 'jsonwebtoken';
 
 /**
  * Get profile picture for a specific user by their ID
@@ -727,10 +729,30 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 
 /**
  * Unified Logout Controller
- * Clears the auth token cookie
+ * Clears the auth token cookie and blacklists the token
  */
 export const logoutUser = async (req: Request, res: Response): Promise<void> => {
     try {
+        const token = req.cookies?.auth_token;
+
+        if (token) {
+            try {
+                const secret = getJwtSecret();
+                const decoded = jwt.verify(token, secret) as { exp: number };
+                
+                if (decoded && decoded.exp) {
+                    // Save to discarded tokens with the same expiration time
+                    await DiscardedToken.create({
+                        token: token,
+                        expiresAt: new Date(decoded.exp * 1000)
+                    });
+                }
+            } catch (err) {
+                // If token is invalid/expired, we don't need to blacklist it
+                console.warn('Logout: Token verification failed during blacklist attempt', err);
+            }
+        }
+
         res.clearCookie('auth_token', {
             httpOnly: true,
             sameSite: 'lax',

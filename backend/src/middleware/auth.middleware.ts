@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret, refreshJwt } from '../utils/jwt/jwt.utils';
+import DiscardedToken from '../models/discardedToken.model';
 
 // Extend Request interface to include user payload
 declare global {
@@ -22,11 +23,11 @@ declare global {
  * @param res Express response object
  * @param next Next function to continue middleware chain
  */
-export const authMiddleware = (
+export const authMiddleware = async (
     req: Request,
     res: Response,
     next: NextFunction
-): void => {
+): Promise<void> => {
     const cookieName = 'auth_token';
     const expiresIn = 30 * 24 * 60 * 60; // 1 month in seconds
 
@@ -37,6 +38,16 @@ export const authMiddleware = (
             res.status(401).json({
                 status: false,
                 message: 'Access denied. No token provided.'
+            });
+            return;
+        }
+
+        // Check if token is blacklisted
+        const isBlacklisted = await DiscardedToken.findOne({ token });
+        if (isBlacklisted) {
+            res.status(401).json({
+                status: false,
+                message: 'Access denied. Token is no longer valid.'
             });
             return;
         }

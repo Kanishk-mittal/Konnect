@@ -86,7 +86,6 @@ src/
 ├── app.ts              # Express app configuration
 ├── index.ts            # Application entry point
 ├── middleware/         # Custom middleware
-│   └── errorHandler.ts # Error handling middleware
 └── routes/             # Route definitions
     └── api.ts          # API routes
 ```
