@@ -108,12 +108,14 @@ response :-
                 "user_id": "65cad...",
                 "id": "21001",
                 "username": "john_doe",
+                "profile_picture": "http://cloudinary.com/...",
                 "isAdmin": true
             },
             {
                 "user_id": "65cad...",
                 "id": "21003",
                 "username": "jane_doe",
+                "profile_picture": null,
                 "isAdmin": false
             }
         ]
@@ -140,12 +142,14 @@ response :-
                 "user_id": "65cad...",
                 "id": "21001",
                 "username": "john_doe",
+                "profile_picture": "http://cloudinary.com/...",
                 "isAdmin": true
             },
             {
                 "user_id": "65cad...",
                 "id": "21004",
                 "username": "test_user",
+                "profile_picture": null,
                 "isAdmin": false
             }
         ]
@@ -355,5 +359,31 @@ response :-
         "id": "65cad...",
         "type": "announcement"
     }
+}
+```
+
+### 14. /chat/leave/:groupId
+Method :- `POST`
+Description :- Removes the currently authenticated user from a chat group.
+Note :- Requires `auth_token` cookie.
+controller :- `leaveChatGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "You have left the chat group successfully."
+}
+```
+
+### 15. /announcement/leave/:groupId
+Method :- `POST`
+Description :- Removes the currently authenticated user from an announcement group.
+Note :- Requires `auth_token` cookie.
+controller :- `leaveAnnouncementGroupController`
+response :-
+```json
+{
+    "status": true,
+    "message": "You have left the announcement group successfully."
 }
 ```

@@ -82,6 +82,14 @@ const Header = () => {
                     <Title style="text-3xl md:text-4xl font-bold ml-4" />
                 </div>
                 <div className="flex items-center gap-4">
+                    {isAuthenticated && (userType === 'admin' || userType === 'club') && (
+                        <button
+                            onClick={() => navigate(userType === 'admin' ? '/admin/dashboard' : '/club/dashboard')}
+                            className="px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium text-sm"
+                        >
+                            Dashboard
+                        </button>
+                    )}
                     {isAuthenticated && (
                         <div className="relative">
                             <div

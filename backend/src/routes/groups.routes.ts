@@ -1,5 +1,22 @@
 import { Router } from 'express';
-import { createGroupController, getUserGroupsController, deleteChatGroupController, deleteAnnouncementGroupController, getChatGroupInfoController, getChatGroupMembersKeysController, getAnnouncementGroupInfoController, getAnnouncementGroupMembersKeysController, updateChatGroupController, updateAnnouncementGroupController, getMemberChatGroupsController, getMemberAnnouncementGroupsController, isGroupAdminAnnouncementController, isUserAdminOfChatGroupController } from '../controller/api_controller/groups.controller';
+import { 
+    createGroupController, 
+    getUserGroupsController, 
+    deleteChatGroupController, 
+    deleteAnnouncementGroupController, 
+    getChatGroupInfoController, 
+    getChatGroupMembersKeysController, 
+    getAnnouncementGroupInfoController, 
+    getAnnouncementGroupMembersKeysController, 
+    updateChatGroupController, 
+    updateAnnouncementGroupController, 
+    getMemberChatGroupsController, 
+    getMemberAnnouncementGroupsController, 
+    isGroupAdminAnnouncementController, 
+    isUserAdminOfChatGroupController,
+    leaveChatGroupController,
+    leaveAnnouncementGroupController
+} from '../controller/api_controller/groups.controller';
 import { decryptRequest } from '../middleware/encryption.middleware';
 import { resolvePublicKey, encryptResponse } from '../middleware/responseEncryption.middleware';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth.middleware';
@@ -59,6 +76,18 @@ router.get('/announcement/is-admin/:groupId',
 router.get('/chat/is-admin/:groupId',
     authMiddleware,
     isUserAdminOfChatGroupController
+);
+
+// Leave a chat group
+router.post('/chat/leave/:groupId',
+    authMiddleware,
+    leaveChatGroupController
+);
+
+// Leave an announcement group
+router.post('/announcement/leave/:groupId',
+    authMiddleware,
+    leaveAnnouncementGroupController
 );
 
 // Update a chat group - only group admin members can update

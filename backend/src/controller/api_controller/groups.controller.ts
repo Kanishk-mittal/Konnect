@@ -352,6 +352,7 @@ export const getChatGroupInfoController = async (req: Request, res: Response): P
                     user_id: '$userDetails._id',
                     id: '$userDetails.id',
                     username: '$userDetails.username',
+                    profile_picture: '$userDetails.profile_picture',
                     isAdmin: '$isAdmin'
                 }
             }
@@ -497,6 +498,7 @@ export const getAnnouncementGroupInfoController = async (req: Request, res: Resp
                     user_id: '$userDetails._id',
                     id: '$userDetails.id',
                     username: '$userDetails.username',
+                    profile_picture: '$userDetails.profile_picture',
                     isAdmin: '$isAdmin'
                 }
             }
@@ -1009,6 +1011,74 @@ export const isUserAdminOfChatGroupController = async (req: Request, res: Respon
 
     } catch (error) {
         console.error('Error in isUserAdminOfChatGroupController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};
+
+// Controller: Leave a chat group
+export const leaveChatGroupController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        if (!groupId || !Types.ObjectId.isValid(groupId)) {
+            res.status(400).json({ status: false, message: 'Invalid group ID.' });
+            return;
+        }
+
+        const membership = await ChatGroupMembershipModel.findOne({ group: groupId, member: userId });
+        if (!membership) {
+            res.status(404).json({ status: false, message: 'You are not a member of this group.' });
+            return;
+        }
+
+        await ChatGroupMembershipModel.deleteOne({ _id: membership._id });
+
+        res.status(200).json({
+            status: true,
+            message: 'You have left the chat group successfully.'
+        });
+    } catch (error) {
+        console.error('Error in leaveChatGroupController:', error);
+        res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
+    }
+};
+
+// Controller: Leave an announcement group
+export const leaveAnnouncementGroupController = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            res.status(401).json({ status: false, message: 'User authentication required.' });
+            return;
+        }
+
+        if (!groupId || !Types.ObjectId.isValid(groupId)) {
+            res.status(400).json({ status: false, message: 'Invalid group ID.' });
+            return;
+        }
+
+        const membership = await AnnouncementGroupMembershipModel.findOne({ group: groupId, member: userId });
+        if (!membership) {
+            res.status(404).json({ status: false, message: 'You are not a member of this announcement group.' });
+            return;
+        }
+
+        await AnnouncementGroupMembershipModel.deleteOne({ _id: membership._id });
+
+        res.status(200).json({
+            status: true,
+            message: 'You have left the announcement group successfully.'
+        });
+    } catch (error) {
+        console.error('Error in leaveAnnouncementGroupController:', error);
         res.status(500).json({ status: false, message: 'An unexpected error occurred.' });
     }
 };
