@@ -30,7 +30,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [recoveryKey, setRecoveryKey] = useState('');
+    const [copied, setCopied] = useState(false);
+    const [confirmed, setConfirmed] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const recoveryKeyRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -186,6 +190,42 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
             setError(err.response?.data?.message || 'Failed to change password');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleGenerateRecoveryKey = async () => {
+        if (!currentPassword) {
+            setError('Please enter your current password to generate a recovery key');
+            return;
+        }
+
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const response = await postEncryptedData('/encryption/recovery-key', {
+                password: currentPassword
+            }, { expectEncryptedResponse: true });
+
+            if (response.status) {
+                setRecoveryKey(response.data.recoveryKey);
+                setConfirmed(false);
+                setSuccess('Recovery key generated successfully!');
+                setTimeout(() => setSuccess(''), 3000);
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Failed to generate recovery key');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleCopyRecoveryKey = () => {
+        if (recoveryKeyRef.current) {
+            recoveryKeyRef.current.select();
+            document.execCommand('copy');
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
         }
     };
 
@@ -392,6 +432,73 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
                             </button>
                         )}
                     </div>
+                </div>
+
+                {/* ── Generate Recovery Key ───────────────────────────── */}
+                <div className="mb-6 border-t pt-6" style={{ borderColor }}>
+                    <h3 className="text-lg font-semibold mb-3">Recovery Options</h3>
+                    {!recoveryKey ? (
+                        <>
+                            <p className="text-sm opacity-70 mb-4">
+                                Generate a new recovery key. You'll need your current password.
+                                This key can be used to recover your account if you lose your password.
+                            </p>
+                            <button
+                                onClick={handleGenerateRecoveryKey}
+                                disabled={isLoading || !currentPassword}
+                                className="w-full py-2 rounded-lg font-medium text-white hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ backgroundColor: (isLoading || !currentPassword) ? '#666' : '#2196F3' }}
+                            >
+                                {isLoading ? 'Generating...' : 'Generate New Recovery Key'}
+                            </button>
+                        </>
+                    ) : (
+                        <div className="space-y-4 p-4 rounded-lg" style={{ backgroundColor: theme === 'dark' ? '#2a2a3e' : '#f0f0f0' }}>
+                            <p className="text-sm font-bold text-red-500">
+                                Important: Please save this recovery key in a secure location.
+                            </p>
+                            <div className="flex gap-2">
+                                <input
+                                    ref={recoveryKeyRef}
+                                    type="text"
+                                    readOnly
+                                    value={recoveryKey}
+                                    className="flex-1 px-4 py-2 rounded-lg border font-mono text-xs"
+                                    style={inputStyle}
+                                />
+                                <button
+                                    onClick={handleCopyRecoveryKey}
+                                    className="px-4 py-2 rounded-lg font-medium text-white bg-blue-500 hover:bg-blue-600 transition-colors"
+                                >
+                                    {copied ? 'Copied!' : 'Copy'}
+                                </button>
+                            </div>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={confirmed}
+                                    onChange={(e) => setConfirmed(e.target.checked)}
+                                    className="w-4 h-4"
+                                />
+                                <span>I have saved my recovery key in a secure location</span>
+                            </label>
+                            <button
+                                onClick={() => {
+                                    if (confirmed) {
+                                        setRecoveryKey('');
+                                        setConfirmed(false);
+                                    } else {
+                                        setError('Please confirm that you have saved the recovery key');
+                                        setTimeout(() => setError(''), 3000);
+                                    }
+                                }}
+                                className="w-full py-2 rounded-lg font-medium text-white transition-opacity"
+                                style={{ backgroundColor: confirmed ? '#4CAF50' : '#666' }}
+                            >
+                                Done
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

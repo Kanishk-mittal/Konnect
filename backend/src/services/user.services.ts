@@ -113,6 +113,49 @@ export const updateCryptographicFields = async (
     }
 };
 
+/**
+ * Regenerates the recovery key and recovery password for a user using their current password.
+ * 
+ * @param user - The user document
+ * @param password - The user's current password
+ */
+export const generateRecoveryKeyService = async (
+    user: UserDocument,
+    password: string
+): Promise<{ status: boolean; recoveryKey?: string; error?: string }> => {
+    try {
+        // 1. Create new recovery password (user's password encrypted with a new recovery RSA public key)
+        const [recoveryKey, recoveryPublicKey] = generateRSAKeyPair();
+        const recoveryPassword = encryptRSA(password, recoveryPublicKey);
+        const recoveryKeyHash = await createHash(recoveryKey);
+
+        const updateData = {
+            recovery_password: recoveryPassword,
+            recovery_key_hash: recoveryKeyHash,
+        };
+
+        // Save the updated fields to the database
+        const updatedUser = await UserModel.findByIdAndUpdate(user._id, updateData, { new: true });
+
+        if (!updatedUser) {
+            return {
+                status: false,
+                error: 'Failed to find user to update.'
+            };
+        }
+
+        return {
+            status: true,
+            recoveryKey
+        };
+    } catch (error) {
+        return {
+            status: false,
+            error: (error as Error).message
+        };
+    }
+};
+
 const createUserDocument = async (userData: userDataInput): Promise<{ userDoc: any, rawKeys: any }> => {
     const { docFields, rawKeys } = await createCryptographicFields(userData.password);
 
