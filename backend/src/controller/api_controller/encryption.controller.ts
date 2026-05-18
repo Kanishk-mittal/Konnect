@@ -4,7 +4,10 @@ import { encryptRSA } from '../../utils/encryption/rsa.utils';
 import { KeyManager } from '../../utils/encryption/key-manager.utils';
 import UserModel from '../../models/user.model';
 import { verifyHash } from '../../utils/encryption/hash.utils';
-import { generateRecoveryKeyService } from '../../services/user.services';
+import { generateRecoveryKeyService, recoverPasswordService } from '../../services/user.services';
+import { validateRecoveryPasswordData } from '../../inputSchema/user.schema';
+import { OTP } from '../../utils/otp.utils';
+import { sendOTPEmail as sendOTP } from "../../utils/mailer.utils";
 
 /**
  * Controller to handle AES external key encryption
@@ -153,3 +156,114 @@ export const generateRecoveryKey = async (req: Request, res: Response): Promise<
         });
     }
 };
+
+/**
+ * Controller to recover password using a recovery key and OTP.
+ */
+export const recoverPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const validation = validateRecoveryPasswordData(req.body);
+
+        if (!validation.status || !validation.data) {
+            res.status(400).json({
+                status: false,
+                message: validation.message
+            });
+            return;
+        }
+
+        const { id, collegeCode, recoveryKey, newPassword, otp } = validation.data;
+
+        // 1. Find the user
+        const user = await UserModel.findOne({ id, college_code: collegeCode });
+        if (!user) {
+            res.status(404).json({
+                status: false,
+                message: 'User not found.'
+            });
+            return;
+        }
+
+        // 2. Verify OTP
+        const isOTPValid = OTP.verifyOTP(user.email_id, otp);
+        if (!isOTPValid) {
+            res.status(401).json({
+                status: false,
+                message: 'Invalid or expired OTP.'
+            });
+            return;
+        }
+
+        // 3. Call the service to recover password
+        const result = await recoverPasswordService(user as any, recoveryKey, newPassword);
+
+        if (!result.status) {
+            res.status(500).json({
+                status: false,
+                message: result.error || 'Failed to recover password.'
+            });
+            return;
+        }
+
+        // 4. Return the new recovery key
+        res.status(200).json({
+            status: true,
+            message: 'Password recovered successfully. Please save your new recovery key.',
+            data: {
+                recoveryKey: result.recoveryKey
+            }
+        });
+
+    } catch (error) {
+        console.error('Error recovering password:', error);
+        res.status(500).json({
+            status: false,
+            message: 'An unexpected error occurred while recovering password.'
+        });
+    }
+};
+
+export const sendOTPEmail = async (req: Request, res: Response) => {
+    console.log('Received request to send OTP email with body:', req.body);
+    const id: string = req.body.id;
+    const collegeCode: string = req.body.collegeCode;
+
+    if (!id || !collegeCode) {
+        return res.status(400).json({
+            status: false,
+            message: 'userId is required'
+        });
+    }
+
+    try {
+        // 1. Find the user
+        const user = await UserModel.findOne({ "id": id, "college_code": collegeCode });
+        if (!user) {
+            return res.status(404).json({
+                status: false,
+                message: 'User not found.'
+            });
+        }
+        const email = user.email_id;
+
+        // 2. Generate OTP and store it with an expiration time
+        const result = await sendOTP(email, 'Password Recovery OTP');
+        if (result.status) {
+            return res.status(200).json({
+                status: true,
+                message: 'OTP sent successfully'
+            });
+        } else {
+            return res.status(500).json({
+                status: false,
+                message: 'Failed to send OTP'
+            });
+        }
+    } catch (error) {
+        console.error('Error sending OTP:', error);
+        return res.status(500).json({
+            status: false,
+            message: 'An error occurred while sending OTP'
+        });
+    }
+}

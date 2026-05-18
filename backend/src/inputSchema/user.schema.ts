@@ -32,6 +32,39 @@ export const validateChangePasswordData = (data: unknown): { status: boolean; me
 };
 
 /**
+ * Schema for password recovery using a recovery key
+ */
+export const recoveryPasswordSchema = z.object({
+    id: z.string().min(1, 'Login ID is required'),
+    collegeCode: z.string().min(1, 'College Code is required'),
+    newPassword: z.string()
+        .min(12, 'New password must be at least 12 characters long')
+        .regex(/[A-Z]/, 'New password must contain at least one uppercase letter')
+        .regex(/[a-z]/, 'New password must contain at least one lowercase letter')
+        .regex(/[0-9]/, 'New password must contain at least one number')
+        .regex(/[^A-Za-z0-9]/, 'New password must contain at least one special character'),
+    recoveryKey: z.string().min(1, 'Recovery key is required'),
+    otp: z.string().length(6, 'OTP must be exactly 6 characters')
+}).strict();
+
+/**
+ * Type inferred from the schema
+ */
+export type RecoveryPasswordData = z.infer<typeof recoveryPasswordSchema>;
+
+/**
+ * Utility function to validate password recovery data
+ */
+export const validateRecoveryPasswordData = (data: unknown): { status: boolean; message: string; data?: RecoveryPasswordData } => {
+    const result = recoveryPasswordSchema.safeParse(data);
+    if (!result.success) {
+        const errorMessage = result.error.issues[0]?.message || 'Invalid input.';
+        return { status: false, message: errorMessage };
+    }
+    return { status: true, message: 'Validation successful', data: result.data };
+};
+
+/**
  * Schema for user login
  */
 const loginSchema = z.object({

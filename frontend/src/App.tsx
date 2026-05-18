@@ -22,6 +22,7 @@ import NotFound from './pages/NotFound'
 import EditGroupPage from './pages/EditGroup'
 import Chat from './pages/Chat'
 import ProtectedRoute from './components/ProtectedRoute'
+import ForgotPassword from './pages/ForgotPassword'
 const App = () => {
   return (
     <PersistentLogin>
@@ -34,6 +35,9 @@ const App = () => {
         />
         <Route path="/student/login"
           element={<StudentLogin />}
+        />
+        <Route path="/forgot-password"
+          element={<ForgotPassword />}
         />
         <Route path="/chat"
           element={

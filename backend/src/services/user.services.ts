@@ -15,11 +15,20 @@ type cryptographicFields = {
     recoveryKeyHash: string;
 }
 
-import { createHash } from '../utils/encryption/hash.utils';
-import { encryptRSA, generateRSAKeyPair } from '../utils/encryption/rsa.utils';
+import { createHash, verifyHash } from '../utils/encryption/hash.utils';
+import { decryptRSA, encryptRSA, generateRSAKeyPair } from '../utils/encryption/rsa.utils';
 import { decryptAES, encryptAES, generateAESKeyFromString } from '../utils/encryption/aes.utils';
 import { internalAesKey } from '../constants/keys';
 import UserModel, { UserDocument } from '../models/user.model';
+
+/**
+ * Normalizes a recovery key by removing all newline characters.
+ * This ensures consistency between keys generated with newlines (PEM format)
+ * and keys submitted via single-line input fields.
+ */
+const normalizeRecoveryKey = (key: string): string => {
+    return key.replace(/[\r\n]+/g, '').trim();
+};
 
 const createCryptographicFields = async (password: string): Promise<{ docFields: any, rawKeys: { recoveryKey: string, privateKey: string } }> => {
     // Hash password
@@ -29,8 +38,9 @@ const createCryptographicFields = async (password: string): Promise<{ docFields:
     const [recoveryKey, recoveryPublicKey] = generateRSAKeyPair();
     const recoveryPassword = encryptRSA(password, recoveryPublicKey);
 
-    // Use await for the hash since it returns a Promise
-    const recoveryKeyHash = await createHash(recoveryKey);
+    // Normalize the recovery key before hashing to ensure consistency
+    const normalizedRecoveryKey = normalizeRecoveryKey(recoveryKey);
+    const recoveryKeyHash = await createHash(normalizedRecoveryKey);
 
     // Generate user's RSA key pair
     const [privateKey, publicKey] = generateRSAKeyPair();
@@ -52,6 +62,86 @@ const createCryptographicFields = async (password: string): Promise<{ docFields:
             privateKey,
         },
     };
+};
+
+/**
+ * Recovers a user's password using a recovery key.
+ * 
+ * @param user - The user document
+ * @param recoveryKey - The RSA private key provided by the user
+ * @param newPassword - The new password to be set
+ */
+export const recoverPasswordService = async (
+    user: UserDocument,
+    recoveryKey: string,
+    newPassword: string
+): Promise<{ status: boolean; recoveryKey?: string; error?: string }> => {
+    try {
+        // Normalize the provided recovery key to handle format inconsistencies
+        const normalizedInputKey = normalizeRecoveryKey(recoveryKey);
+
+        // 1. Verify the recovery key by hashing it and comparing with the stored hash
+        const isRecoveryKeyValid = await verifyHash(normalizedInputKey, user.recovery_key_hash);
+        if (!isRecoveryKeyValid) {
+            return {
+                status: false,
+                error: 'Invalid recovery key.'
+            };
+        }
+
+        // 2. Decrypt the recovery_password using the provided recoveryKey (RSA Private Key)
+        // recovery_password is the user's old password encrypted with the recovery public key
+        let oldPassword: string;
+        try {
+            oldPassword = decryptRSA(user.recovery_password, normalizedInputKey);
+        } catch (error) {
+            return {
+                status: false,
+                error: 'Failed to decrypt credentials with the provided recovery key. Ensure the recovery key is correct.'
+            };
+        }
+
+        // 3. Decrypt existing private key using the oldPassword
+        const decryptedPrivateKey = decryptAES(user.private_key, generateAESKeyFromString(oldPassword));
+
+        // 4. Update password and cryptographic fields
+        const passwordHash = await createHash(newPassword);
+
+        // 5. Create new recovery info
+        const [newRecoveryKey, newRecoveryPublicKey] = generateRSAKeyPair();
+        const newRecoveryPassword = encryptRSA(newPassword, newRecoveryPublicKey);
+        const newRecoveryKeyHash = await createHash(newRecoveryKey);
+
+        // 6. Re-encrypt the existing private key with the newPassword
+        const encryptedPrivateKey = encryptAES(decryptedPrivateKey, generateAESKeyFromString(newPassword));
+
+        const updateData = {
+            password_hash: passwordHash,
+            recovery_password: newRecoveryPassword,
+            private_key: encryptedPrivateKey,
+            recovery_key_hash: newRecoveryKeyHash,
+        };
+
+        // Save the updated fields to the database
+        const updatedUser = await UserModel.findByIdAndUpdate(user._id, updateData, { new: true });
+
+        if (!updatedUser) {
+            return {
+                status: false,
+                error: 'Failed to find user to update.'
+            };
+        }
+
+        return {
+            status: true,
+            recoveryKey: newRecoveryKey
+        };
+    } catch (error) {
+        return {
+            status: false,
+            error: (error as Error).message
+        };
+    }
 };
 
 /**
@@ -79,7 +169,10 @@ export const updateCryptographicFields = async (
         // 3. Create new recovery password (user's new password encrypted with a new recovery RSA public key)
         const [recoveryKey, recoveryPublicKey] = generateRSAKeyPair();
         const recoveryPassword = encryptRSA(newPassword, recoveryPublicKey);
-        const recoveryKeyHash = await createHash(recoveryKey);
+        
+        // Normalize the recovery key before hashing to ensure consistency
+        const normalizedRecoveryKey = normalizeRecoveryKey(recoveryKey);
+        const recoveryKeyHash = await createHash(normalizedRecoveryKey);
 
         // 4. Re-encrypt the existing private key with the newPassword
         const encryptedPrivateKey = encryptAES(decryptedPrivateKey, generateAESKeyFromString(newPassword));
@@ -127,7 +220,10 @@ export const generateRecoveryKeyService = async (
         // 1. Create new recovery password (user's password encrypted with a new recovery RSA public key)
         const [recoveryKey, recoveryPublicKey] = generateRSAKeyPair();
         const recoveryPassword = encryptRSA(password, recoveryPublicKey);
-        const recoveryKeyHash = await createHash(recoveryKey);
+        
+        // Normalize the recovery key before hashing to ensure consistency
+        const normalizedRecoveryKey = normalizeRecoveryKey(recoveryKey);
+        const recoveryKeyHash = await createHash(normalizedRecoveryKey);
 
         const updateData = {
             recovery_password: recoveryPassword,

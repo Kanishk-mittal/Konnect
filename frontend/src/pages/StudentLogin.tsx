@@ -1,7 +1,7 @@
 // React and Redux imports
 import { useSelector, useDispatch } from 'react-redux';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import type { RootState, AppDispatch } from '../store/store';
 
 // Components
@@ -145,6 +145,15 @@ const StudentLogin = () => {
                 label="Password"
                 type="password"
               />
+
+              <div className="flex justify-end mt-[-8px]">
+                <Link 
+                  to="/forgot-password" 
+                  className={`text-sm hover:underline ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+                >
+                  Forgot Password?
+                </Link>
+              </div>
 
               <div className='flex justify-center items-center'>
                 <button
